@@ -14,9 +14,19 @@ class Order extends Model
     // Izinkan pengisian massal untuk kolom ini
     protected $fillable = [
         'room_id',
+        'user_id',
         'total_price',
         'status',
     ];
+
+   /**
+     * [BARU] Mendapatkan user yang membuat pesanan online.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
 
     /**
      * Mendapatkan kamar yang memiliki pesanan ini.

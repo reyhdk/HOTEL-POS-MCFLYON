@@ -18,7 +18,7 @@ class MenuController extends Controller
     {
         $validatedData = $request->validate([
             'name' => 'required|string|max:255|unique:menus,name',
-            // 'category' => 'required|string|max:255', // Hapus jika tidak ada kolom category
+            'category' => 'required|string|max:255', // Hapus jika tidak ada kolom category
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
@@ -58,7 +58,7 @@ class MenuController extends Controller
             if ($menu->image) {
                 Storage::delete($menu->image);
             }
-            
+
             // [DIUBAH] Simpan path file, bukan URL lengkap
             $path = $request->file('image')->store('public/menus');
             $validatedData['image'] = $path;

@@ -67,8 +67,26 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function register(credentials: any) {
-    // ...
+  try {
+    // 1. Kirim data kredensial ke endpoint 'auth/register'
+    const { data } = await ApiService.post("auth/register", credentials);
+
+    // 2. Ambil data user dan token dari respons server
+    const newUser = data.data.user;
+    const token = data.data.token;
+
+    // 3. Simpan data user dan token, set status menjadi "terautentikasi"
+    setAuth(newUser, token);
+
+    // 4. Arahkan user ke dashboard yang sesuai setelah berhasil mendaftar
+    handleRedirect(newUser);
+  } catch (error: any) {
+    // 5. Jika terjadi error (misal: email sudah terdaftar)
+    // Simpan pesan error untuk ditampilkan di halaman
+    errors.value = error.response?.data?.errors || { message: ["Gagal mendaftar."] };
+    throw error; // Lemparkan error agar komponen bisa menangani
   }
+}
 
   async function logout() {
     try {
@@ -86,7 +104,7 @@ export const useAuthStore = defineStore("auth", () => {
       purgeAuth();
       return;
     }
-    
+
     // ApiService.setHeader(); // <-- HAPUS BARIS INI
     try {
       const { data } = await ApiService.get("auth/me");

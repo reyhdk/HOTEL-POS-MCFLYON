@@ -60,41 +60,58 @@ const registrationSchema = Yup.object().shape({
   password_confirmation: Yup.string().required().oneOf([Yup.ref("password")], "Password harus sama").label("Konfirmasi password"),
 });
 
+// Salin dan ganti seluruh fungsi onSubmitRegister Anda dengan yang ini
+
 const onSubmitRegister = async (values: any) => {
   if (submitButton.value) {
     submitButton.value.disabled = true;
     submitButton.value.setAttribute("data-kt-indicator", "on");
   }
 
-  // Panggil aksi register dari store
-  await store.register(values);
+  try {
+    // 1. Mencoba menjalankan proses registrasi
+    await store.register(values);
 
-  // PERBAIKAN: Cek status login sebagai indikator sukses
-  if (store.isAuthenticated) {
+    // 2. Jika berhasil (tidak ada error yang dilempar), tampilkan pesan sukses
     Swal.fire({
-      text: "Registrasi berhasil! Anda akan dialihkan ke dasbor.",
+      text: "Registrasi berhasil! Anda akan dialihkan.",
       icon: "success",
       buttonsStyling: false,
       confirmButtonText: "Ok, Lanjutkan!",
       customClass: { confirmButton: "btn btn-primary" },
     }).then(() => {
-      router.push({ name: "dashboard" });
+      // Redirect bisa dilakukan di sini atau di dalam handleRedirect di auth.ts
+      // store.handleRedirect(store.user) sudah menanganinya, jadi baris di bawah ini opsional
+      // router.push({ name: "dashboard" });
     });
-  } else {
-    // Jika tidak sukses, tampilkan pesan error dari store
+
+  } catch (error) {
+    // 3. Jika store.register gagal, blok ini akan berjalan
+    const errorData = store.errors as any;
+    let errorMessage = "Terjadi kesalahan. Silakan coba lagi.";
+
+    // Cek jika errorData adalah objek dan ambil pesan pertama di dalamnya
+    if (typeof errorData === 'object' && errorData !== null) {
+      const firstErrorKey = Object.keys(errorData)[0];
+      if (firstErrorKey && Array.isArray(errorData[firstErrorKey])) {
+        errorMessage = errorData[firstErrorKey][0];
+      }
+    }
+
     Swal.fire({
-      text: store.errors as string, // Tampilkan pesan error
+      text: errorMessage, // Tampilkan pesan error yang sudah diformat
       icon: "error",
       buttonsStyling: false,
       confirmButtonText: "Coba Lagi",
-      customClass: { confirmButton: "btn btn-primary" },
+      customClass: { confirmButton: "btn btn-danger" }, // Ubah warna tombol untuk error
     });
-  }
-
-  // Aktifkan kembali tombol submit
-  submitButton.value?.removeAttribute("data-kt-indicator");
-  if (submitButton.value) {
-    submitButton.value.disabled = false;
+  } finally {
+    // 4. Blok ini akan selalu berjalan, baik sukses maupun gagal
+    // Aktifkan kembali tombol submit
+    if (submitButton.value) {
+      submitButton.value.disabled = false;
+      submitButton.value.removeAttribute("data-kt-indicator");
+    }
   }
 };
 </script>

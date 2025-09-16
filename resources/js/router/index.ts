@@ -43,9 +43,24 @@ const routes: Array<RouteRecordRaw> = [
         name: 'booking-history',
         component: () => import("@/pages/user-dashboard/booking-history/Index.vue"),
         meta: {
-            middleware: "auth", 
+            middleware: "auth",
         }
-      }
+      },
+        {
+        path: "/user/food-order",
+        name: "user-food-order",
+
+        // --- UBAH BARIS DI BAWAH INI ---
+        component: () => import("@/pages/user-dashboard/food-order/index.vue"),
+        // --- SESUAIKAN DENGAN PATH DI ATAS ---
+
+        meta: {
+            pageTitle: "Pesan Makanan",
+            breadcrumbs: ["Dashboard", "Pesan Makanan"],
+            middleware: "auth",
+        },
+        },
+
     ],
   },
 
@@ -174,7 +189,7 @@ NProgress.configure({ showSpinner: false });
 router.beforeEach(async (to, from, next) => {
   NProgress.start();
   document.title = `${to.meta.pageTitle || 'Welcome'} - ${import.meta.env.VITE_APP_NAME}`;
-  
+
   const authStore = useAuthStore();
 
   // 1. Selalu coba pulihkan sesi jika token ada tapi data user belum dimuat
@@ -196,7 +211,7 @@ router.beforeEach(async (to, from, next) => {
       // Jika butuh login tapi pengguna belum login, arahkan ke sign-in
       return next({ name: 'sign-in' });
     }
-    
+
     if (requiredRole && requiredRole !== userRole) {
       // Jika sudah login tapi role tidak cocok, arahkan ke dashboard mereka masing-masing
       if (userRole === 'admin') return next({ name: 'admin-dashboard' });
@@ -211,7 +226,7 @@ router.beforeEach(async (to, from, next) => {
     if (userRole === 'admin') return next({ name: 'admin-dashboard' });
     return next({ name: 'user-dashboard' });
   }
-  
+
   // 4. Jika semua kondisi di atas tidak terpenuhi, izinkan akses
   next();
 });

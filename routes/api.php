@@ -62,17 +62,10 @@ Route::middleware('auth:api')->group(function () {
     // ==================================================
     // --- RUTE KHUSUS TAMU --- (SETELAH TAMU LOGIN)
     // ==================================================
-    Route::prefix('guest')->name('guest.')->group(function () {
-        // Mendapatkan profil tamu dan info kamar aktifnya
+  Route::prefix('guest')->name('guest.')->group(function () {
         Route::get('/profile', [GuestOrderController::class, 'getProfile']);
-        
-        // Melihat daftar menu yang tersedia
         Route::get('/menu', [MenuController::class, 'index']);
-        
-        // Membuat pesanan makanan/minuman baru
         Route::post('/orders', [GuestOrderController::class, 'store']);
-        
-        // Melihat riwayat pesanan di kamarnya
         Route::get('/orders', [GuestOrderController::class, 'getOrderHistory']);
     });
 
@@ -90,7 +83,7 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/rooms/{room}/mark-for-cleaning', [RoomController::class, 'markForCleaning']);
         Route::post('/rooms/{room}/mark-as-clean', [RoomController::class, 'markAsClean']);
         Route::post('/rooms/{room}/request-cleaning', [RoomController::class, 'requestCleaning']);
-        
+
         // Facility Management
         Route::apiResource('facilities', FacilityController::class);
 
@@ -100,7 +93,7 @@ Route::middleware('auth:api')->group(function () {
         // Check-in & Check-out
         Route::post('/check-in', [CheckInController::class, 'store']);
         Route::post('/check-out/{room}', [CheckInController::class, 'checkout']);
-        
+
         // Order, Payment, & Folio (POS Admin)
         Route::post('/orders', [OrderController::class, 'store']);
         Route::get('/pending-orders', [PaymentController::class, 'getPendingOrders']);

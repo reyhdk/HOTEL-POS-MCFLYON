@@ -8,24 +8,30 @@ const MainMenuConfig: Array<MenuItem> = [
     pages: [
       {
         heading: "Dashboard",
-        route: "/user/dashboard", // PERBAIKAN: Sesuaikan dengan path di router
+        route: "/user/dashboard",
         keenthemesIcon: "element-11",
         roles: ["user"],
       },
+      // --- [DITAMBAHKAN] Menu untuk Fitur Pesan Makanan Online ---
+      {
+        heading: "Restaurant",
+        route: "/user/food-order", // Ini adalah rute baru untuk halaman pesanan
+        keenthemesIcon: "coffee",    // Ikon yang cocok untuk makanan/minuman
+        roles: ["user"],
+      },
+      // -----------------------------------------------------------
       {
         heading: "Booking Online",
-        route: "/user/booking", // PERBAIKAN: Sesuaikan dengan path di router
+        route: "/user/booking",
         keenthemesIcon: "calendar-add",
         roles: ["user"],
       },
       {
         heading: "Riwayat Booking Saya",
-        route: "/user/booking-history", // PERBAIKAN: Sesuaikan dengan path di router
+        route: "/user/booking-history",
         keenthemesIcon: "book-open",
         roles: ["user"],
       },
-
-
     ],
   },
 
@@ -97,7 +103,7 @@ const MainMenuConfig: Array<MenuItem> = [
            {
             heading: "Fasilitas",
             route: "/admin/master/facilities",
-            keenthemesIcon: "element-11", 
+            keenthemesIcon: "element-11",
             roles: ["admin"],
           },
           {
