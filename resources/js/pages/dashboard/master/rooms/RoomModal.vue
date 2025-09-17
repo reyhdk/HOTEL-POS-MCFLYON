@@ -1,4 +1,4 @@
-<<template>
+<template>
   <div class="modal fade" id="kt_modal_room" ref="modalRef" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered mw-650px">
       <div class="modal-content rounded">
@@ -19,12 +19,9 @@
 
             <div class="mb-10 text-center">
               <div class="position-relative d-inline-block">
-                <div class="image-input-wrapper shadow-sm" :style="{ 
+                <div class="image-input-wrapper shadow-sm" :style="{
                   backgroundImage: `url(${imagePreview || '/media/svg/avatars/blank.svg'})`,
-                  width: '150px',
-                  height: '150px',
-                  backgroundSize: 'cover',
-                  borderRadius: '1.25rem'
+                  width: '150px', height: '150px', backgroundSize: 'cover', borderRadius: '1.25rem'
                 }">
                 </div>
                 <label class="btn btn-icon btn-circle btn-color-muted btn-active-color-primary w-35px h-35px bg-body shadow-sm position-absolute top-100 start-100 translate-middle" title="Ganti gambar">
@@ -69,6 +66,20 @@
                   </el-input>
                 </el-form-item>
               </div>
+
+              <div class="col-md-6">
+                <label class="fs-6 fw-semibold mb-2">Tersedia Mulai</label>
+                <el-form-item prop="tersedia_mulai">
+                    <el-date-picker v-model="formData.tersedia_mulai" type="date" placeholder="Pilih tanggal mulai" class="w-100" format="YYYY-MM-DD" value-format="YYYY-MM-DD"/>
+                </el-form-item>
+              </div>
+              <div class="col-md-6">
+                <label class="fs-6 fw-semibold mb-2">Tersedia Sampai</label>
+                <el-form-item prop="tersedia_sampai">
+                    <el-date-picker v-model="formData.tersedia_sampai" type="date" placeholder="Pilih tanggal selesai" class="w-100" format="YYYY-MM-DD" value-format="YYYY-MM-DD"/>
+                </el-form-item>
+              </div>
+
               <div class="col-12">
                 <label class="fs-6 fw-semibold mb-2">Fasilitas Kamar</label>
                 <el-form-item prop="facility_ids">
@@ -102,17 +113,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, defineProps, defineEmits } from "vue";
-import axios from "@/libs/axios";
+import { ref, computed, watch, onMounted } from "vue";
+// [DIBENARKAN] ApiService lebih baik digunakan daripada axios langsung jika sudah ada
+import ApiService from "@/core/services/ApiService";
 import Swal from "sweetalert2";
 import { Modal } from "bootstrap";
+import type { FormInstance, FormRules } from 'element-plus'
 
 // Mendefinisikan tipe data
-interface Facility {
-  id: number;
-  name: string;
-}
-
+interface Facility { id: number; name: string; }
 interface RoomData {
   id: number;
   room_number: string;
@@ -120,12 +129,11 @@ interface RoomData {
   status: string;
   price_per_night: number;
   description: string | null;
-  image_url: string | null; // Disesuaikan untuk menerima URL gambar
+  image_url: string | null;
   tersedia_mulai: string | null;
   tersedia_sampai: string | null;
   facilities: Facility[];
 }
-
 interface FormData {
   id: number | null;
   room_number: string;
@@ -140,10 +148,10 @@ interface FormData {
 }
 
 const props = defineProps<{ roomData: RoomData | null }>();
-const emit = defineEmits(['room-updated']);
+const emit = defineEmits(['room-updated', 'close-modal']);
 
 // Variabel Reaktif
-const formRef = ref<any>(null);
+const formRef = ref<FormInstance>();
 const modalRef = ref<null | HTMLElement>(null);
 const imageInputRef = ref<null | HTMLInputElement>(null);
 const loading = ref(false);
@@ -166,33 +174,42 @@ const formData = ref<FormData>(getInitialFormData());
 const getFacilities = async () => {
   try {
     loadingFacilities.value = true;
-    const response = await axios.get("/facilities");
-    allFacilities.value = response.data;
+    const { data } = await ApiService.get("/facilities");
+    allFacilities.value = data;
   } catch (error) {
-    console.error("Gagal mengambil data fasilitas:", error);
     Swal.fire("Error", "Gagal memuat daftar fasilitas.", "error");
   } finally {
     loadingFacilities.value = false;
   }
 };
 
-// Panggil saat komponen dimuat
-onMounted(() => {
-  getFacilities();
-});
+onMounted(getFacilities);
+
+// Fungsi untuk format tanggal YYYY-MM-DD
+const formatDate = (dateString: string | null): string | null => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    // [DIBENARKAN] Mengatasi masalah timezone offset
+    const offset = date.getTimezoneOffset();
+    const correctedDate = new Date(date.getTime() - (offset*60*1000));
+    return correctedDate.toISOString().split('T')[0];
+};
 
 // Mengawasi perubahan pada props untuk mengisi form
 watch(() => props.roomData, (newVal) => {
   if (newVal) {
-    // Mode Edit: Isi form dengan data yang ada
+    // Mode Edit
     formData.value = {
       ...newVal,
       image: null,
-      facility_ids: newVal.facilities ? newVal.facilities.map(f => f.id) : []
+      facility_ids: newVal.facilities ? newVal.facilities.map(f => f.id) : [],
+      // [DIBENARKAN] Format tanggal saat mengisi form
+      tersedia_mulai: formatDate(newVal.tersedia_mulai),
+      tersedia_sampai: formatDate(newVal.tersedia_sampai),
     };
     imagePreview.value = newVal.image_url;
   } else {
-    // Mode Tambah: Reset form
+    // Mode Tambah
     formRef.value?.resetFields();
     formData.value = getInitialFormData();
     imagePreview.value = null;
@@ -213,7 +230,7 @@ const handleImageChange = (event: Event) => {
 };
 
 // Aturan Validasi
-const rules = ref({
+const rules = ref<FormRules>({
   room_number: [{ required: true, message: "Nomor kamar wajib diisi.", trigger: "blur" }],
   type: [{ required: true, message: "Tipe kamar wajib dipilih.", trigger: "change" }],
   status: [{ required: true, message: "Status kamar wajib dipilih.", trigger: "change" }],
@@ -226,55 +243,40 @@ const submit = () => {
   formRef.value.validate(async (valid: boolean) => {
     if (valid) {
       loading.value = true;
-      
+
       const data = new FormData();
-      data.append('room_number', formData.value.room_number);
-      data.append('type', formData.value.type);
-      data.append('status', formData.value.status);
-      data.append('price_per_night', String(formData.value.price_per_night));
-
-      if (formData.value.description) data.append('description', formData.value.description);
-      if (formData.value.image) data.append('image', formData.value.image);
-      if (formData.value.tersedia_mulai) data.append('tersedia_mulai', formData.value.tersedia_mulai);
-      if (formData.value.tersedia_sampai) data.append('tersedia_sampai', formData.value.tersedia_sampai);
-
-      if (formData.value.facility_ids.length > 0) {
-        formData.value.facility_ids.forEach(id => {
-          data.append('facility_ids[]', String(id));
-        });
-      }
+      // [DIBENARKAN] Mengirim semua data termasuk yang nullable
+      Object.entries(formData.value).forEach(([key, value]) => {
+          if (key === 'facility_ids') {
+              (value as number[]).forEach(id => data.append('facility_ids[]', String(id)));
+          } else if (value !== null && value !== '') {
+              data.append(key, value as any);
+          }
+      });
 
       try {
         if (isEditMode.value) {
-          data.append('_method', 'PUT'); // Gunakan PUT untuk update
-          await axios.post(`/rooms/${formData.value.id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } });
+          // [DIBENARKAN] Laravel hanya menerima POST untuk FormData, _method digunakan untuk meniru PUT
+          data.append('_method', 'PUT');
+          await ApiService.post(`/rooms/${formData.value.id}`, data);
         } else {
-          await axios.post("/rooms", data, { headers: { 'Content-Type': 'multipart/form-data' } });
+          await ApiService.post("/rooms", data);
         }
         Swal.fire({
           text: `Kamar berhasil ${ isEditMode.value ? "diperbarui" : "ditambahkan" }!`,
           icon: "success",
-          buttonsStyling: false,
-          confirmButtonText: "Ok, mengerti!",
-          customClass: { confirmButton: "btn btn-primary" },
         }).then(() => {
           if (modalRef.value) Modal.getInstance(modalRef.value)?.hide();
           emit("room-updated");
         });
       } catch (error: any) {
-         let errorMessages = "Maaf, terjadi kesalahan.";
-        if (error.response && error.response.data && error.response.data.errors) {
-          errorMessages = Object.values(error.response.data.errors).flat().join('<br>');
+        let errorMessages = "Maaf, terjadi kesalahan.";
+        if (error.response?.data?.errors) {
+         errorMessages = Object.values(error.response.data.errors).flat().join('<br>');
         }
-        Swal.fire({
-          html: errorMessages,
-          icon: "error",
-          buttonsStyling: false,
-          confirmButtonText: "Ok, mengerti!",
-          customClass: { confirmButton: "btn btn-primary" },
-        });
-      } finally { 
-        loading.value = false; 
+        Swal.fire({ html: errorMessages, icon: "error" });
+      } finally {
+        loading.value = false;
       }
     }
   });

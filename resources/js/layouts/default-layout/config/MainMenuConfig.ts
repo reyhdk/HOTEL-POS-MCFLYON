@@ -65,6 +65,11 @@ const MainMenuConfig: Array<MenuItem> = [
             roles: ["admin"],
           },
           {
+            heading: "Pesanan Online", 
+            route: "/admin/online-orders",
+            roles: ["admin"],
+          },
+          {
             heading: "Daftar Tagihan",
             route: "/admin/payment",
             roles: ["admin"],

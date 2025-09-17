@@ -121,6 +121,12 @@ const routes: Array<RouteRecordRaw> = [
         meta: { pageTitle: "Tamu" },
       },
       {
+        path: "/admin/online-orders",
+        name: "admin-online-orders",
+        component: () => import("@/pages/dashboard/online-orders/Index.vue"),
+        meta: { middleware: "auth", pageTitle: "Pesanan Online" },
+      },
+      {
         path: "master/menus",
         name: "admin-master-menus",
         component: () => import("@/pages/dashboard/master/menus/Index.vue"),

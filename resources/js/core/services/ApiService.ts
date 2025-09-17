@@ -66,6 +66,11 @@ class ApiService {
     return ApiService.vueInstance.axios.put(`${resource}`, params);
   }
 
+  // [DIBENARKAN] Metode untuk PATCH request ditambahkan di sini
+  public static patch(resource: string, params: any) {
+    return ApiService.vueInstance.axios.patch(resource, params);
+  }
+
   // Metode untuk DELETE request
   public static delete(resource: string) {
     return ApiService.vueInstance.axios.delete(resource);

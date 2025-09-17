@@ -18,6 +18,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\Api\UserBookingController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\Guest\GuestOrderController;
+use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
+
 
 
 /*
@@ -102,6 +104,10 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancelOrder']);
         Route::get('/folios', [FolioController::class, 'index']);
         Route::post('/folios/{room}/checkout', [FolioController::class, 'processFolioPaymentAndCheckout']);
+        Route::get('/online-orders', [AdminOrderController::class, 'index']);
+        Route::get('/online-orders/{order}', [AdminOrderController::class, 'show']); // <-- TAMBAHKAN INI
+        // routes/api.php
+       Route::patch('/online-orders/{order}/status', [AdminOrderController::class, 'updateStatus']); // <-- TAMBAHKAN INI
 
         // Settings, Users & Roles
         Route::post('/setting', [SettingController::class, 'update'])->middleware('can:setting');
