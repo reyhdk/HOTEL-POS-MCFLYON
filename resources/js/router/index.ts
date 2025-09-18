@@ -10,13 +10,13 @@ declare module "vue-router" {
     pageTitle?: string;
     breadcrumb?: string[];
     middleware?: "auth" | "guest";
-    role?: "admin" | "user"; // Sesuai dengan guard baru Anda
+    role?: "admin" | "user";
   }
 }
 
 const routes: Array<RouteRecordRaw> = [
   // =======================================================
-  // ▼▼▼ GRUP RUTE USER (TIDAK BERUBAH) ▼▼▼
+  // ▼▼▼ GRUP RUTE USER ▼▼▼
   // =======================================================
   {
     path: "/user",
@@ -42,35 +42,36 @@ const routes: Array<RouteRecordRaw> = [
         path: 'booking-history',
         name: 'booking-history',
         component: () => import("@/pages/user-dashboard/booking-history/Index.vue"),
-        meta: {
-            middleware: "auth",
-        }
+        meta: { pageTitle: "Riwayat Booking" }
       },
-        {
-        path: "/user/food-order",
+      {
+        path: "food-order",
         name: "user-food-order",
-
-        // --- UBAH BARIS DI BAWAH INI ---
         component: () => import("@/pages/user-dashboard/food-order/index.vue"),
-        // --- SESUAIKAN DENGAN PATH DI ATAS ---
-
         meta: {
-            pageTitle: "Pesan Makanan",
-            breadcrumbs: ["Dashboard", "Pesan Makanan"],
-            middleware: "auth",
+          pageTitle: "Pesan Makanan",
+          breadcrumbs: ["Dashboard", "Pesan Makanan"],
         },
+      },
+      {
+        path: "payment/:orderId",
+        name: "user-payment",
+        component: () => import("@/pages/user-dashboard/payment-page/index.vue"),
+        meta: {
+          pageTitle: "Pembayaran",
+          breadcrumbs: ["Dashboard", "Pesan Makanan", "Pembayaran"],
         },
-
+      }
     ],
   },
 
   // =======================================================
-  // ▼▼▼ GRUP RUTE ADMIN (SUDAH DISESUAIKAN) ▼▼▼
+  // ▼▼▼ GRUP RUTE ADMIN ▼▼▼
   // =======================================================
   {
     path: "/admin",
     component: () => import("@/layouts/default-layout/DefaultLayout.vue"),
-    meta: { middleware: "auth", role: "admin" }, // Menggunakan 'role'
+    meta: { middleware: "auth", role: "admin" },
     children: [
       {
         path: "dashboard",
@@ -83,6 +84,12 @@ const routes: Array<RouteRecordRaw> = [
         name: "admin-pos",
         component: () => import("@/pages/dashboard/pos/Index.vue"),
         meta: { pageTitle: "Point of Sale" },
+      },
+       {
+        path: "online-orders",
+        name: "admin-online-orders",
+        component: () => import("@/pages/dashboard/online-orders/Index.vue"),
+        meta: { pageTitle: "Pesanan Online" },
       },
       {
         path: "master/rooms",
@@ -121,12 +128,6 @@ const routes: Array<RouteRecordRaw> = [
         meta: { pageTitle: "Tamu" },
       },
       {
-        path: "/admin/online-orders",
-        name: "admin-online-orders",
-        component: () => import("@/pages/dashboard/online-orders/Index.vue"),
-        meta: { middleware: "auth", pageTitle: "Pesanan Online" },
-      },
-      {
         path: "master/menus",
         name: "admin-master-menus",
         component: () => import("@/pages/dashboard/master/menus/Index.vue"),
@@ -154,7 +155,7 @@ const routes: Array<RouteRecordRaw> = [
   },
 
   // =======================================================
-  // ▼▼▼ GRUP RUTE GUEST & 404 (TIDAK BERUBAH) ▼▼▼
+  // ▼▼▼ GRUP RUTE GUEST & 404 ▼▼▼
   // =======================================================
   {
     path: "/",
@@ -176,7 +177,7 @@ const routes: Array<RouteRecordRaw> = [
     ],
   },
   {
-    path: "/:pathMatch(.*)*", // Koreksi kecil: (.*)* lebih umum untuk catch-all
+    path: "/:pathMatch(.*)*",
     name: '404',
     component: () => import("@/pages/errors/Error404.vue"),
   },
@@ -198,42 +199,36 @@ router.beforeEach(async (to, from, next) => {
 
   const authStore = useAuthStore();
 
-  // 1. Selalu coba pulihkan sesi jika token ada tapi data user belum dimuat
-  // Ini adalah kunci untuk menangani refresh halaman
+  // Selalu coba pulihkan sesi jika token ada tapi data user belum dimuat
   if (JwtService.getToken() && !authStore.isUserLoaded) {
     await authStore.verifyAuth();
   }
 
   const isAuthenticated = authStore.isAuthenticated;
-  const userRole = authStore.userRole; // Gunakan getter dari store
+  const userRole = authStore.userRole;
 
   const requiresAuth = to.meta.middleware === 'auth';
   const requiresGuest = to.meta.middleware === 'guest';
-  const requiredRole = to.meta.role; // Pastikan Anda menggunakan 'role' di meta rute Anda
+  const requiredRole = to.meta.role;
 
-  // 2. Logika untuk rute yang butuh login ('auth')
+  // Logika untuk rute yang butuh login ('auth')
   if (requiresAuth) {
     if (!isAuthenticated) {
-      // Jika butuh login tapi pengguna belum login, arahkan ke sign-in
       return next({ name: 'sign-in' });
     }
-
     if (requiredRole && requiredRole !== userRole) {
-      // Jika sudah login tapi role tidak cocok, arahkan ke dashboard mereka masing-masing
       if (userRole === 'admin') return next({ name: 'admin-dashboard' });
       return next({ name: 'user-dashboard' });
     }
   }
 
-  // 3. Logika untuk rute tamu ('guest')
+  // Logika untuk rute tamu ('guest')
   if (requiresGuest && isAuthenticated) {
-    // Jika ini halaman tamu (seperti login) tapi pengguna sudah login,
-    // arahkan mereka ke dashboard yang sesuai
     if (userRole === 'admin') return next({ name: 'admin-dashboard' });
     return next({ name: 'user-dashboard' });
   }
 
-  // 4. Jika semua kondisi di atas tidak terpenuhi, izinkan akses
+  // Jika semua kondisi di atas tidak terpenuhi, izinkan akses
   next();
 });
 

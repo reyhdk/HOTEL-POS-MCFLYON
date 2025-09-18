@@ -15,18 +15,16 @@ class GuestOrderController extends Controller
 {
     /**
      * Mendapatkan profil tamu yang sedang login dan info kamar aktif mereka.
-     * Endpoint ini sangat berguna untuk halaman utama aplikasi tamu.
      */
     public function getProfile(Request $request)
     {
-        $user = Auth::user(); // Dapatkan User yang terotentikasi
+        $user = Auth::user();
 
-        // Cari sesi check-in yang masih aktif yang terhubung dengan booking milik user ini.
         $activeCheckIn = CheckIn::where('is_active', true)
             ->whereHas('booking', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })
-            ->with(['room', 'guest']) // Muat relasi room dan guest
+            ->with(['room', 'guest'])
             ->first();
 
         if (!$activeCheckIn) {
@@ -35,19 +33,19 @@ class GuestOrderController extends Controller
 
         return response()->json([
             'user' => $user,
-            'guest_details' => $activeCheckIn->guest, // Detail tamu dari check-in
-            'active_room' => $activeCheckIn->room     // Kamar yang sedang ditempati
+            'guest_details' => $activeCheckIn->guest,
+            'active_room' => $activeCheckIn->room
         ]);
     }
 
     /**
-     * Menyimpan pesanan makanan baru dari tamu.
+     * Menyimpan pesanan makanan baru dari tamu, mengurangi stok,
+     * dan membuat pesanan dalam status 'pending'.
      */
     public function store(Request $request)
     {
-        $user = Auth::user(); // 1. Dapatkan User dari token otentikasi
+        $user = Auth::user();
 
-        // 2. Cari kamar tempat tamu sedang check-in aktif melalui relasi User -> Booking -> CheckIn
         $activeCheckIn = CheckIn::where('is_active', true)
             ->whereHas('booking', fn($q) => $q->where('user_id', $user->id))
             ->first();
@@ -57,44 +55,42 @@ class GuestOrderController extends Controller
         }
         $roomId = $activeCheckIn->room_id;
 
-        // 3. Validasi input, SAMA SEPERTI OrderController, tapi tanpa 'room_id'
         $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.menu_id' => 'required|exists:menus,id',
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-        // 4. Logika pembuatan pesanan dibungkus dalam transaksi database
         return DB::transaction(function () use ($validated, $roomId, $user) {
             $totalPrice = 0;
             $orderItemsData = [];
 
             foreach ($validated['items'] as $item) {
-                $menu = Menu::findOrFail($item['menu_id']);
+                $menu = Menu::where('id', $item['menu_id'])->lockForUpdate()->firstOrFail();
 
                 if ($menu->stock < $item['quantity']) {
                     throw ValidationException::withMessages([
-                        'items' => "Stok untuk menu '{$menu->name}' tidak mencukupi."
+                        'items' => "Stok untuk menu '{$menu->name}' tidak mencukupi. Sisa stok: {$menu->stock}."
                     ]);
                 }
 
-                $menu->decrement('stock', $item['quantity']); // Langsung kurangi stok
+                $menu->decrement('stock', $item['quantity']);
 
                 $totalPrice += $menu->price * $item['quantity'];
                 $orderItemsData[] = [ 'menu_id' => $menu->id, 'quantity' => $item['quantity'], 'price' => $menu->price ];
             }
 
             $order = Order::create([
-                'room_id' => $roomId,       // ID Kamar didapat dari otentikasi
-                'user_id' => $user->id,       // ID User yang memesan
+                'room_id' => $roomId,
+                'user_id' => $user->id,
                 'total_price' => $totalPrice,
-                'status' => 'pending',        // Status awal pesanan
+                'status' => 'pending',
             ]);
 
             $order->items()->createMany($orderItemsData);
 
             return response()->json([
-                'message' => 'Pesanan berhasil dibuat dan akan ditambahkan ke tagihan kamar Anda.',
+                'message' => 'Pesanan berhasil dibuat, silakan lanjutkan ke pembayaran.',
                 'order' => $order->load('items.menu')
             ], 201);
         });
@@ -120,5 +116,41 @@ class GuestOrderController extends Controller
                         ->get();
 
         return response()->json($orders);
+    }
+
+    /**
+     * Menampilkan detail satu pesanan milik pengguna yang sedang login.
+     */
+    public function show(Order $order)
+    {
+        // Otorisasi: Pastikan pesanan ini milik user yang sedang login
+        if (Auth::id() !== $order->user_id) {
+            return response()->json(['message' => 'Tidak diizinkan'], 403);
+        }
+
+        return $order->load(['room', 'user', 'items.menu']);
+    }
+
+    /**
+     * Memproses "pembayaran" untuk sebuah pesanan dengan mengubah statusnya.
+     */
+    public function processPayment(Order $order)
+    {
+        // Otorisasi: Pastikan pesanan ini milik user yang sedang login
+        if (Auth::id() !== $order->user_id) {
+            return response()->json(['message' => 'Tidak diizinkan'], 403);
+        }
+
+        if ($order->status !== 'pending') {
+            return response()->json(['message' => 'Pesanan ini tidak dapat dibayar.'], 422);
+        }
+
+        $order->status = 'paid';
+        $order->save();
+
+        return response()->json([
+            'message' => 'Pembayaran berhasil dikonfirmasi!',
+            'order' => $order
+        ]);
     }
 }

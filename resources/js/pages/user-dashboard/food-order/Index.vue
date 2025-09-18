@@ -73,7 +73,7 @@
                       <button class="btn btn-icon btn-sm btn-light-primary" @click="updateQuantity(item.id, 1)">+</button>
                     </div>
                     <button class="btn btn-icon btn-sm btn-light-danger ms-3" @click="removeFromCart(item.id)">
-                       <i class="ki-duotone ki-trash fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
+                        <i class="ki-duotone ki-trash fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
                     </button>
                   </div>
                 </TransitionGroup>
@@ -125,6 +125,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
+import { useRouter } from "vue-router"; // [DIBENARKAN] Import useRouter
 import ApiService from "@/core/services/ApiService";
 import Swal from "sweetalert2";
 
@@ -139,7 +140,6 @@ interface Menu {
 interface Room {
   id: number;
   room_number: string;
-  // tambahkan properti lain jika perlu
 }
 interface CartItem extends Menu {
   quantity: number;
@@ -151,7 +151,8 @@ const isLoading = ref(true);
 const cart = ref<CartItem[]>([]);
 const activeRoom = ref<Room | null>(null);
 const guestName = ref<string>('');
-const isSubmitting = ref(false); // [DITAMBAHKAN] State untuk loading saat checkout
+const isSubmitting = ref(false);
+const router = useRouter(); // [DIBENARKAN] Inisialisasi router
 
 // --- FUNGSI-FUNGSI API ---
 const fetchMenus = async () => {
@@ -174,16 +175,12 @@ const fetchGuestProfile = async () => {
 };
 
 const processOrder = async () => {
-  // Pengecekan awal, jika keranjang kosong, hentikan fungsi.
   if (cart.value.length === 0) {
     Swal.fire({ text: "Keranjang Anda kosong.", icon: "warning" });
     return;
   }
 
-  // Aktifkan status loading pada tombol
   isSubmitting.value = true;
-
-  // 1. Ubah format data keranjang menjadi payload untuk API.
   const payload = {
     items: cart.value.map(item => ({
       menu_id: item.id,
@@ -192,20 +189,11 @@ const processOrder = async () => {
   };
 
   try {
-    // 2. Kirim data pesanan ke server. Status pesanan akan 'pending'.
     const response = await ApiService.post("/guest/orders", payload);
-    const newOrder = response.data.order; // Ambil data pesanan yang baru dibuat dari respons
-
-    // 3. Kosongkan keranjang belanja di frontend.
+    const newOrder = response.data.order;
     cart.value = [];
-
-    // 4. [PERUBAHAN UTAMA] Arahkan pengguna ke halaman pembayaran.
-    //    Kita membawa ID pesanan agar halaman pembayaran tahu pesanan mana yang harus diproses.
-    //    Pastikan Anda sudah membuat rute bernama 'user-payment'.
     router.push({ name: 'user-payment', params: { orderId: newOrder.id } });
-
   } catch (error: any) {
-    // 5. Tangani jika terjadi error saat membuat pesanan.
     const errorMessage = error.response?.data?.message || "Terjadi kesalahan saat memproses pesanan.";
     Swal.fire({
       text: errorMessage,
@@ -215,16 +203,13 @@ const processOrder = async () => {
       customClass: { confirmButton: "btn btn-danger" },
     });
   } finally {
-    // 6. Matikan status loading pada tombol setelah semua proses selesai.
     isSubmitting.value = false;
   }
 };
 
-
 // --- FUNGSI-FUNGSI KERANJANG ---
 const addToCart = (menu: Menu) => {
   const itemInCart = cart.value.find((item) => item.id === menu.id);
-
   if (itemInCart) {
     if (itemInCart.quantity < menu.stock) {
       itemInCart.quantity++;
@@ -241,20 +226,20 @@ const addToCart = (menu: Menu) => {
 const updateQuantity = (menuId: number, amount: number) => {
   const itemInCart = cart.value.find((item) => item.id === menuId);
   if (!itemInCart) return;
-
   const newQuantity = itemInCart.quantity + amount;
-
   if (newQuantity <= 0) {
     cart.value = cart.value.filter(item => item.id !== menuId);
     return;
   }
-
   if (amount > 0 && newQuantity > itemInCart.stock) {
-      Swal.fire({ text: `Stok untuk ${itemInCart.name} tidak mencukupi.`, icon: "warning" });
-      return;
+    Swal.fire({ text: `Stok untuk ${itemInCart.name} tidak mencukupi.`, icon: "warning" });
+    return;
   }
-
   itemInCart.quantity = newQuantity;
+};
+
+const removeFromCart = (menuId: number) => {
+  cart.value = cart.value.filter(item => item.id !== menuId);
 };
 
 // --- FUNGSI BANTUAN ---
@@ -270,13 +255,11 @@ const formatCurrency = (value: number) => {
 const cartTotal = computed(() => {
   return cart.value.reduce((total, item) => total + item.price * item.quantity, 0);
 });
-
 const taxAmount = computed(() => {
-    return cartTotal.value * 0.10; // [DIPERBAIKI] Menghitung pajak 10%
+  return cartTotal.value * 0.10;
 });
-
 const grandTotal = computed(() => {
-    return cartTotal.value + taxAmount.value;
+  return cartTotal.value + taxAmount.value;
 });
 
 // --- LIFECYCLE HOOK ---

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Room;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+
 
 class RoomController extends Controller
 {
@@ -83,7 +85,9 @@ class RoomController extends Controller
             'description' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'facility_ids' => 'nullable|array',
-            'facility_ids.*' => 'exists:facilities,id'
+            'facility_ids.*' => 'exists:facilities,id',
+            'tersedia_mulai' => 'nullable|date',
+            'tersedia_sampai' => 'nullable|date|after_or_equal:tersedia_mulai',
         ]);
 
         if ($request->hasFile('image')) {
@@ -105,16 +109,23 @@ class RoomController extends Controller
      */
     public function update(Request $request, Room $room)
     {
-        $validatedData = $request->validate([
-            'room_number' => 'required|string|unique:rooms,room_number,' . $room->id,
-            'type' => 'required|string',
-            'status' => 'required|string',
-            'price_per_night' => 'required|numeric|min:0',
-            'description' => 'nullable|string',
-            'image' => 'nullable|sometimes',
-            'facility_ids' => 'nullable|array',
-            'facility_ids.*' => 'exists:facilities,id'
-        ]);
+        // app/Http/Controllers/Api/RoomController.php -> method store()
+
+    $validatedData = $request->validate([
+        'room_number' => 'required|string|unique:rooms,room_number,' . $room->id,
+        'type' => 'required|string',
+        'status' => 'required|string',
+        'price_per_night' => 'required|numeric|min:0',
+        'description' => 'nullable|string',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+        'facility_ids' => 'nullable|array',
+        'facility_ids.*' => 'exists:facilities,id',
+        'tersedia_mulai' => 'nullable|date',
+        'tersedia_sampai' => 'nullable|date|after_or_equal:tersedia_mulai',
+    ]);
+
+        Log::info('Data yang divalidasi untuk diupdate:', $validatedData);
+
 
         if ($request->hasFile('image')) {
             if ($room->image) Storage::delete($room->image);

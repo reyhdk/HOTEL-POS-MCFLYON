@@ -69,6 +69,8 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/menu', [MenuController::class, 'index']);
         Route::post('/orders', [GuestOrderController::class, 'store']);
         Route::get('/orders', [GuestOrderController::class, 'getOrderHistory']);
+        Route::get('/orders/{order}', [GuestOrderController::class, 'show']);
+        Route::post('/orders/{order}/pay', [GuestOrderController::class, 'processPayment']);
     });
 
     // --- RUTE KHUSUS ADMIN ---

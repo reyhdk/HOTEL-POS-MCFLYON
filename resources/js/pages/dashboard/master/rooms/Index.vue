@@ -186,7 +186,7 @@ const filteredRooms = computed(() => {
 const getRooms = async () => {
   try {
     loading.value = true;
-    const { data } = await ApiService.get("/rooms");
+    const { data } = await ApiService.get(`/rooms?_=${new Date().getTime()}`);
     rooms.value = data;
   } catch (error) {
     rooms.value = [];
