@@ -8,7 +8,7 @@
 
       <div v-else-if="order">
         <h1 class="mb-4">Konfirmasi Pembayaran</h1>
-        
+
         <div class="d-flex justify-content-between align-items-center mb-5 p-4 bg-light rounded">
           <div>
             <p class="text-muted mb-1">Nomor Pesanan</p>
@@ -49,11 +49,11 @@
         </div>
 
         <div class="separator separator-dashed my-8"></div>
-        
+
         <div>
           <h3 class="mb-4">Metode Pembayaran</h3>
           <p class="text-muted">Untuk saat ini, semua pesanan akan ditagihkan langsung ke kamar Anda saat check-out.</p>
-          
+
           <button @click="processPayment" class="btn btn-lg btn-success w-100 mt-5" :disabled="isProcessingPayment">
             <span v-if="!isProcessingPayment">
               <i class="ki-duotone ki-shield-tick fs-2"><span class="path1"></span><span class="path2"></span></i>
@@ -67,7 +67,7 @@
         </div>
 
       </div>
-      
+
       <div v-else class="text-center py-10">
         <p>Pesanan tidak ditemukan.</p>
       </div>
@@ -120,7 +120,7 @@ const processPayment = async () => {
     isProcessingPayment.value = true;
     try {
         await ApiService.post(`/guest/orders/${orderId}/pay`, {});
-        
+
         await Swal.fire({
             text: "Pembayaran berhasil dikonfirmasi!",
             icon: "success",
@@ -146,4 +146,4 @@ const formatCurrency = (value: number) => {
 onMounted(() => {
   fetchOrderDetails();
 });
-</script>
+</script>r

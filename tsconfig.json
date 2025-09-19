@@ -3,7 +3,10 @@
     "include": [
         "env.d.ts",
         "resources/js/*",
-        "resources/js/**/{*.js,*.ts,*.vue}"
+        "resources/js/**/*.vue",
+        "resources/js/**/*.ts",
+        "resources/js/**/*.js",
+        "resources/js/**/*.d.ts"
     ],
     "compilerOptions": {
         "lib": ["ES2020", "DOM"],
