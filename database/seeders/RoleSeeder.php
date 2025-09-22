@@ -16,15 +16,28 @@ class RoleSeeder extends Seeder
         // Reset cached roles and permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // PERBAIKAN: Tambahkan 'full_name' saat membuat role
+        // Role Inti
         Role::firstOrCreate(
             ['name' => 'admin', 'guard_name' => 'api'],
-            ['full_name' => 'Administrator'] // Nilai untuk full_name
+            ['full_name' => 'Administrator']
         );
-
         Role::firstOrCreate(
             ['name' => 'user', 'guard_name' => 'api'],
-            ['full_name' => 'User'] // Nilai untuk full_name
+            ['full_name' => 'User']
+        );
+
+        // [DIPERBAIKI] Role Staf Hotel Ditambahkan di Sini
+        Role::firstOrCreate(
+            ['name' => 'receptionist', 'guard_name' => 'api'],
+            ['full_name' => 'Receptionist']
+        );
+        Role::firstOrCreate(
+            ['name' => 'chef', 'guard_name' => 'api'],
+            ['full_name' => 'Chef']
+        );
+        Role::firstOrCreate(
+            ['name' => 'cleaning-service', 'guard_name' => 'api'],
+            ['full_name' => 'Cleaning Service']
         );
     }
 }

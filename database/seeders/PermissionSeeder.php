@@ -3,9 +3,9 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 class PermissionSeeder extends Seeder
 {
@@ -14,47 +14,83 @@ class PermissionSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::table('role_has_permissions')->delete();
-
         // Reset cached roles and permissions
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        $menuMaster = ['master', 'master-user', 'master-role'];
-        $menuWebsite = ['website', 'setting'];
+        // 1. Definisikan semua permission yang ada, dikelompokkan berdasarkan fitur
+        $masterPermissions = [
+            'view rooms', 'create rooms', 'edit rooms', 'delete rooms',
+            'view facilities', 'create facilities', 'edit facilities', 'delete facilities',
+            'view guests', 'create guests', 'edit guests', 'delete guests',
+            'view menus', 'create menus', 'edit menus', 'delete menus',
+            'view users', 'create users', 'edit users', 'delete users',
+            'view roles', 'create roles', 'edit roles', 'delete roles',
+        ];
 
+        $posPermissions = [
+            'create pos_orders',    // Untuk kasir di resepsionis
+            'view online_orders',   // Untuk Chef dan Admin
+            'manage payments',      // Untuk resepsionis
+            'view folios',          // Untuk resepsionis
+        ];
+
+        $reportPermissions = [
+            'view transaction_history',
+        ];
+
+        $settingPermissions = [
+            'edit settings',
+        ];
+
+        // Gabungkan semua permission menjadi satu array
+        $allPermissions = array_merge(
+            $masterPermissions,
+            $posPermissions,
+            $reportPermissions,
+            $settingPermissions
+        );
+
+        // Buat semua permission yang telah didefinisikan
+        foreach ($allPermissions as $permissionName) {
+            Permission::firstOrCreate(['name' => $permissionName, 'guard_name' => 'api']);
+        }
+
+        $this->command->info('Semua permission berhasil dibuat.');
+
+        // 2. Tentukan permission untuk setiap role
         $permissionsByRole = [
-            'admin' => ['dashboard', ...$menuMaster, ...$menuWebsite],
+            'admin' => $allPermissions, // Admin mendapatkan semua permission
+
+            'receptionist' => [
+                'view rooms',
+                'view guests', 'create guests', 'edit guests',
+                'create pos_orders',
+                'manage payments',
+                'view folios',
+            ],
+
+            'chef' => [
+                'view online_orders',
+                'view menus', 'create menus', 'edit menus',
+            ],
+
+            'cleaning-service' => [
+                'view rooms', // Hanya bisa melihat status kamar
+            ],
+
+            'user' => [
+                // Role 'user' (tamu) biasanya tidak memiliki permission di admin panel
+            ]
         ];
 
-        $insertPermissions = fn ($role) => collect($permissionsByRole[$role])
-            ->map(function ($name) {
-                $check = Permission::whereName($name)->first();
-
-                if (!$check) {
-                    return Permission::create([
-                        'name' => $name,
-                        'guard_name' => 'api',
-                    ])->id;
-                }
-
-                return $check->id;
-            })
-            ->toArray();
-
-        $permissionIdsByRole = [
-            'admin' => $insertPermissions('admin')
-        ];
-
-        foreach ($permissionIdsByRole as $role => $permissionIds) {
-            $role = Role::whereName($role)->first();
-
-            DB::table('role_has_permissions')
-                ->insert(
-                    collect($permissionIds)->map(fn ($id) => [
-                        'role_id' => $role->id,
-                        'permission_id' => $id
-                    ])->toArray()
-                );
+        // 3. Berikan permission ke setiap role
+        foreach ($permissionsByRole as $roleName => $permissionNames) {
+            $role = Role::whereName($roleName)->first();
+            if ($role) {
+                // Gunakan syncPermissions untuk cara yang lebih bersih dan aman
+                $role->syncPermissions($permissionNames);
+                $this->command->info("Memberikan permission ke role: {$roleName}");
+            }
         }
     }
 }

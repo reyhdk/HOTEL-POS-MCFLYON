@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\Uuid;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -13,7 +14,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements JWTSubject
 {
-    use Uuid, HasRoles,  Notifiable;
+    use Uuid, HasRoles, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -45,54 +46,76 @@ class User extends Authenticatable implements JWTSubject
      */
     protected $casts = [
         'password' => 'hashed',
-        'email_verified_at' => 'datetime', // <-- Tambahkan ini untuk MustVerifyEmail
-
+        'email_verified_at' => 'datetime',
     ];
 
-    protected $appends = ['permission', 'role'];
+    /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = ['photo_url', 'all_permissions', 'role'];
 
+    /**
+     * Event listener untuk model.
+     */
     protected static function booted()
     {
         static::deleted(function ($user) {
-            if ($user->photo != null && $user->photo != '') {
-                $old_photo = str_replace('/storage/', '', $user->photo);
-                Storage::disk('public')->delete($old_photo);
+            if ($user->photo) {
+                Storage::disk('public')->delete($user->photo);
             }
         });
     }
 
     /**
-     * Get the identifier that will be stored in the subject claim of the JWT.
-     *
-     * @return mixed
+     * [DITAMBAHKAN] Memberitahu Laravel untuk menggunakan kolom 'uuid' pada route model binding.
+     * Ini adalah kunci untuk memperbaiki error 404 Anda.
      */
+    public function getRouteKeyName()
+    {
+        return 'uuid';
+    }
+
+    // --- JWT METHODS ---
+
     public function getJWTIdentifier()
     {
         return $this->getKey();
     }
 
-    /**
-     * Return a key value array, containing any custom claims to be added to the JWT.
-     *
-     * @return array
-     */
     public function getJWTCustomClaims()
     {
         return [];
     }
 
-    public function getRoleAttribute()
-    {
-        return $this->roles()->first();
-    }
-
-    public function getPermissionAttribute()
-    {
-        return $this->getAllPermissions()->pluck('name');
-    }
+    // --- RELATIONS ---
 
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
-    }   
+    }
+
+    // --- ATTRIBUTES & ACCESSORS ---
+
+    protected function photoUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->photo ? Storage::url($this->photo) : null,
+        );
+    }
+
+    protected function role(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->roles()->first(),
+        );
+    }
+
+    protected function allPermissions(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->getAllPermissions()->pluck('name'),
+        );
+    }
 }

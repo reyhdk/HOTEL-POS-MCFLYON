@@ -1,109 +1,106 @@
+<template>
+  <Form
+    v-if="isFormVisible"
+    :selected="selectedId"
+    @close="isFormVisible = false"
+    @refresh="refreshTable"
+  />
+
+  <div class="card shadow-sm" v-else>
+    <div class="card-header">
+      <h3 class="card-title">Manajemen Role</h3>
+      <div class="card-toolbar">
+        <button class="btn btn-primary btn-sm" @click="openAddForm">
+          <i class="ki-duotone ki-plus fs-2"></i>
+          Tambah Role
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div v-if="loading" class="text-center">Memuat data...</div>
+      <table v-else class="table table-row-dashed">
+        <thead>
+          <tr class="text-start text-gray-400 fw-bold fs-7 text-uppercase gs-0">
+            <th>Nama Role</th>
+            <th>Nama Tampilan</th>
+            <th class="text-end">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="role in roles" :key="role.id">
+            <td>{{ role.name }}</td>
+            <td>{{ role.full_name }}</td>
+            <td class="text-end">
+              <button @click="openEditForm(role)" class="btn btn-sm btn-light-primary me-2">Edit</button>
+              <button @click="deleteRole(role.id)" class="btn btn-sm btn-light-danger">Hapus</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
-import { h, ref, watch } from "vue";
-import { useDelete } from "@/libs/hooks";
-import Form from "./Form.vue";
-import { createColumnHelper } from "@tanstack/vue-table";
-import type { Role } from "@/types"; // [DIBENARKAN] Menggunakan tipe Role
+import { ref, onMounted } from "vue";
+import ApiService from "@/core/services/ApiService";
+import Swal from "sweetalert2";
+import Form from "./Form.vue"; // Pastikan path ini benar
 
-// [DIBENARKAN] Mendefinisikan kolom sesuai tipe Role
-const columnHelper = createColumnHelper<Role>();
-const paginateRef = ref<any>(null);
-const selectedId = ref<number | null>(null); // [DIBENARKAN] Tipe diubah menjadi number | null
-const isFormVisible = ref<boolean>(false);
+interface Role {
+  id: number;
+  name: string;
+  full_name: string;
+}
 
-const { delete: deleteRole } = useDelete({
-    onSuccess: () => paginateRef.value.refetch(),
-});
+const roles = ref<Role[]>([]);
+const loading = ref(true);
+const isFormVisible = ref(false);
+const selectedId = ref<number | null>(null);
 
-const columns = [
-    columnHelper.accessor("id", { // Menggunakan 'id' untuk nomor urut
-        header: "#",
-        cell: info => info.row.index + 1,
-    }),
-    columnHelper.accessor("name", {
-        header: "Nama",
-    }),
-    columnHelper.accessor("full_name", {
-        header: "Nama Lengkap",
-    }),
-    columnHelper.accessor("id", {
-        header: "Aksi",
-        cell: (info) =>
-            h("div", { class: "d-flex gap-2" }, [
-                h(
-                    "button",
-                    {
-                        class: "btn btn-sm btn-icon btn-light-primary",
-                        title: "Edit",
-                        onClick: () => {
-                            selectedId.value = info.getValue();
-                            isFormVisible.value = true;
-                        },
-                    },
-                    h("i", { class: "ki-duotone ki-pencil fs-2" })
-                ),
-                h(
-                    "button",
-                    {
-                        class: "btn btn-sm btn-icon btn-light-danger",
-                        title: "Hapus",
-                        onClick: () =>
-                            deleteRole(`/master/roles/${info.getValue()}`),
-                    },
-                    h("i", { class: "ki-duotone ki-trash fs-2" })
-                ),
-            ]),
-    }),
-];
-
-const refreshTable = () => {
-  if (paginateRef.value) {
-    paginateRef.value.refetch();
+const fetchRoles = async () => {
+  try {
+    loading.value = true;
+    const { data } = await ApiService.get("/master/roles");
+    roles.value = data.data; // Sesuaikan dengan struktur paginasi Laravel
+  } finally {
+    loading.value = false;
   }
 };
 
+const refreshTable = () => {
+    isFormVisible.value = false;
+    fetchRoles();
+};
+
 const openAddForm = () => {
-    selectedId.value = null; // Pastikan ID kosong saat menambah
+    selectedId.value = null;
     isFormVisible.value = true;
 };
 
-// Mengawasi perubahan visibilitas form
-    (isFormVisible, (isVisible) => {
-    if (!isVisible) {
-        selectedId.value = null; // Reset ID saat form ditutup
-    }
-    window.scrollTo(0, 0);
-});
+const openEditForm = (role: Role) => {
+    selectedId.value = role.id;
+    isFormVisible.value = true;
+};
+
+const deleteRole = (id: number) => {
+    Swal.fire({
+        text: "Apakah Anda yakin ingin menghapus role ini?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Ya, Hapus",
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                await ApiService.delete(`/master/roles/${id}`);
+                Swal.fire("Berhasil!", "Role telah dihapus.", "success");
+                fetchRoles();
+            } catch (error) {
+                Swal.fire("Gagal", "Terjadi kesalahan saat menghapus.", "error");
+            }
+        }
+    });
+};
+
+onMounted(fetchRoles);
 </script>
-
-<template>
-    <Form
-        v-if="isFormVisible"
-        :selected="selectedId"
-        @close="isFormVisible = false"
-        @refresh="refreshTable"
-    />
-
-    <div class="card shadow-sm">
-        <div class="card-header align-items-center">
-            <h2 class="mb-0">Manajemen Role</h2>
-            <button
-                type="button"
-                class="btn btn-sm btn-primary ms-auto"
-                v-if="!isFormVisible"
-                @click="openAddForm"
-            >
-                <i class="ki-duotone ki-plus fs-2"></i>
-                Tambah Role
-            </button>
-        </div>
-        <div class="card-body">
-            <PaginateDataTable
-                ref="paginateRef"
-                id="table-role"
-                url="/master/roles"
-                :columns="columns"
-            ></PaginateDataTable>
-        </div>
-    </div>
-</template>

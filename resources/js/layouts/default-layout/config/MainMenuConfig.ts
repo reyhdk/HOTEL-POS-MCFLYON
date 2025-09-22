@@ -1,6 +1,6 @@
 import type { MenuItem } from "@/layouts/default-layout/config/types";
 
-const MainMenuConfig: Array<MenuItem> = [
+const MainMenuConfig: MenuItem[] = [
   // =======================================================
   // == MENU UNTUK USER (TAMU) ==
   // =======================================================
@@ -12,14 +12,12 @@ const MainMenuConfig: Array<MenuItem> = [
         keenthemesIcon: "element-11",
         roles: ["user"],
       },
-      // --- [DITAMBAHKAN] Menu untuk Fitur Pesan Makanan Online ---
       {
         heading: "Restaurant",
-        route: "/user/food-order", // Ini adalah rute baru untuk halaman pesanan
-        keenthemesIcon: "coffee",    // Ikon yang cocok untuk makanan/minuman
+        route: "/user/food-order",
+        keenthemesIcon: "coffee",
         roles: ["user"],
       },
-      // -----------------------------------------------------------
       {
         heading: "Booking Online",
         route: "/user/booking",
@@ -43,6 +41,7 @@ const MainMenuConfig: Array<MenuItem> = [
       {
         heading: "Dashboard Admin",
         route: "/admin/dashboard",
+        name: "view dashboard", // [DIBENARKAN] Ditambahkan 'name'
         keenthemesIcon: "element-11",
         roles: ["admin"],
       },
@@ -56,27 +55,32 @@ const MainMenuConfig: Array<MenuItem> = [
       {
         sectionTitle: "Point of Sale",
         route: "/pos",
+        name: "pos", // [DIBENARKAN] Ditambahkan 'name' induk
         keenthemesIcon: "basket",
         roles: ["admin"],
         sub: [
           {
             heading: "Buat Pesanan",
             route: "/admin/pos",
+            name: "create pos_orders", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
-            heading: "Pesanan Online", 
+            heading: "Pesanan Online",
             route: "/admin/online-orders",
+            name: "view online_orders", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
             heading: "Daftar Tagihan",
             route: "/admin/payment",
+            name: "manage payments", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
             heading: "Folio Kamar",
             route: "/admin/folio",
+            name: "view folios", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
         ],
@@ -84,12 +88,14 @@ const MainMenuConfig: Array<MenuItem> = [
       {
         sectionTitle: "Laporan",
         route: "/reports",
+        name: "reports", // [DIBENARKAN] Ditambahkan 'name' induk
         keenthemesIcon: "chart-simple",
         roles: ["admin"],
         sub: [
           {
             heading: "Riwayat Transaksi",
             route: "/admin/history",
+            name: "view transaction_history", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
         ],
@@ -97,38 +103,44 @@ const MainMenuConfig: Array<MenuItem> = [
       {
         sectionTitle: "Master",
         route: "/master",
+        name: "master", // [DIBENARKAN] Ditambahkan 'name' induk
         keenthemesIcon: "cube-3",
         roles: ["admin"],
         sub: [
           {
             heading: "Kamar",
             route: "/admin/master/rooms",
+            name: "view rooms", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
-           {
+          {
             heading: "Fasilitas",
             route: "/admin/master/facilities",
-            keenthemesIcon: "element-11",
+            name: "view facilities", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
             heading: "Tamu",
             route: "/admin/master/guests",
+            name: "view guests", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
             heading: "Menu",
             route: "/admin/master/menus",
+            name: "view menus", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
             heading: "Users",
             route: "/admin/master/users",
+            name: "view users", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
             heading: "Roles",
             route: "/admin/master/roles",
+            name: "view roles", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
         ],
@@ -136,12 +148,14 @@ const MainMenuConfig: Array<MenuItem> = [
       {
         sectionTitle: "Pengaturan",
         route: "/pengaturan",
+        name: "settings", // [DIBENARKAN] Ditambahkan 'name' induk
         keenthemesIcon: "setting-2",
         roles: ["admin"],
         sub: [
           {
             heading: "Website Setting",
             route: "/admin/setting",
+            name: "edit settings", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
         ],

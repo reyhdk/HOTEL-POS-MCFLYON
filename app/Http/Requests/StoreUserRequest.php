@@ -12,6 +12,7 @@ class StoreUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
+        // Diasumsikan otorisasi sudah ditangani oleh middleware di rute
         return true;
     }
 
@@ -23,12 +24,12 @@ class StoreUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'required',
-            'email' => 'required|email|unique:users',
-            'password' => ['required', 'confirmed', Password::default()],
-            'phone' => 'required|unique:users',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'phone' => 'required|string|unique:users,phone',
             'photo' => 'nullable|image',
-            'role_id' => 'required'
+            'role_name' => 'required|string|exists:roles,name',
         ];
     }
 }
