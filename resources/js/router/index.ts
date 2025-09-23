@@ -47,7 +47,7 @@ const routes: Array<RouteRecordRaw> = [
       {
         path: "food-order",
         name: "user-food-order",
-        component: () => import("@/pages/user-dashboard/food-order/index.vue"),
+        component: () => import("@/pages/user-dashboard/food-order/Index.vue"),
         meta: {
           pageTitle: "Pesan Makanan",
           breadcrumbs: ["Dashboard", "Pesan Makanan"],
@@ -56,7 +56,7 @@ const routes: Array<RouteRecordRaw> = [
       {
         path: "payment/:orderId",
         name: "user-payment",
-        component: () => import("@/pages/user-dashboard/payment-page/index.vue"),
+        component: () => import("@/pages/user-dashboard/payment-page/Index.vue"),
         meta: {
           pageTitle: "Pembayaran",
           breadcrumbs: ["Dashboard", "Pesan Makanan", "Pembayaran"],

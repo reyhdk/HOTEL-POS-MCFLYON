@@ -10,9 +10,10 @@ export interface User {
   name: string;
   email: string;
   phone: string;
-  photo?: string;
-  permission: Array<string>;
+  photo_url?: string;
+  all_permissions: string[]; // [DIBENARKAN] Disesuaikan dengan accessor di backend
   role?: {
+    id: number;
     name: string;
     full_name: string;
   };
@@ -24,7 +25,7 @@ export const useAuthStore = defineStore("auth", () => {
   const isAuthenticated = ref(!!JwtService.getToken());
 
   const isUserLoaded = computed(() => !!user.value);
-  const userRole = computed(() => user.value?.role?.name || 'user');
+  const userRole = computed(() => user.value?.role?.name || '');
 
   function setAuth(authUser: User, token?: string) {
     isAuthenticated.value = true;
@@ -32,7 +33,6 @@ export const useAuthStore = defineStore("auth", () => {
     errors.value = {};
     if (token) {
       JwtService.saveToken(token);
-      // ApiService.setHeader(); // <-- HAPUS BARIS INI
     }
   }
 
@@ -41,13 +41,17 @@ export const useAuthStore = defineStore("auth", () => {
     user.value = null;
     errors.value = {};
     JwtService.destroyToken();
-    // ApiService.removeHeader(); // <-- HAPUS BARIS INI
   }
 
   function handleRedirect(loggedInUser: User) {
-    if (loggedInUser?.role?.name === 'admin') {
+    const staffRoles = ['admin', 'receptionist', 'chef', 'cleaning-service'];
+    const userRoleName = loggedInUser?.role?.name;
+
+    if (userRoleName && staffRoles.includes(userRoleName)) {
+      // Jika rolenya adalah salah satu dari staf, arahkan ke dasbor admin
       router.push({ name: "admin-dashboard" });
     } else {
+      // Jika bukan, berarti itu tamu (user)
       router.push({ name: "user-dashboard" });
     }
   }
@@ -67,30 +71,24 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function register(credentials: any) {
-  try {
-    // 1. Kirim data kredensial ke endpoint 'auth/register'
-    const { data } = await ApiService.post("auth/register", credentials);
-
-    // 2. Ambil data user dan token dari respons server
-    const newUser = data.data.user;
-    const token = data.data.token;
-
-    // 3. Simpan data user dan token, set status menjadi "terautentikasi"
-    setAuth(newUser, token);
-
-    // 4. Arahkan user ke dashboard yang sesuai setelah berhasil mendaftar
-    handleRedirect(newUser);
-  } catch (error: any) {
-    // 5. Jika terjadi error (misal: email sudah terdaftar)
-    // Simpan pesan error untuk ditampilkan di halaman
-    errors.value = error.response?.data?.errors || { message: ["Gagal mendaftar."] };
-    throw error; // Lemparkan error agar komponen bisa menangani
+    try {
+      const { data } = await ApiService.post("auth/register", credentials);
+      const newUser = data.data.user;
+      const token = data.data.token;
+      setAuth(newUser, token);
+      handleRedirect(newUser);
+    } catch (error: any) {
+      errors.value = error.response?.data?.errors || { message: ["Gagal mendaftar."] };
+      throw error;
+    }
   }
-}
 
   async function logout() {
     try {
-      await ApiService.delete("auth/logout");
+      // Hanya panggil API logout jika ada token
+      if(JwtService.getToken()){
+        await ApiService.delete("auth/logout");
+      }
     } catch (error) {
       console.error("Logout gagal:", error);
     } finally {
@@ -105,7 +103,6 @@ export const useAuthStore = defineStore("auth", () => {
       return;
     }
 
-    // ApiService.setHeader(); // <-- HAPUS BARIS INI
     try {
       const { data } = await ApiService.get("auth/me");
       setAuth(data.data.user);

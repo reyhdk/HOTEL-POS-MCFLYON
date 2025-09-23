@@ -1,119 +1,107 @@
-<?php 
+<?php
 
- use Illuminate\Support\Facades\Route; 
- // --- Controller Imports --- 
- use App\Http\Controllers\Api\CheckInController; 
- use App\Http\Controllers\Api\DashboardController; 
- use App\Http\Controllers\Api\FacilityController; 
- use App\Http\Controllers\Api\FolioController; 
- use App\Http\Controllers\Api\GuestController; 
- use App\Http\Controllers\Api\MenuController; 
- use App\Http\Controllers\Api\OrderController; 
- use App\Http\Controllers\Api\PaymentController; 
- use App\Http\Controllers\Api\RoomController; 
- use App\Http\Controllers\AuthController; 
- use App\Http\Controllers\RoleController; 
- use App\Http\Controllers\SettingController; 
- use App\Http\Controllers\UserController; 
- use App\Http\Controllers\Api\UserBookingController; 
- use App\Http\Controllers\Api\BookingController; 
- use App\Http\Controllers\Api\Guest\GuestOrderController; 
- use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController; 
+use Illuminate\Support\Facades\Route;
+// --- Controller Imports ---
+use App\Http\Controllers\Api\CheckInController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\FacilityController;
+use App\Http\Controllers\Api\FolioController;
+use App\Http\Controllers\Api\GuestController;
+use App\Http\Controllers\Api\MenuController;
+use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\RoomController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SettingController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\Api\UserBookingController;
+use App\Http\Controllers\Api\BookingController;
+use App\Http\Controllers\Api\Guest\GuestOrderController;
+use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
 
+// ==================================================
+// RUTE PUBLIK & AUTENTIKASI
+// ==================================================
+Route::prefix('public')->group(function () {
+    Route::get('/available-rooms', [RoomController::class, 'getAvailableRooms']);
+    Route::get('/room-details/{room}', [RoomController::class, 'showPublic']);
+    Route::post('/bookings', [BookingController::class, 'store']);
+    Route::get('/facilities', [FacilityController::class, 'index']);
+});
 
- /* |-------------------------------------------------------------------------- 
- | API Routes 
- |-------------------------------------------------------------------------- 
- */ 
+Route::prefix('auth')->group(function () {
+    Route::post('login', [AuthController::class, 'login']);
+    Route::post('register', [AuthController::class, 'register']);
+});
 
- // ================================================== 
- // RUTE PUBLIK (TIDAK PERLU LOGIN) 
- // ================================================== 
+// ==================================================
+// RUTE TERAUTENTIKASI (PERLU LOGIN)
+// ==================================================
+Route::middleware('auth:api')->group(function () {
 
- Route::prefix('public')->group(function () { 
-     Route::get('/available-rooms', [RoomController::class, 'getAvailableRooms']); 
-     Route::get('/room-details/{room}', [RoomController::class, 'showPublic']); 
-     Route::post('/bookings', [BookingController::class, 'store']); 
-     Route::get('/facilities', [FacilityController::class, 'index']); 
- }); 
+    // Auth & User Profile
+    Route::prefix('auth')->group(function () {
+        Route::delete('logout', [AuthController::class, 'logout']);
+        Route::get('me', [AuthController::class, 'me']);
+    });
 
- // Autentikasi untuk ADMIN PANEL 
- Route::prefix('auth')->group(function () { 
-     Route::post('login', [AuthController::class, 'login']); 
-     Route::post('register', [AuthController::class, 'register']); 
- }); 
+    // --- RUTE KHUSUS TAMU (USER) ---
+    Route::prefix('guest')->name('guest.')->group(function () {
+        Route::get('/profile', [GuestOrderController::class, 'getProfile']);
+        Route::get('/menu', [MenuController::class, 'index']);
+        Route::post('/orders', [GuestOrderController::class, 'store']);
+        Route::get('/orders', [GuestOrderController::class, 'getOrderHistory']);
+        Route::get('/orders/{order}', [GuestOrderController::class, 'show']);
+        Route::post('/orders/{order}/pay', [GuestOrderController::class, 'processPayment']);
+    });
+    
+    Route::get('/my-bookings', [UserBookingController::class, 'index']);
 
+    // --- RUTE PANEL ADMIN (DILINDUNGI DENGAN PERMISSION) ---
+    
+    // Dashboard (butuh izin 'view dashboard')
+    Route::get('/dashboard-stats', [DashboardController::class, 'getStats'])->middleware('can:view dashboard');
+    Route::get('/sales-chart-data', [DashboardController::class, 'getSalesChartData'])->middleware('can:view dashboard');
 
+    // POS & Pesanan
+    Route::post('/orders', [OrderController::class, 'store'])->middleware('can:create pos_orders');
+    Route::get('/pending-orders', [PaymentController::class, 'getPendingOrders'])->middleware('can:manage payments');
+    Route::get('/transaction-history', [PaymentController::class, 'getTransactionHistory'])->middleware('can:view transaction_history');
+    Route::post('/orders/{order}/pay', [PaymentController::class, 'processPayment'])->middleware('can:manage payments');
+    Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancelOrder'])->middleware('can:manage payments');
+    Route::get('/folios', [FolioController::class, 'index'])->middleware('can:view folios');
+    Route::post('/folios/{room}/checkout', [FolioController::class, 'processFolioPaymentAndCheckout'])->middleware('can:manage payments');
+    
+    // Manajemen Pesanan Online
+    Route::get('/online-orders', [AdminOrderController::class, 'index'])->middleware('can:view online_orders');
+    Route::get('/online-orders/{order}', [AdminOrderController::class, 'show'])->middleware('can:view online_orders');
+    Route::patch('/online-orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->middleware('can:view online_orders');
 
- Route::get('/my-bookings', [UserBookingController::class, 'index']); 
- Route::get('/setting', [SettingController::class, 'index']); 
+    // Check-in & Check-out
+    Route::post('/check-in', [CheckInController::class, 'store'])->middleware('can:create pos_orders');
+    Route::post('/check-out/{room}', [CheckInController::class, 'checkout'])->middleware('can:create pos_orders');
 
- // ================================================== 
- // RUTE TERAUTENTIKASI (PERLU LOGIN) 
- // ================================================== 
- Route::middleware('auth:api')->group(function () { 
+    // Manajemen Master Data
+    Route::apiResource('menus', MenuController::class)->middleware('can:view menus');
+    Route::apiResource('rooms', RoomController::class)->middleware('can:view rooms');
+    Route::apiResource('facilities', FacilityController::class)->middleware('can:view facilities');
+    Route::apiResource('guests', GuestController::class)->middleware('can:view guests');
+    
+    // Grup untuk Users & Roles
+    Route::prefix('master')->group(function () {
+        Route::get('/all-roles', [UserController::class, 'getAllRoles'])->middleware('can:view roles');
+        Route::apiResource('users', UserController::class)->scoped(['user' => 'uuid'])->middleware('can:view users');
+        Route::apiResource('roles', RoleController::class)->middleware('can:view roles');
+    });
 
-     // Auth & User Profile (Admin) 
-     Route::prefix('auth')->group(function () { 
-         Route::delete('logout', [AuthController::class, 'logout']); 
-         Route::get('me', [AuthController::class, 'me']); 
-     }); 
-
-     // ================================================== 
-     // --- RUTE KHUSUS TAMU --- (SETELAH TAMU LOGIN) 
-     // ================================================== 
-  Route::prefix('guest')->name('guest.')->group(function () { 
-         Route::get('/profile', [GuestOrderController::class, 'getProfile']); 
-         Route::get('/menu', [MenuController::class, 'index']); 
-         Route::post('/orders', [GuestOrderController::class, 'store']); 
-         Route::get('/orders', [GuestOrderController::class, 'getOrderHistory']); 
-         Route::get('/orders/{order}', [GuestOrderController::class, 'show']); 
-         Route::post('/orders/{order}/pay', [GuestOrderController::class, 'processPayment']); 
-     }); 
-
-     // --- RUTE KHUSUS ADMIN --- 
-     Route::middleware('role:admin')->group(function () { 
-         // Dashboard 
-         Route::get('/dashboard-stats', [DashboardController::class, 'getStats']); 
-         Route::get('/sales-chart-data', [DashboardController::class, 'getSalesChartData']); 
-
-         // Menu Management 
-         Route::apiResource('menus', MenuController::class); 
-
-         // Room Management & Cleaning 
-         Route::apiResource('rooms', RoomController::class); 
-         Route::post('/rooms/{room}/mark-for-cleaning', [RoomController::class, 'markForCleaning']); 
-         Route::post('/rooms/{room}/mark-as-clean', [RoomController::class, 'markAsClean']); 
-         Route::post('/rooms/{room}/request-cleaning', [RoomController::class, 'requestCleaning']); 
-
-         // Facility Management 
-         Route::apiResource('facilities', FacilityController::class); 
-
-         // Guest Management 
-         Route::apiResource('guests', GuestController::class); 
-
-         // Check-in & Check-out 
-         Route::post('/check-in', [CheckInController::class, 'store']); 
-         Route::post('/check-out/{room}', [CheckInController::class, 'checkout']); 
-
-         // Order, Payment, & Folio (POS Admin) 
-         Route::post('/orders', [OrderController::class, 'store']); 
-         Route::get('/pending-orders', [PaymentController::class, 'getPendingOrders']); 
-         Route::get('/transaction-history', [PaymentController::class, 'getTransactionHistory']); 
-         Route::post('/orders/{order}/pay', [PaymentController::class, 'processPayment']); 
-         Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancelOrder']); 
-         Route::get('/folios', [FolioController::class, 'index']); 
-         Route::post('/folios/{room}/checkout', [FolioController::class, 'processFolioPaymentAndCheckout']); 
-         Route::get('/online-orders', [AdminOrderController::class, 'index']); 
-         Route::get('/online-orders/{order}', [AdminOrderController::class, 'show']); // <-- TAMBAHKAN INI 
-         // routes/api.php 
-
-         Route::patch('/online-orders/{order}/status', [AdminOrderController::class, 'updateStatus']); // <-- TAMBAHKAN INI 
-
-         // Settings, Users & Roles 
-          Route::get('/all-roles', [UserController::class, 'getAllRoles']); // Untuk dropdown di form user 
-         Route::apiResource('/master/users', UserController::class); 
-         Route::apiResource('/master/roles', RoleController::class); 
-         }); 
-     });
+    // Pengaturan
+    Route::get('/setting', [SettingController::class, 'index'])->middleware('can:edit settings');
+    Route::post('/setting', [SettingController::class, 'update'])->middleware('can:edit settings');
+});
