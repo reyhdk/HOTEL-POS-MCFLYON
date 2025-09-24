@@ -102,44 +102,44 @@ const MainMenuConfig: MenuItem[] = [
       },
       {
         sectionTitle: "Master",
-        route: "/master",
+        route: "/admin",
         name: "master", // [DIBENARKAN] Ditambahkan 'name' induk
         keenthemesIcon: "cube-3",
         roles: ["admin"],
         sub: [
           {
             heading: "Kamar",
-            route: "/admin/master/rooms",
+            route: "/admin/admin/rooms",
             name: "view rooms", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
             heading: "Fasilitas",
-            route: "/admin/master/facilities",
+            route: "/admin/admin/facilities",
             name: "view facilities", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
             heading: "Tamu",
-            route: "/admin/master/guests",
+            route: "/admin/admin/guests",
             name: "view guests", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
             heading: "Menu",
-            route: "/admin/master/menus",
+            route: "/admin/admin/menus",
             name: "view menus", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
             heading: "Users",
-            route: "/admin/master/users",
+            route: "/admin/admin/users",
             name: "view users", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
           {
             heading: "Roles",
-            route: "/admin/master/roles",
+            route: "/admin/admin/roles",
             name: "view roles", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },

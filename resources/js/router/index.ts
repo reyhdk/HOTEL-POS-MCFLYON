@@ -4,19 +4,18 @@ import JwtService from "@/core/services/JwtService";
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
 
-// Deklarasi tipe Anda, menggunakan 'role'
 declare module "vue-router" {
   interface RouteMeta {
     pageTitle?: string;
     breadcrumb?: string[];
     middleware?: "auth" | "guest";
-    role?: "admin" | "user";
+    role?: string | string[];
   }
 }
 
 const routes: Array<RouteRecordRaw> = [
   // =======================================================
-  // ▼▼▼ GRUP RUTE USER ▼▼▼
+  // ▼▼▼ GRUP RUTE USER (TAMU) ▼▼▼
   // =======================================================
   {
     path: "/user",
@@ -33,10 +32,7 @@ const routes: Array<RouteRecordRaw> = [
         path: "booking",
         name: "user-booking",
         component: () => import("@/pages/user-dashboard/bookings/Index.vue"),
-        meta: {
-          pageTitle: "Booking Online",
-          breadcrumb: ["Dashboard", "Booking"],
-        },
+        meta: { pageTitle: "Booking Online", breadcrumb: ["Dashboard", "Booking"] },
       },
       {
         path: 'booking-history',
@@ -48,30 +44,24 @@ const routes: Array<RouteRecordRaw> = [
         path: "food-order",
         name: "user-food-order",
         component: () => import("@/pages/user-dashboard/food-order/Index.vue"),
-        meta: {
-          pageTitle: "Pesan Makanan",
-          breadcrumbs: ["Dashboard", "Pesan Makanan"],
-        },
+        meta: { pageTitle: "Pesan Makanan", breadcrumbs: ["Dashboard", "Pesan Makanan"] },
       },
       {
         path: "payment/:orderId",
         name: "user-payment",
         component: () => import("@/pages/user-dashboard/payment-page/Index.vue"),
-        meta: {
-          pageTitle: "Pembayaran",
-          breadcrumbs: ["Dashboard", "Pesan Makanan", "Pembayaran"],
-        },
+        meta: { pageTitle: "Pembayaran", breadcrumbs: ["Dashboard", "Pesan Makanan", "Pembayaran"] },
       }
     ],
   },
 
   // =======================================================
-  // ▼▼▼ GRUP RUTE ADMIN ▼▼▼
+  // ▼▼▼ GRUP RUTE ADMIN & STAF LAINNYA ▼▼▼
   // =======================================================
   {
     path: "/admin",
     component: () => import("@/layouts/default-layout/DefaultLayout.vue"),
-    meta: { middleware: "auth", role: "admin" },
+    meta: { middleware: "auth", role: ['admin', 'receptionist', 'chef', 'cleaning-service'] },
     children: [
       {
         path: "dashboard",
@@ -85,7 +75,7 @@ const routes: Array<RouteRecordRaw> = [
         component: () => import("@/pages/dashboard/pos/Index.vue"),
         meta: { pageTitle: "Point of Sale" },
       },
-       {
+      {
         path: "online-orders",
         name: "admin-online-orders",
         component: () => import("@/pages/dashboard/online-orders/Index.vue"),
@@ -155,15 +145,15 @@ const routes: Array<RouteRecordRaw> = [
   },
 
   // =======================================================
-  // ▼▼▼ GRUP RUTE GUEST & 404 ▼▼▼
+  // ▼▼▼ GRUP RUTE AUTENTIKASI (DIPERBAIKI) ▼▼▼
   // =======================================================
   {
-    path: "/",
+    path: "/auth", // 1. Path induk diubah menjadi /auth
     component: () => import("@/layouts/AuthLayout.vue"),
     meta: { middleware: "guest" },
     children: [
       {
-        path: "",
+        path: "sign-in", // 2. Path anak sekarang menjadi 'sign-in'
         name: "sign-in",
         component: () => import("@/pages/auth/sign-in/Index.vue"),
         meta: { pageTitle: "Sign In" },
@@ -175,6 +165,11 @@ const routes: Array<RouteRecordRaw> = [
         meta: { pageTitle: "Sign Up" },
       },
     ],
+  },
+  {
+    // 3. Rute root (/) sekarang akan otomatis mengarahkan ke halaman login
+    path: "/",
+    redirect: "/auth/sign-in",
   },
   {
     path: "/:pathMatch(.*)*",
@@ -193,45 +188,52 @@ const router = createRouter({
 
 NProgress.configure({ showSpinner: false });
 
+// [DIBENARKAN] Logika Navigation Guard yang lebih aman
 router.beforeEach(async (to, from, next) => {
   NProgress.start();
   document.title = `${to.meta.pageTitle || 'Welcome'} - ${import.meta.env.VITE_APP_NAME}`;
 
   const authStore = useAuthStore();
+  const token = JwtService.getToken();
 
-  // Selalu coba pulihkan sesi jika token ada tapi data user belum dimuat
-  if (JwtService.getToken() && !authStore.isUserLoaded) {
+  if (token && !authStore.isUserLoaded) {
     await authStore.verifyAuth();
   }
 
   const isAuthenticated = authStore.isAuthenticated;
   const userRole = authStore.userRole;
+  const staffRoles = ['admin', 'receptionist', 'chef', 'cleaning-service'];
 
-  const requiresAuth = to.meta.middleware === 'auth';
-  const requiresGuest = to.meta.middleware === 'guest';
-  const requiredRole = to.meta.role;
-
-  // Logika untuk rute yang butuh login ('auth')
-  if (requiresAuth) {
+  // 1. Logika untuk halaman tamu (login, register)
+  if (to.meta.middleware === "guest") {
+    if (isAuthenticated) {
+      if (staffRoles.includes(userRole)) {
+        return next({ name: 'admin-dashboard' });
+      }
+      return next({ name: 'user-dashboard' });
+    }
+    return next();
+  }
+  
+  // 2. Logika untuk halaman yang butuh login
+  if (to.meta.middleware === "auth") {
     if (!isAuthenticated) {
       return next({ name: 'sign-in' });
     }
-    if (requiredRole && requiredRole !== userRole) {
-      if (userRole === 'admin') return next({ name: 'admin-dashboard' });
-      return next({ name: 'user-dashboard' });
+
+    // Cek otorisasi berdasarkan role
+    if (to.meta.role) {
+      const requiredRoles = Array.isArray(to.meta.role) ? to.meta.role : [to.meta.role];
+      if (!requiredRoles.includes(userRole)) {
+        return next({ name: '404' });
+      }
     }
   }
 
-  // Logika untuk rute tamu ('guest')
-  if (requiresGuest && isAuthenticated) {
-    if (userRole === 'admin') return next({ name: 'admin-dashboard' });
-    return next({ name: 'user-dashboard' });
-  }
-
-  // Jika semua kondisi di atas tidak terpenuhi, izinkan akses
-  next();
+  // 3. Jika semua kondisi lolos, izinkan akses
+  return next();
 });
-
+    
 router.afterEach(() => {
   NProgress.done();
 });

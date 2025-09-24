@@ -27,7 +27,7 @@ use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 */
 
 // ==================================================
-// RUTE PUBLIK & AUTENTIKASI
+// RUTE PUBLIK (TIDAK PERLU LOGIN)
 // ==================================================
 Route::prefix('public')->group(function () {
     Route::get('/available-rooms', [RoomController::class, 'getAvailableRooms']);
@@ -36,6 +36,10 @@ Route::prefix('public')->group(function () {
     Route::get('/facilities', [FacilityController::class, 'index']);
 });
 
+// [DIPERBAIKI] Rute setting untuk mengambil data (GET) dipindahkan ke sini
+Route::get('/setting', [SettingController::class, 'index']);
+
+// Autentikasi
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
     Route::post('register', [AuthController::class, 'register']);
@@ -52,7 +56,9 @@ Route::middleware('auth:api')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
     });
 
-    // --- RUTE KHUSUS TAMU (USER) ---
+    Route::get('/my-bookings', [UserBookingController::class, 'index']);
+    
+    // --- RUTE KHUSUS TAMU ---
     Route::prefix('guest')->name('guest.')->group(function () {
         Route::get('/profile', [GuestOrderController::class, 'getProfile']);
         Route::get('/menu', [MenuController::class, 'index']);
@@ -61,14 +67,16 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/orders/{order}', [GuestOrderController::class, 'show']);
         Route::post('/orders/{order}/pay', [GuestOrderController::class, 'processPayment']);
     });
-    
-    Route::get('/my-bookings', [UserBookingController::class, 'index']);
 
     // --- RUTE PANEL ADMIN (DILINDUNGI DENGAN PERMISSION) ---
     
-    // Dashboard (butuh izin 'view dashboard')
-    Route::get('/dashboard-stats', [DashboardController::class, 'getStats'])->middleware('can:view dashboard');
-    Route::get('/sales-chart-data', [DashboardController::class, 'getSalesChartData'])->middleware('can:view dashboard');
+    // [DIPERBAIKI] Rute untuk UPDATE setting tetap di sini agar aman
+    Route::post('/setting', [SettingController::class, 'update'])->middleware('can:edit settings');
+    
+    Route::middleware('can:view dashboard')->group(function () {
+        Route::get('/dashboard-stats', [DashboardController::class, 'getStats']);
+        Route::get('/sales-chart-data', [DashboardController::class, 'getSalesChartData']);
+    });
 
     // POS & Pesanan
     Route::post('/orders', [OrderController::class, 'store'])->middleware('can:create pos_orders');
@@ -87,21 +95,16 @@ Route::middleware('auth:api')->group(function () {
     // Check-in & Check-out
     Route::post('/check-in', [CheckInController::class, 'store'])->middleware('can:create pos_orders');
     Route::post('/check-out/{room}', [CheckInController::class, 'checkout'])->middleware('can:create pos_orders');
-
+    
     // Manajemen Master Data
     Route::apiResource('menus', MenuController::class)->middleware('can:view menus');
     Route::apiResource('rooms', RoomController::class)->middleware('can:view rooms');
     Route::apiResource('facilities', FacilityController::class)->middleware('can:view facilities');
     Route::apiResource('guests', GuestController::class)->middleware('can:view guests');
     
-    // Grup untuk Users & Roles
     Route::prefix('master')->group(function () {
         Route::get('/all-roles', [UserController::class, 'getAllRoles'])->middleware('can:view roles');
         Route::apiResource('users', UserController::class)->scoped(['user' => 'uuid'])->middleware('can:view users');
         Route::apiResource('roles', RoleController::class)->middleware('can:view roles');
     });
-
-    // Pengaturan
-    Route::get('/setting', [SettingController::class, 'index'])->middleware('can:edit settings');
-    Route::post('/setting', [SettingController::class, 'update'])->middleware('can:edit settings');
 });
