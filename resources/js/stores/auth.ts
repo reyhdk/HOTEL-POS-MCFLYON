@@ -11,7 +11,6 @@ export interface User {
   email: string;
   phone: string;
   photo_url?: string;
-  all_permissions: string[]; // [DIBENARKAN] Disesuaikan dengan accessor di backend
   role?: {
     id: number;
     name: string;
@@ -23,13 +22,22 @@ export const useAuthStore = defineStore("auth", () => {
   const errors = ref<any>({});
   const user = ref<User | null>(null);
   const isAuthenticated = ref(!!JwtService.getToken());
+  // ▼▼▼ TAMBAHKAN STATE UNTUK PERMISSIONS ▼▼▼
+  const permissions = ref<string[]>([]);
 
   const isUserLoaded = computed(() => !!user.value);
   const userRole = computed(() => user.value?.role?.name || '');
 
-  function setAuth(authUser: User, token?: string) {
+  // ▼▼▼ TAMBAHKAN COMPUTED PROPERTY UNTUK MENGECEK PERMISSION ▼▼▼
+  const hasPermission = computed(() => {
+    return (permissionName: string) => permissions.value.includes(permissionName);
+  });
+
+  function setAuth(authData: any, token?: string) {
     isAuthenticated.value = true;
-    user.value = authUser;
+    user.value = authData.user;
+    // ▼▼▼ SIMPAN PERMISSIONS KE DALAM STATE ▼▼▼
+    permissions.value = authData.permissions || [];
     errors.value = {};
     if (token) {
       JwtService.saveToken(token);
@@ -39,30 +47,22 @@ export const useAuthStore = defineStore("auth", () => {
   function purgeAuth() {
     isAuthenticated.value = false;
     user.value = null;
+    // ▼▼▼ KOSONGKAN JUGA PERMISSIONS SAAT LOGOUT ▼▼▼
+    permissions.value = [];
     errors.value = {};
     JwtService.destroyToken();
   }
 
   function handleRedirect(loggedInUser: User) {
-    const staffRoles = ['admin', 'receptionist', 'chef', 'cleaning-service'];
-    const userRoleName = loggedInUser?.role?.name;
-
-    if (userRoleName && staffRoles.includes(userRoleName)) {
-      // Jika rolenya adalah salah satu dari staf, arahkan ke dasbor admin
-      router.push({ name: "admin-dashboard" });
-    } else {
-      // Jika bukan, berarti itu tamu (user)
-      router.push({ name: "user-dashboard" });
-    }
+    // ... (Fungsi ini tidak perlu diubah)
   }
 
   async function login(credentials: any) {
     try {
       const { data } = await ApiService.post("auth/login", credentials);
-      const loggedInUser = data.data.user;
-      const token = data.data.token;
-      setAuth(loggedInUser, token);
-      handleRedirect(loggedInUser);
+      // 'data.data' sekarang berisi { user, permissions, token }
+      setAuth(data.data, data.data.token); 
+      handleRedirect(data.data.user);
     } catch (error: any) {
       purgeAuth();
       errors.value = error.response?.data?.message || "Email atau password salah.";
@@ -97,15 +97,15 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function verifyAuth() {
+    async function verifyAuth() {
     if (!JwtService.getToken()) {
       purgeAuth();
       return;
     }
 
-    try {
+     try {
       const { data } = await ApiService.get("auth/me");
-      setAuth(data.data.user);
+      setAuth(data.data);
     } catch (error) {
       purgeAuth();
     }
@@ -117,9 +117,11 @@ export const useAuthStore = defineStore("auth", () => {
     isAuthenticated,
     isUserLoaded,
     userRole,
+    permissions,// Expose permissions
+    hasPermission, 
     login,
     logout,
     register,
     verifyAuth,
   };
-});
+}); // End of defineStore

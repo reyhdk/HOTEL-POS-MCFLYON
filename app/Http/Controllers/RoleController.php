@@ -3,29 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\RoleRequest;
-use Spatie\Permission\Models\Role; // [DIBENARKAN] Menggunakan model Spatie langsung
-use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class RoleController extends Controller
 {
-    /**
-     * Menampilkan daftar role (bisa paginasi atau list lengkap).
-     */
     public function index(Request $request)
     {
-        // Jika hanya butuh list untuk dropdown
         if ($request->has('list_only')) {
             return Role::where('name', '!=', 'admin')->get();
         }
 
-        // Logika paginasi untuk tabel
         $perPage = $request->input('per_page', 10);
         $search = $request->input('search');
 
-        $query = Role::where('name', '!=', 'admin'); // Jangan tampilkan role superadmin
+        $query = Role::where('name', '!=', 'admin');
 
         if ($search) {
+            // [PERBAIKAN] Menggunakan sintaks function yang lebih kompatibel
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('full_name', 'like', "%{$search}%");
@@ -35,33 +31,33 @@ class RoleController extends Controller
         return $query->latest()->paginate($perPage);
     }
 
-    /**
-     * Menyimpan role baru.
-     */
     public function store(RoleRequest $request)
     {
         $validatedData = $request->validated();
 
-        $role = Role::create([
-            'name' => $validatedData['name'],
-            'guard_name' => 'api',
-            'full_name' => $validatedData['full_name']
-        ]);
+        DB::beginTransaction();
+        try {
+            $role = Role::create([
+                'name' => $validatedData['name'],
+                'guard_name' => 'api',
+                'full_name' => $validatedData['full_name']
+            ]);
 
-        if (!empty($validatedData['permissions'])) {
-            $permissions = Permission::whereIn('name', $validatedData['permissions'])->get();
-            $role->syncPermissions($permissions);
+            if (!empty($validatedData['permissions'])) {
+                $role->syncPermissions($validatedData['permissions']);
+            }
+
+            DB::commit();
+            return response()->json($role, 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Gagal menyimpan role.'], 500);
         }
-
-        return response()->json($role, 201);
     }
 
-    /**
-     * Menampilkan satu role spesifik.
-     */
     public function show(Role $role)
     {
-        // Mengembalikan role beserta nama-nama permission-nya
         return response()->json([
             'id' => $role->id,
             'name' => $role->name,
@@ -70,27 +66,28 @@ class RoleController extends Controller
         ]);
     }
 
-    /**
-     * Memperbarui role yang ada.
-     */
     public function update(RoleRequest $request, Role $role)
     {
         $validatedData = $request->validated();
 
-        $role->update([
-            'name' => $validatedData['name'],
-            'full_name' => $validatedData['full_name']
-        ]);
+        DB::beginTransaction();
+        try {
+            $role->update([
+                'name' => $validatedData['name'],
+                'full_name' => $validatedData['full_name']
+            ]);
+            
+            $role->syncPermissions($validatedData['permissions'] ?? []);
 
-        $permissions = Permission::whereIn('name', $validatedData['permissions'] ?? [])->get();
-        $role->syncPermissions($permissions);
+            DB::commit();
+            return response()->json($role);
 
-        return response()->json($role);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Gagal memperbarui role.'], 500);
+        }
     }
 
-    /**
-     * Menghapus role.
-     */
     public function destroy(Role $role)
     {
         if ($role->name === 'admin') {
@@ -98,7 +95,6 @@ class RoleController extends Controller
         }
 
         $role->delete();
-
         return response()->json(null, 204);
     }
 }

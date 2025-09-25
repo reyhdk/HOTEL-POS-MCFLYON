@@ -18,6 +18,21 @@ class PermissionSeeder extends Seeder
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // 1. Definisikan semua permission yang ada, dikelompokkan berdasarkan fitur
+
+        // Izin Induk/Grup untuk Menu Utama (agar menu accordion bisa tampil)
+        $groupPermissions = [
+            'pos', 
+            'reports', 
+            'master', 
+            'settings',
+        ];
+
+        // Izin untuk Halaman Dashboard
+        $dashboardPermissions = [
+            'view dashboard',
+        ];
+
+        // Izin untuk Fitur Master Data
         $masterPermissions = [
             'view rooms', 'create rooms', 'edit rooms', 'delete rooms',
             'view facilities', 'create facilities', 'edit facilities', 'delete facilities',
@@ -27,67 +42,72 @@ class PermissionSeeder extends Seeder
             'view roles', 'create roles', 'edit roles', 'delete roles',
         ];
 
+        // Izin untuk Fitur Point of Sale (POS)
         $posPermissions = [
-            'create pos_orders',    // Untuk kasir di resepsionis
-            'view online_orders',   // Untuk Chef dan Admin
-            'manage payments',      // Untuk resepsionis
-            'view folios',          // Untuk resepsionis
+            'create pos_orders',
+            'view online_orders',
+            'manage payments',
+            'view folios',
         ];
 
+        // Izin untuk Fitur Laporan
         $reportPermissions = [
             'view transaction_history',
         ];
 
+        // Izin untuk Fitur Pengaturan
         $settingPermissions = [
             'edit settings',
         ];
 
-        // Gabungkan semua permission menjadi satu array
+        // Gabungkan semua permission menjadi satu array besar
         $allPermissions = array_merge(
+            $groupPermissions,
+            $dashboardPermissions,
             $masterPermissions,
             $posPermissions,
             $reportPermissions,
             $settingPermissions
         );
 
-        // Buat semua permission yang telah didefinisikan
+        // Buat semua permission yang telah didefinisikan ke dalam database
         foreach ($allPermissions as $permissionName) {
             Permission::firstOrCreate(['name' => $permissionName, 'guard_name' => 'api']);
         }
 
         $this->command->info('Semua permission berhasil dibuat.');
 
-        // 2. Tentukan permission untuk setiap role
+        // 2. Tentukan permission spesifik untuk setiap role
         $permissionsByRole = [
-            'admin' => $allPermissions, // Admin mendapatkan semua permission
+            // Admin mendapatkan semua permission yang ada
+            'admin' => $allPermissions, 
 
             'receptionist' => [
-                'view rooms',
-                'view guests', 'create guests', 'edit guests',
-                'create pos_orders',
-                'manage payments',
-                'view folios',
+                'view dashboard', 
+                'pos', 'create pos_orders', 'manage payments', 'view folios',
+                'master', 'view rooms', 'view guests', 'create guests', 'edit guests',
             ],
 
             'chef' => [
-                'view online_orders',
-                'view menus', 'create menus', 'edit menus',
+                'view dashboard',
+                'pos', 'view online_orders', 
+                'master', 'view menus', 'create menus', 'edit menus',
             ],
 
-            'cleaning-service' => [
-                'view rooms', // Hanya bisa melihat status kamar
+            'cleaning-service' => [ 
+                'view dashboard',
+                'master', 
+                'view rooms' 
             ],
 
-            'user' => [
-                // Role 'user' (tamu) biasanya tidak memiliki permission di admin panel
-            ]
+            // Role 'user' (tamu) tidak memiliki permission untuk panel admin
+            'user' => []
         ];
 
-        // 3. Berikan permission ke setiap role
+        // 3. Berikan permission tersebut ke setiap role yang sesuai
         foreach ($permissionsByRole as $roleName => $permissionNames) {
             $role = Role::whereName($roleName)->first();
             if ($role) {
-                // Gunakan syncPermissions untuk cara yang lebih bersih dan aman
                 $role->syncPermissions($permissionNames);
                 $this->command->info("Memberikan permission ke role: {$roleName}");
             }

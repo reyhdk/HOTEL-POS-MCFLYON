@@ -6,22 +6,38 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
     /**
+     * Helper function to create user response.
+     */
+    private function createAuthResponse($user, $token = null)
+    {
+        $response = [
+            'status' => true,
+            'data' => [
+                // Load relasi 'roles' agar data role selalu ada
+                'user' => $user->load('roles'), 
+                // Ambil semua nama permission yang dimiliki user
+                'permissions' => $user->getAllPermissions()->pluck('name'),
+            ]
+        ];
+
+        if ($token) {
+            $response['data']['token'] = $token;
+        }
+
+        return response()->json($response);
+    }
+    
+    /**
      * Mengambil data user yang sedang login.
      */
     public function me()
     {
-        return response()->json([
-            'status' => true,
-            'data' => [
-                'user' => auth()->user()
-            ]
-        ]);
+        return $this->createAuthResponse(auth()->user());
     }
 
     /**
@@ -41,14 +57,9 @@ class AuthController extends Controller
             ], 401);
         }
 
-        return response()->json([
-            'status' => true,
-            'data' => [
-                'user' => auth()->user(),
-                'token' => $token
-            ]
-        ]);
+        return $this->createAuthResponse(auth()->user(), $token);
     }
+
 
     /**
      * Proses registrasi user baru.

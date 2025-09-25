@@ -107,44 +107,44 @@ const MainMenuConfig: MenuItem[] = [
         keenthemesIcon: "cube-3",
         roles: ["admin"],
         sub: [
-          {
-            heading: "Kamar",
-            route: "/admin/admin/rooms",
-            name: "view rooms", // [DIBENARKAN] Ditambahkan 'name'
-            roles: ["admin"],
-          },
-          {
-            heading: "Fasilitas",
-            route: "/admin/admin/facilities",
-            name: "view facilities", // [DIBENARKAN] Ditambahkan 'name'
-            roles: ["admin"],
-          },
-          {
-            heading: "Tamu",
-            route: "/admin/admin/guests",
-            name: "view guests", // [DIBENARKAN] Ditambahkan 'name'
-            roles: ["admin"],
-          },
-          {
-            heading: "Menu",
-            route: "/admin/admin/menus",
-            name: "view menus", // [DIBENARKAN] Ditambahkan 'name'
-            roles: ["admin"],
-          },
-          {
-            heading: "Users",
-            route: "/admin/admin/users",
-            name: "view users", // [DIBENARKAN] Ditambahkan 'name'
-            roles: ["admin"],
-          },
-          {
-            heading: "Roles",
-            route: "/admin/admin/roles",
-            name: "view roles", // [DIBENARKAN] Ditambahkan 'name'
-            roles: ["admin"],
-          },
-        ],
-      },
+        {
+      heading: "Kamar",
+      route: "/admin/master/rooms", // BENAR
+      name: "view rooms",
+      roles: ["admin"],
+    },
+    {
+      heading: "Fasilitas",
+      route: "/admin/master/facilities", // BENAR
+      name: "view facilities",
+      roles: ["admin"],
+    },
+    {
+      heading: "Tamu",
+      route: "/admin/master/guests", // BENAR
+      name: "view guests",
+      roles: ["admin"],
+    },
+    {
+      heading: "Menu",
+      route: "/admin/master/menus", // BENAR
+      name: "view menus",
+      roles: ["admin"],
+    },
+    {
+      heading: "Users",
+      route: "/admin/master/users", // BENAR
+      name: "view users",
+      roles: ["admin"],
+    },
+    {
+      heading: "Roles",
+      route: "/admin/master/roles", // BENAR
+      name: "view roles",
+      roles: ["admin"],
+    },
+  ],
+},
       {
         sectionTitle: "Pengaturan",
         route: "/pengaturan",

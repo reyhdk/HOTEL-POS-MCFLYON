@@ -27,7 +27,7 @@
 
     <div class="text-gray-400 fw-semobold fs-4 text-center">
       Belum memiliki akun?
-      <router-link to="/sign-up" class="link-primary fw-bold">
+      <router-link to="/auth/sign-up" class="link-primary fw-bold">
         Buat Akun Sekarang
       </router-link>
     </div>

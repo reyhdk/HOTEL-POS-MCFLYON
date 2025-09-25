@@ -123,37 +123,37 @@ const scrollElRef = ref<null | HTMLElement>(null);
 const authStore = useAuthStore();
 
 // =======================================================
-// ▼▼▼ LOGIKA FILTER FINAL YANG LEBIH SEDERHANA DAN AMAN ▼▼▼
+// ▼▼▼ LOGIKA FILTER MENU BARU BERBASIS PERMISSION ▼▼▼
 // =======================================================
-const userRole = computed(() => {
-  // Secara eksplisit cek jika user dan role ada sebelum mengakses name
-  if (authStore.user && authStore.user.role && authStore.user.role.name) {
-    return authStore.user.role.name;
-  }
-  return "user"; // Nilai default jika tidak ada role
-});
+const userRole = computed(() => authStore.userRole);
 
 const filteredMenu = computed(() => {
   const result: MenuItem[] = [];
 
-  // Loop melalui setiap section utama di MainMenuConfig
   for (const section of MainMenuConfig) {
     const newSection: MenuItem = { ...section, pages: [] };
 
-    // Periksa apakah section ini punya pages
     if (section.pages) {
-      // Loop melalui setiap halaman di dalam section
       for (const page of section.pages) {
-        // Periksa apakah halaman ini diizinkan untuk role user
-        if (page.roles?.includes(userRole.value)) {
+        // Logika Pengecekan Baru:
+        // 1. Jika menu untuk user biasa, cek rolenya.
+        // 2. Jika menu untuk admin, cek PERMISSION-nya.
+        
+        const isUserMenu = page.roles?.includes('user');
+        const hasAccess = isUserMenu 
+          ? page.roles?.includes(userRole.value) 
+          : page.name ? authStore.hasPermission(page.name) : true;
+
+        if (hasAccess) {
           const newPage = { ...page };
 
-          // Jika ada sub-menu, filter sub-menunya juga
+          // Jika ada sub-menu, filter sub-menunya juga dengan logika yang sama
           if (page.sub) {
-            newPage.sub = page.sub.filter(subItem => subItem.roles?.includes(userRole.value));
+            newPage.sub = page.sub.filter(subItem => 
+              subItem.name ? authStore.hasPermission(subItem.name) : true
+            );
           }
           
-          // Tambahkan halaman jika tidak punya sub-menu ATAU jika sub-menunya tidak kosong setelah difilter
           if (!newPage.sub || newPage.sub.length > 0) {
             newSection.pages?.push(newPage);
           }
@@ -161,7 +161,6 @@ const filteredMenu = computed(() => {
       }
     }
 
-    // Jika section memiliki halaman setelah difilter, tambahkan ke hasil akhir
     if (newSection.pages && newSection.pages.length > 0) {
       result.push(newSection);
     }

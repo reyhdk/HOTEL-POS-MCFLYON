@@ -35,7 +35,7 @@ const formSchema = Yup.object().shape({
 async function fetchData() {
     // Ambil daftar semua role untuk dropdown
     try {
-        const { data } = await ApiService.get("/all-roles");
+        const { data } = await ApiService.get("/master/all-roles");
         allRoles.value = data;
     } catch (error) {
         toast.error("Gagal memuat daftar role.");
@@ -74,7 +74,7 @@ async function submit() {
     const payload = { ...formData.value };
     delete payload.roles; // Hapus relasi 'roles' sebelum mengirim
     delete payload.photo_url; // Hapus properti 'photo_url'
-    
+
     try {
         if (props.selected) {
             await ApiService.put(`/master/users/${props.selected}`, payload);
