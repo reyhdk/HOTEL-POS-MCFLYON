@@ -76,7 +76,7 @@ class RoleController extends Controller
                 'name' => $validatedData['name'],
                 'full_name' => $validatedData['full_name']
             ]);
-            
+
             $role->syncPermissions($validatedData['permissions'] ?? []);
 
             DB::commit();

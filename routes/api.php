@@ -17,6 +17,7 @@ use App\Http\Controllers\SettingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Api\UserBookingController;
 use App\Http\Controllers\Api\BookingController;
+use App\Http\Controllers\Api\Guest\ServiceRequestController;
 use App\Http\Controllers\Api\Guest\GuestOrderController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 
@@ -66,6 +67,8 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/orders', [GuestOrderController::class, 'getOrderHistory']);
         Route::get('/orders/{order}', [GuestOrderController::class, 'show']);
         Route::post('/orders/{order}/pay', [GuestOrderController::class, 'processPayment']);
+        Route::post('/service-requests', [ServiceRequestController::class, 'store']);
+
     });
 
     // --- RUTE PANEL ADMIN (DILINDUNGI DENGAN PERMISSION) ---

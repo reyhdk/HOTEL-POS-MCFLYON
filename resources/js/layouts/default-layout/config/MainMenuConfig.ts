@@ -19,6 +19,12 @@ const MainMenuConfig: MenuItem[] = [
         roles: ["user"],
       },
       {
+      heading: "Layanan Kamar",
+      route: "/user/room-service",
+      keenthemesIcon: "profile-circle",
+      roles: ["user"],
+      },
+      {
         heading: "Booking Online",
         route: "/user/booking",
         keenthemesIcon: "calendar-add",
