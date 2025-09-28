@@ -20,6 +20,8 @@ use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\Guest\ServiceRequestController;
 use App\Http\Controllers\Api\Guest\GuestOrderController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
+// ▼▼▼ TAMBAHKAN USE STATEMENT INI ▼▼▼
+use App\Http\Controllers\Api\Admin\ServiceRequestController as AdminServiceRequestController;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,7 +39,6 @@ Route::prefix('public')->group(function () {
     Route::get('/facilities', [FacilityController::class, 'index']);
 });
 
-// [DIPERBAIKI] Rute setting untuk mengambil data (GET) dipindahkan ke sini
 Route::get('/setting', [SettingController::class, 'index']);
 
 // Autentikasi
@@ -68,12 +69,10 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/orders/{order}', [GuestOrderController::class, 'show']);
         Route::post('/orders/{order}/pay', [GuestOrderController::class, 'processPayment']);
         Route::post('/service-requests', [ServiceRequestController::class, 'store']);
-
     });
 
     // --- RUTE PANEL ADMIN (DILINDUNGI DENGAN PERMISSION) ---
     
-    // [DIPERBAIKI] Rute untuk UPDATE setting tetap di sini agar aman
     Route::post('/setting', [SettingController::class, 'update'])->middleware('can:edit settings');
     
     Route::middleware('can:view dashboard')->group(function () {
@@ -94,6 +93,13 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/online-orders', [AdminOrderController::class, 'index'])->middleware('can:view online_orders');
     Route::get('/online-orders/{order}', [AdminOrderController::class, 'show'])->middleware('can:view online_orders');
     Route::patch('/online-orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->middleware('can:view online_orders');
+
+
+    // Manajemen Permintaan Layanan (Untuk Staf)
+    Route::middleware('can:manage service_requests')->group(function () {
+        Route::get('/admin/service-requests', [AdminServiceRequestController::class, 'index']);
+        Route::patch('/admin/service-requests/{serviceRequest}/status', [AdminServiceRequestController::class, 'updateStatus']);
+    });
 
     // Check-in & Check-out
     Route::post('/check-in', [CheckInController::class, 'store'])->middleware('can:create pos_orders');

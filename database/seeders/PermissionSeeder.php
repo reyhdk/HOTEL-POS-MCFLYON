@@ -50,6 +50,11 @@ class PermissionSeeder extends Seeder
             'view folios',
         ];
 
+        $serviceRequestPermissions = [
+            'manage service_requests', // Izin untuk mengelola permintaan layanan
+        ];
+
+
         // Izin untuk Fitur Laporan
         $reportPermissions = [
             'view transaction_history',
@@ -67,6 +72,7 @@ class PermissionSeeder extends Seeder
             $masterPermissions,
             $posPermissions,
             $reportPermissions,
+            $serviceRequestPermissions,
             $settingPermissions
         );
 
@@ -85,7 +91,8 @@ class PermissionSeeder extends Seeder
             'receptionist' => [
                 'view dashboard', 
                 'pos', 'create pos_orders', 'manage payments', 'view folios',
-                'master', 'view rooms', 'view guests', 'create guests', 'edit guests',
+                'master', 'view rooms', 'view guests', 'create guests', 'edit guests', 
+                'manage service_requests',
             ],
 
             'chef' => [
@@ -97,7 +104,8 @@ class PermissionSeeder extends Seeder
             'cleaning-service' => [ 
                 'view dashboard',
                 'master', 
-                'view rooms' 
+                'view rooms',
+                'manage service_requests',
             ],
 
             // Role 'user' (tamu) tidak memiliki permission untuk panel admin

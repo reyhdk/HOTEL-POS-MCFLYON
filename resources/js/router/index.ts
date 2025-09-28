@@ -88,6 +88,12 @@ const routes: Array<RouteRecordRaw> = [
         meta: { pageTitle: "Pesanan Online" },
       },
       {
+      path: "service-requests",
+      name: "admin-service-requests",
+      component: () => import("@/pages/dashboard/service-requests/Index.vue"),
+      meta: { pageTitle: "Permintaan Layanan" },
+      },
+      {
         path: "master/rooms",
         name: "admin-master-rooms",
         component: () => import("@/pages/dashboard/master/rooms/Index.vue"),

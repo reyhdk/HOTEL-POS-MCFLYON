@@ -1,13 +1,16 @@
 {
-    "include": ["./resources/js/**/*", "./resources/js/**/{*.js,*.ts,*.vue}"],
-    "compilerOptions": {
-        "baseUrl": ".",
-        "paths": {
-            "@/*": ["./resources/js/*"]
-        },
-        "allowJs": true
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./resources/js/*"]
     },
-    "exclude": ["node_modules", "public"],
-    "experimentalDecorators": true,
-    "allowJs": true
+    "allowJs": true,
+    "experimentalDecorators": true
+  },
+  "include": [
+    "./resources/js/**/*.js",
+    "./resources/js/**/*.ts",
+    "./resources/js/**/*.vue"
+  ],
+  "exclude": ["node_modules", "public"]
 }

@@ -72,6 +72,19 @@ const MainMenuConfig: MenuItem[] = [
             roles: ["admin"],
           },
           {
+        sectionTitle: "Layanan Hotel",
+        route: "/hotel-services", // Rute induk tidak harus ada
+        name: "manage service_requests", // Gunakan permission yang sesuai
+        keenthemesIcon: "abstract-29",
+        sub: [
+          {
+            heading: "Permintaan Layanan",
+            route: "/admin/service-requests",
+            name: "manage service_requests", // Permission yang sama untuk sub-menu
+          },
+        ],
+      },
+          {
             heading: "Pesanan Online",
             route: "/admin/online-orders",
             name: "view online_orders", // [DIBENARKAN] Ditambahkan 'name'
