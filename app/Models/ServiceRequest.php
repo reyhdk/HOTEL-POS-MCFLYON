@@ -16,6 +16,7 @@ class ServiceRequest extends Model
         'quantity',
         'notes',
         'status',
+        'cleaning_time',
     ];
 
     public function room()

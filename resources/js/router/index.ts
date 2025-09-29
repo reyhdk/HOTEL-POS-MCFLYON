@@ -52,6 +52,19 @@ const routes: Array<RouteRecordRaw> = [
       component: () => import("@/pages/user-dashboard/room-service/Index.vue"),
       meta: { pageTitle: "Layanan Kamar" },
     },
+    {
+      path: "request-history",
+      name: "user-request-history",
+      component: () => import("@/pages/user-dashboard/request-history/Index.vue"),
+      meta: { pageTitle: "Riwayat Permintaan" },
+    },
+    {
+      path: "checkout",
+      name: "user-checkout",
+      component: () => import("@/pages/user-dashboard/checkout/Index.vue"),
+      meta: { pageTitle: "Tagihan & Checkout" },
+    },
+
       {
         path: "payment/:orderId",
         name: "user-payment",
@@ -226,7 +239,7 @@ router.beforeEach(async (to, from, next) => {
     }
     return next();
   }
-  
+
   // 2. Logika untuk halaman yang butuh login
   if (to.meta.middleware === "auth") {
     if (!isAuthenticated) {
@@ -245,7 +258,7 @@ router.beforeEach(async (to, from, next) => {
   // 3. Jika semua kondisi lolos, izinkan akses
   return next();
 });
-    
+
 router.afterEach(() => {
   NProgress.done();
 });

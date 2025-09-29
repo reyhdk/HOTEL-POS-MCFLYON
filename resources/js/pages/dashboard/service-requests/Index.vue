@@ -20,7 +20,7 @@
               <th>Kamar</th>
               <th>Nama Tamu</th>
               <th>Permintaan</th>
-              <th>Jumlah</th>
+              <th>Jadwal / Jumlah</th>
               <th>Catatan</th>
               <th>Status</th>
               <th class="text-end">Aksi</th>
@@ -37,7 +37,13 @@
               <td><span class="badge badge-light-primary">{{ req.room.room_number }}</span></td>
               <td>{{ req.user.name }}</td>
               <td>{{ req.service_name }}</td>
-              <td>{{ req.quantity }}</td>
+              <td>
+                <div v-if="req.cleaning_time" class="d-flex align-items-center">
+                    <i class="ki-duotone ki-time fs-3 text-primary me-2"></i>
+                    <span class="fw-bold">{{ req.cleaning_time.substring(0, 5) }}</span>
+                </div>
+                <span v-else>x {{ req.quantity }}</span>
+              </td>
               <td>{{ req.notes || '-' }}</td>
               <td>
                 <span :class="getStatusBadge(req.status)">{{ req.status }}</span>
@@ -70,6 +76,7 @@
     </div>
   </div>
 </template>
+
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import ApiService from "@/core/services/ApiService";
@@ -84,8 +91,8 @@ interface ServiceRequest {
   quantity: number;
   notes: string | null;
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  cleaning_time: string | null; // <-- Tambahkan properti ini
 }
-
 interface Pagination {
   current_page: number;
   last_page: number;
@@ -98,11 +105,6 @@ interface Pagination {
 
 // --- STATE ---
 const requests = ref<ServiceRequest[]>([]);
-const isLoading = ref(true);
-const statusFilter = ref('');
-
-// ▼▼▼ PERBAIKAN DI SINI ▼▼▼
-// Berikan nilai awal yang lengkap untuk objek pagination
 const pagination = ref<Pagination>({
   current_page: 1,
   last_page: 1,
@@ -112,8 +114,8 @@ const pagination = ref<Pagination>({
   prev_page_url: null,
   next_page_url: null,
 });
-// ▲▲▲ -------------------- ▲▲▲
-
+const isLoading = ref(true);
+const statusFilter = ref('');
 
 // --- API FUNCTIONS ---
 const fetchServiceRequests = async (page = 1) => {

@@ -21,9 +21,9 @@ class PermissionSeeder extends Seeder
 
         // Izin Induk/Grup untuk Menu Utama (agar menu accordion bisa tampil)
         $groupPermissions = [
-            'pos', 
-            'reports', 
-            'master', 
+            'pos',
+            'reports',
+            'master',
             'settings',
         ];
 
@@ -58,6 +58,8 @@ class PermissionSeeder extends Seeder
         // Izin untuk Fitur Laporan
         $reportPermissions = [
             'view transaction_history',
+            'view checkout_history', // Izin baru untuk melihat riwayat checkout
+
         ];
 
         // Izin untuk Fitur Pengaturan
@@ -86,24 +88,26 @@ class PermissionSeeder extends Seeder
         // 2. Tentukan permission spesifik untuk setiap role
         $permissionsByRole = [
             // Admin mendapatkan semua permission yang ada
-            'admin' => $allPermissions, 
+            'admin' => $allPermissions,
 
             'receptionist' => [
-                'view dashboard', 
+                'view dashboard',
                 'pos', 'create pos_orders', 'manage payments', 'view folios',
-                'master', 'view rooms', 'view guests', 'create guests', 'edit guests', 
+                'master', 'view rooms', 'view guests', 'create guests', 'edit guests',
                 'manage service_requests',
+                'view checkout_history',
+
             ],
 
             'chef' => [
                 'view dashboard',
-                'pos', 'view online_orders', 
+                'pos', 'view online_orders',
                 'master', 'view menus', 'create menus', 'edit menus',
             ],
 
-            'cleaning-service' => [ 
+            'cleaning-service' => [
                 'view dashboard',
-                'master', 
+                'master',
                 'view rooms',
                 'manage service_requests',
             ],

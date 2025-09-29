@@ -25,6 +25,12 @@ const MainMenuConfig: MenuItem[] = [
       roles: ["user"],
       },
       {
+      heading: "Tagihan & Checkout",
+      route: "/user/checkout",
+      keenthemesIcon: "exit-right",
+      roles: ["user"],
+    },
+      {
         heading: "Booking Online",
         route: "/user/booking",
         keenthemesIcon: "calendar-add",
@@ -71,19 +77,7 @@ const MainMenuConfig: MenuItem[] = [
             name: "create pos_orders", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],
           },
-          {
-        sectionTitle: "Layanan Hotel",
-        route: "/hotel-services", // Rute induk tidak harus ada
-        name: "manage service_requests", // Gunakan permission yang sesuai
-        keenthemesIcon: "abstract-29",
-        sub: [
-          {
-            heading: "Permintaan Layanan",
-            route: "/admin/service-requests",
-            name: "manage service_requests", // Permission yang sama untuk sub-menu
-          },
-        ],
-      },
+
           {
             heading: "Pesanan Online",
             route: "/admin/online-orders",
@@ -104,6 +98,26 @@ const MainMenuConfig: MenuItem[] = [
           },
         ],
       },
+      {
+        sectionTitle: "Layanan Hotel",
+        route: "/hotel-services", // Rute induk tidak harus ada
+        name: "manage service_requests", // Gunakan permission yang sesuai
+        keenthemesIcon: "abstract-29",
+        sub: [
+          {
+            heading: "Permintaan Layanan",
+            route: "/admin/service-requests",
+            name: "manage service_requests", // Permission yang sama untuk sub-menu
+          },
+
+        ],
+      },
+      {
+      heading: "Riwayat Permintaan",
+      route: "/user/request-history",
+      keenthemesIcon: "time",
+      roles: ["user"],
+    },
       {
         sectionTitle: "Laporan",
         route: "/reports",

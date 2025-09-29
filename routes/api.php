@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 // --- Controller Imports ---
+use App\Http\Controllers\Api\Admin\CheckoutHistoryController;
 use App\Http\Controllers\Api\CheckInController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FacilityController;
@@ -59,7 +60,7 @@ Route::middleware('auth:api')->group(function () {
     });
 
     Route::get('/my-bookings', [UserBookingController::class, 'index']);
-    
+
     // --- RUTE KHUSUS TAMU ---
     Route::prefix('guest')->name('guest.')->group(function () {
         Route::get('/profile', [GuestOrderController::class, 'getProfile']);
@@ -69,12 +70,16 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/orders/{order}', [GuestOrderController::class, 'show']);
         Route::post('/orders/{order}/pay', [GuestOrderController::class, 'processPayment']);
         Route::post('/service-requests', [ServiceRequestController::class, 'store']);
+        Route::get('/service-requests', [ServiceRequestController::class, 'index']);
+        Route::get('/folio', [App\Http\Controllers\Api\Guest\CheckoutController::class, 'getFolio']);
+        Route::post('/checkout', [App\Http\Controllers\Api\Guest\CheckoutController::class, 'processCheckout']);
+
     });
 
     // --- RUTE PANEL ADMIN (DILINDUNGI DENGAN PERMISSION) ---
-    
+
     Route::post('/setting', [SettingController::class, 'update'])->middleware('can:edit settings');
-    
+
     Route::middleware('can:view dashboard')->group(function () {
         Route::get('/dashboard-stats', [DashboardController::class, 'getStats']);
         Route::get('/sales-chart-data', [DashboardController::class, 'getSalesChartData']);
@@ -88,7 +93,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancelOrder'])->middleware('can:manage payments');
     Route::get('/folios', [FolioController::class, 'index'])->middleware('can:view folios');
     Route::post('/folios/{room}/checkout', [FolioController::class, 'processFolioPaymentAndCheckout'])->middleware('can:manage payments');
-    
+
     // Manajemen Pesanan Online
     Route::get('/online-orders', [AdminOrderController::class, 'index'])->middleware('can:view online_orders');
     Route::get('/online-orders/{order}', [AdminOrderController::class, 'show'])->middleware('can:view online_orders');
@@ -104,13 +109,15 @@ Route::middleware('auth:api')->group(function () {
     // Check-in & Check-out
     Route::post('/check-in', [CheckInController::class, 'store'])->middleware('can:create pos_orders');
     Route::post('/check-out/{room}', [CheckInController::class, 'checkout'])->middleware('can:create pos_orders');
-    
+    Route::get('/admin/checkout-history', [CheckoutHistoryController::class, 'index'])->middleware('can:view checkout_history');
+
+
     // Manajemen Master Data
     Route::apiResource('menus', MenuController::class)->middleware('can:view menus');
     Route::apiResource('rooms', RoomController::class)->middleware('can:view rooms');
     Route::apiResource('facilities', FacilityController::class)->middleware('can:view facilities');
     Route::apiResource('guests', GuestController::class)->middleware('can:view guests');
-    
+
     Route::prefix('master')->group(function () {
         Route::get('/all-roles', [UserController::class, 'getAllRoles'])->middleware('can:view roles');
         Route::apiResource('users', UserController::class)->scoped(['user' => 'uuid'])->middleware('can:view users');
