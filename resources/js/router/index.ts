@@ -25,7 +25,7 @@ const routes: Array<RouteRecordRaw> = [
       {
         path: "dashboard",
         name: "user-dashboard",
-        component: () => import("@/pages/dashboard/Index.vue"),
+        component: () => import("@/pages/user-dashboard/Index.vue"),
         meta: { pageTitle: "Dasbor" },
       },
       {

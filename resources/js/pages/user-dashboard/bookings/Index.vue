@@ -16,7 +16,7 @@
           <label class="form-label fw-semibold">Tanggal Check-out:</label>
           <el-date-picker v-model="searchParams.check_out_date" type="date" placeholder="Pilih tanggal" class="w-100" format="DD-MM-YYYY" value-format="YYYY-MM-DD" />
         </div>
-        
+
         <div class="col-lg-2 col-md-6">
           <label class="form-label fw-semibold">Jenis Kamar:</label>
           <el-select v-model="searchParams.type" placeholder="Semua Jenis" class="w-100" clearable>
@@ -52,7 +52,7 @@
         <span class="spinner-border text-primary"></span>
         <p class="mt-4">Mencari kamar terbaik untuk Anda...</p>
       </div>
-      
+
       <div v-else-if="!availableRooms.length && hasSearched" class="text-center py-10">
         <i class="ki-duotone ki-magnifier-r fs-3x text-muted mb-4"></i>
         <p class="fw-bold fs-4">Maaf, Kamar Tidak Ditemukan</p>
@@ -146,7 +146,7 @@ const formatCurrency = (value: number) => {
 const getFacilities = async () => {
   try {
     isLoadingFacilities.value = true;
-    const response = await axios.get('/public/facilities'); 
+    const response = await axios.get('/public/facilities');
     allFacilities.value = response.data;
   } catch (error) {
     toast.error('Gagal memuat daftar fasilitas.');

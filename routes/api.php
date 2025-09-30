@@ -21,8 +21,9 @@ use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\Guest\ServiceRequestController;
 use App\Http\Controllers\Api\Guest\GuestOrderController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
-// ▼▼▼ TAMBAHKAN USE STATEMENT INI ▼▼▼
 use App\Http\Controllers\Api\Admin\ServiceRequestController as AdminServiceRequestController;
+use App\Http\Controllers\MidtransController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -51,6 +52,7 @@ Route::prefix('auth')->group(function () {
 // ==================================================
 // RUTE TERAUTENTIKASI (PERLU LOGIN)
 // ==================================================
+Route::post('/midtrans/notification', [MidtransController::class, 'handleNotification']);
 Route::middleware('auth:api')->group(function () {
 
     // Auth & User Profile
@@ -117,6 +119,9 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('rooms', RoomController::class)->middleware('can:view rooms');
     Route::apiResource('facilities', FacilityController::class)->middleware('can:view facilities');
     Route::apiResource('guests', GuestController::class)->middleware('can:view guests');
+
+    Route::post('/midtrans/create-transaction', [MidtransController::class, 'createTransaction']);
+
 
     Route::prefix('master')->group(function () {
         Route::get('/all-roles', [UserController::class, 'getAllRoles'])->middleware('can:view roles');

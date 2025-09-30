@@ -10,12 +10,12 @@ use App\Models\CheckIn;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth; 
+use Illuminate\Support\Facades\Auth;
 
 class BookingController extends Controller
 {
     /**
-     * Menyimpan booking baru, membuat data tamu, membuat catatan check-in, 
+     * Menyimpan booking baru, membuat data tamu, membuat catatan check-in,
      * dan mengubah status kamar dalam satu proses.
      */
     public function store(Request $request)
@@ -53,14 +53,14 @@ class BookingController extends Controller
             );
 
             // 3. Buat Catatan Booking Baru
-            $booking = Booking::create([    
+            $booking = Booking::create([
                 'room_id' => $room->id,
                 'guest_id' => $guest->id,
                 'user_id' => Auth::id(), // [DIUBAH] Tambahkan ID pengguna yang login
                 'check_in_date' => $checkInDate,
                 'check_out_date' => $checkOutDate,
                 'total_price' => $room->price_per_night * $checkOutDate->diffInDays($checkInDate),
-                'status' => 'confirmed', 
+                'status' => 'confirmed',
             ]);
 
             // 4. Buat Catatan Check-in yang Aktif
@@ -79,7 +79,7 @@ class BookingController extends Controller
             DB::commit();
 
             return response()->json([
-                'message' => 'Booking Anda telah berhasil dikonfirmasi!', 
+                'message' => 'Booking Anda telah berhasil dikonfirmasi!',
                 'booking' => $booking
             ], 201);
 
