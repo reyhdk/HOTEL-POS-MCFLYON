@@ -98,8 +98,10 @@
 import { ref, computed, watch } from 'vue';
 import type { PropType } from 'vue';
 import { Modal } from 'bootstrap';
-import axios from '@/libs/axios';
+import axios from '@/libs/axios'; // Pastikan path axios Anda benar
 import { toast } from 'vue3-toastify';
+
+declare const snap: any;
 
 const props = defineProps({
   room: { type: Object as PropType<any>, default: null },
@@ -111,7 +113,6 @@ const emit = defineEmits(['booking-success']);
 const modalRef = ref<HTMLElement | null>(null);
 const isLoading = ref(false);
 
-// [DITAMBAHKAN] Properti guest_phone di formData
 const formData = ref({
   guest_name: '',
   guest_email: '',
@@ -144,7 +145,6 @@ const formatCurrency = (value: number) => {
 };
 
 const submitBooking = async () => {
-  // [DIUBAH] Validasi sekarang mencakup nomor telepon
   if (!formData.value.guest_name.trim() || !formData.value.guest_email.trim() || !formData.value.guest_phone.trim()) {
     toast.warn("Harap isi semua kolom yang diperlukan.");
     return;
@@ -160,27 +160,45 @@ const submitBooking = async () => {
       room_id: props.room.id,
       guest_name: formData.value.guest_name,
       guest_email: formData.value.guest_email,
-      guest_phone: formData.value.guest_phone, // [DITAMBAHKAN] Kirim data telepon
+      guest_phone: formData.value.guest_phone,
       check_in_date: props.bookingDates.check_in_date,
       check_out_date: props.bookingDates.check_out_date,
     };
     
-    const response = await axios.post('/public/bookings', payload);
+    const response = await axios.post('/api/public/bookings', payload);
+    const snapToken = response.data.snap_token;
+
+    if (!snapToken) {
+        throw new Error('Snap Token tidak diterima dari server.');
+    }
     
-    toast.success(response.data.message || 'Booking Anda telah berhasil dikonfirmasi!');
-    emit('booking-success');
-    
-    Modal.getInstance(modalRef.value as HTMLElement)?.hide();
+    snap.pay(snapToken, {
+        onSuccess: function(result){
+            toast.success('Pembayaran berhasil! Booking Anda telah dikonfirmasi.');
+            emit('booking-success');
+            Modal.getInstance(modalRef.value as HTMLElement)?.hide();
+        },
+        onPending: function(result){
+            toast.info('Pembayaran Anda tertunda. Harap selesaikan pembayaran.');
+            emit('booking-success');
+            Modal.getInstance(modalRef.value as HTMLElement)?.hide();
+        },
+        onError: function(result){
+            toast.error('Pembayaran Gagal. Silakan coba lagi.');
+        },
+        onClose: function(){
+            toast.warn('Anda menutup jendela pembayaran sebelum selesai.');
+        }
+    });
 
   } catch (error: any) {
-    const message = error.response?.data?.message || 'Terjadi kesalahan saat membuat pesanan.';
+    const message = error.response?.data?.message || 'Terjadi kesalahan saat memproses pesanan.';
     toast.error(message);
   } finally {
     isLoading.value = false;
   }
 };
 
-// Reset form saat data baru masuk
 watch(() => props.room, () => {
   formData.value.guest_name = '';
   formData.value.guest_email = '';
