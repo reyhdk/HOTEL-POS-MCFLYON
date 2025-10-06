@@ -16,7 +16,7 @@ class Order extends Model
         'room_id',
         'user_id',
         'total_price',
-        'status',
+        'midtrans_order_id',
     ];
 
    /**

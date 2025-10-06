@@ -43,7 +43,7 @@
               </div>
 
               <div class="separator separator-dashed my-5"></div>
-              
+
               <div class="d-flex flex-stack">
                 <span class="fw-semibold">Durasi Menginap</span>
                 <span class="fw-semibold">{{ durationInNights }} Malam</span>
@@ -72,7 +72,7 @@
               </div>
             </form>
           </div>
-          
+
           <div v-else class="text-center py-10">
             <span class="spinner-border text-primary"></span>
             <p class="mt-4">Memuat detail pesanan...</p>
@@ -153,7 +153,7 @@ const submitBooking = async () => {
     toast.error("Terjadi kesalahan, kamar tidak terpilih.");
     return;
   }
-  
+
   isLoading.value = true;
   try {
     const payload = {
@@ -164,14 +164,14 @@ const submitBooking = async () => {
       check_in_date: props.bookingDates.check_in_date,
       check_out_date: props.bookingDates.check_out_date,
     };
-    
-    const response = await axios.post('/api/public/bookings', payload);
+
+    const response = await axios.post('/public/bookings', payload);
     const snapToken = response.data.snap_token;
 
     if (!snapToken) {
         throw new Error('Snap Token tidak diterima dari server.');
     }
-    
+
     snap.pay(snapToken, {
         onSuccess: function(result){
             toast.success('Pembayaran berhasil! Booking Anda telah dikonfirmasi.');
@@ -202,6 +202,6 @@ const submitBooking = async () => {
 watch(() => props.room, () => {
   formData.value.guest_name = '';
   formData.value.guest_email = '';
-  formData.value.guest_phone = ''; 
+  formData.value.guest_phone = '';
 });
 </script>

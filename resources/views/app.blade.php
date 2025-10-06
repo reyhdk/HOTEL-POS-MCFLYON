@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
-<head>
-  <meta charset="UTF-8">
+<meta charset="UTF-8">
   <meta name="description" content="Metronic Vue Demo" />
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,400,500,600,700">
-  {{-- <link rel="stylesheet" href="/splash-screen.css"> --}}
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TPAIS APP</title>
 
+  <script src="https://app.sandbox.midtrans.com/snap/snap.js"
+   data-client-key="{{ env('MIDTRANS_CLIENT_KEY', 'Mid-client-SWhXbcjiZxqLJEUS') }}"></script>
   <style>
     /* Style to hide the spinner arrows */
     input[type="number"]::-webkit-inner-spin-button,

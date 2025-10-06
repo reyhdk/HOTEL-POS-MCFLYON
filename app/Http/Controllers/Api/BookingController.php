@@ -9,24 +9,15 @@ use App\Models\Room;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Midtrans\Config;
-use Midtrans\Snap;
 use Illuminate\Support\Facades\Log;
+use Midtrans\Snap;
 use Throwable;
 
 class BookingController extends Controller
 {
-    public function __construct()
-    {
-        Config::$serverKey = config('midtrans.server_key');
-        Config::$isProduction = config('midtrans.is_production');
-        Config::$isSanitized = true;
-        Config::$is3ds = true;
-        if (app()->environment('local')) {
-            Config::$curlOptions[CURLOPT_SSL_VERIFYPEER] = false;
-        }
-    }
-
+    /**
+     * Menyimpan data booking baru dan membuat transaksi Midtrans.
+     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -38,16 +29,22 @@ class BookingController extends Controller
             'check_out_date' => 'required|date|after:check_in_date',
         ]);
 
+        // Kalkulasi harga tetap dilakukan di awal
         $room = Room::findOrFail($validated['room_id']);
         $checkInDate = Carbon::parse($validated['check_in_date']);
         $checkOutDate = Carbon::parse($validated['check_out_date']);
+        $durationInNights = $checkOutDate->diffInDays($checkInDate);
+        $totalPrice = $room->price_per_night * $durationInNights;
+
         $booking = null;
 
         try {
-            DB::transaction(function () use ($validated, $room, $checkInDate, $checkOutDate, &$booking) {
-                $room = Room::where('id', $validated['room_id'])->lockForUpdate()->first();
-                
-                if ($room->status !== 'available') {
+            DB::transaction(function () use ($validated, $checkInDate, $checkOutDate, $totalPrice, &$booking) {
+                // Kunci baris data kamar untuk mencegah double booking saat proses ini berjalan
+                $lockedRoom = Room::where('id', $validated['room_id'])->lockForUpdate()->first();
+
+                // Pastikan kamar masih tersedia tepat sebelum membuat booking
+                if ($lockedRoom->status !== 'available') {
                     throw new \Exception('Maaf, kamar ini baru saja dipesan. Silakan pilih kamar lain.');
                 }
 
@@ -56,58 +53,48 @@ class BookingController extends Controller
                     ['name' => $validated['guest_name'], 'phone_number' => $validated['guest_phone']]
                 );
 
-                $room->status = 'booked';
-                $room->save();
-
+                // Membuat record booking baru dengan status 'pending'. Ini sudah benar.
                 $booking = Booking::create([
-                    'room_id' => $room->id,
+                    'room_id' => $lockedRoom->id,
                     'guest_id' => $guest->id,
                     'user_id' => auth()->id(),
                     'check_in_date' => $checkInDate,
                     'check_out_date' => $checkOutDate,
-                    'total_price' => $room->price_per_night * $checkOutDate->diffInDays($checkInDate),
+                    'total_price' => $totalPrice,
                     'status' => 'pending',
                 ]);
             });
 
+            // Logika setelah transaksi database berhasil
+            if (!$booking) {
+                throw new \Exception('Gagal membuat record booking di database.');
+            }
+
             $midtransOrderId = 'BOOK-' . $booking->id . '-' . time();
-            
+            $booking->midtrans_order_id = $midtransOrderId;
+            $booking->save();
+
             $params = [
                 'transaction_details' => [
                     'order_id' => $midtransOrderId,
-                    'gross_amount' => (int) $booking->total_price,
+                    'gross_amount' => (int) $totalPrice,
                 ],
                 'customer_details' => [
                     'first_name' => $validated['guest_name'],
                     'email' => $validated['guest_email'],
                     'phone' => $validated['guest_phone'],
                 ],
-                'item_details' => [[
-                    'id' => (string) $room->id,
-                    'price' => (int) $booking->total_price,
-                    'quantity' => 1,
-                    'name' => substr('Booking Kamar ' . $room->room_number . ' (' . $checkInDate->format('d M') . ')', 0, 50),
-                ]],
             ];
 
             $snapToken = Snap::getSnapToken($params);
-            
-            $booking->midtrans_order_id = $midtransOrderId;
-            $booking->save();
 
             return response()->json(['snap_token' => $snapToken]);
 
         } catch (Throwable $e) {
-            if ($booking) {
-                $booking->room()->update(['status' => 'available']);
-            }
-            Log::error('Booking Store Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
-
-            return response()->json(
-                ['message' => 'Gagal memproses booking: ' . $e->getMessage()],
-                500,
-                ['Access-Control-Allow-Origin' => '*']
-            );
+            // Karena kita tidak mengubah status kamar, blok catch ini menjadi lebih sederhana.
+            // Tidak perlu mengembalikan status kamar lagi.
+            Log::error('Booking Store Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal memproses booking: ' . $e->getMessage()], 500);
         }
     }
 }
