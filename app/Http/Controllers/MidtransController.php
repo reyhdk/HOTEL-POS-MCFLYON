@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Api\Guest\GuestOrderController;
 use App\Models\Booking;
 use App\Models\CheckIn;
 use App\Models\Order;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB; // <-- 1. Tambahkan ini
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Midtrans\Notification;
 use Throwable;
@@ -23,7 +24,7 @@ class MidtransController extends Controller
 
             if (str_starts_with($notification->order_id, 'BOOK-')) {
                 $this->handleBookingNotification($notification);
-            } else {
+            } else if (str_starts_with($notification->order_id, 'ORDER-')) {
                 $this->handleOrderNotification($notification);
             }
 
@@ -36,30 +37,23 @@ class MidtransController extends Controller
     }
 
     /**
-     * Memproses notifikasi khusus untuk Booking.
+     * Memproses notifikasi khusus untuk Booking Kamar.
      */
     private function handleBookingNotification(Notification $notification)
     {
         $booking = Booking::where('midtrans_order_id', $notification->order_id)->first();
 
-        // Abaikan jika booking tidak ditemukan atau statusnya bukan 'pending'
         if (!$booking || $booking->status !== 'pending') {
             return;
         }
 
         if (($notification->transaction_status == 'capture' || $notification->transaction_status == 'settlement') && $notification->fraud_status == 'accept') {
-
-            // --- PERBAIKAN UTAMA DI SINI ---
-            // Gunakan DB Transaction untuk memastikan semua proses berhasil atau tidak sama sekali.
             DB::transaction(function () use ($booking) {
-                // 1. Ubah status booking menjadi 'paid'
                 $booking->status = 'paid';
                 $booking->save();
 
-                // 2. Ubah status kamar terkait menjadi 'occupied'
                 $booking->room()->update(['status' => 'occupied']);
 
-                // 3. Buat record check-in baru
                 CheckIn::create([
                     'room_id' => $booking->room_id,
                     'guest_id' => $booking->guest_id,
@@ -68,26 +62,34 @@ class MidtransController extends Controller
                     'is_active' => true
                 ]);
             });
-
         } else if (in_array($notification->transaction_status, ['cancel', 'expire', 'deny'])) {
-            // Jika pembayaran dibatalkan atau gagal
             $booking->status = 'cancelled';
             $booking->save();
-            // Tidak ada lagi yang perlu dilakukan pada kamar, karena statusnya tidak pernah berubah.
         }
     }
 
     /**
-     * Memproses notifikasi untuk Order lain (contoh: makanan).
+     * Memproses notifikasi khusus untuk Order Makanan.
      */
     private function handleOrderNotification(Notification $notification)
     {
         $order = Order::where('midtrans_order_id', $notification->order_id)->first();
 
-        if (!$order) {
-            Log::warning("Order dengan Midtrans Order ID {$notification->order_id} tidak ditemukan.");
+        if (!$order || $order->status !== 'pending') {
             return;
         }
-        // ... logika untuk order
+
+        if (($notification->transaction_status == 'capture' || $notification->transaction_status == 'settlement') && $notification->fraud_status == 'accept') {
+            // Panggil fungsi untuk mengurangi stok dari GuestOrderController
+            GuestOrderController::handleSuccessfulPayment($order);
+            
+            // Ubah status pesanan
+            $order->status = 'paid'; // atau 'processing' sesuai alur dapur Anda
+            
+        } else if (in_array($notification->transaction_status, ['cancel', 'expire', 'deny'])) {
+            $order->status = 'cancelled';
+        }
+        
+        $order->save();
     }
 }

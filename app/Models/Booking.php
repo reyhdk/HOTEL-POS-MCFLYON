@@ -18,11 +18,12 @@ class Booking extends Model
     protected $fillable = [
         'room_id',
         'user_id',
-        'guest_id', 
+        'guest_id',
         'check_in_date',
         'check_out_date',
         'total_price',
         'status',
+        'midtrans_order_id',
     ];
 
     /**
@@ -45,5 +46,4 @@ class Booking extends Model
 {
     return $this->belongsTo(Guest::class);
 }
-
 }

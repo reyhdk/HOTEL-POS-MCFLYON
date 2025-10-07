@@ -45,7 +45,7 @@ class BookingController extends Controller
 
                 // Pastikan kamar masih tersedia tepat sebelum membuat booking
                 if ($lockedRoom->status !== 'available') {
-                    throw new \Exception('Maaf, kamar ini baru saja dipesan. Silakan pilih kamar lain.');
+                    throw new \Exception('Maaf, kamar ini baru saja dipesan, Silakan pilih kamar lain.');
                 }
 
                 $guest = Guest::firstOrCreate(

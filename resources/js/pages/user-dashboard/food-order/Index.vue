@@ -199,22 +199,48 @@ const fetchGuestProfile = async () => {
 };
 
 const processOrder = async () => {
-  if (cart.value.length === 0) {
-    Swal.fire({ text: "Keranjang Anda kosong.", icon: "warning" });
+  if (cart.value.length === 0 || !activeRoom.value) {
+    Swal.fire({ text: "Keranjang Anda kosong atau Anda belum check-in.", icon: "warning" });
     return;
   }
   isSubmitting.value = true;
+  
+  // --- PERBAIKAN DI SINI ---
   const payload = {
+    // 1. Tambahkan room_id
+    room_id: activeRoom.value.id, 
+    
+    // 2. Sesuaikan payload items sesuai kebutuhan controller baru
     items: cart.value.map(item => ({
       menu_id: item.id,
       quantity: item.quantity,
+      // price tidak perlu dikirim, karena backend akan mengambilnya dari database
     })),
   };
+  
   try {
     const response = await ApiService.post("/guest/orders", payload);
-    const newOrder = response.data.order;
-    cart.value = [];
-    router.push({ name: 'user-payment', params: { orderId: newOrder.id } });
+    
+    // Asumsi backend mengembalikan objek order secara langsung atau di dalam `response.data`
+    // Jika backend Anda yang baru mengembalikan { message: '...', order: {...} }, maka `response.data.order` sudah benar
+    const newOrder = response.data.order || response.data; 
+
+    // Kosongkan keranjang setelah berhasil membuat pesanan
+    cart.value = []; 
+
+    // Tampilkan notifikasi sukses sebelum redirect
+    Swal.fire({
+        text: "Pesanan berhasil dibuat! Anda akan diarahkan ke halaman pembayaran.",
+        icon: "success",
+        timer: 2000,
+        showConfirmButton: false
+    });
+
+    // Arahkan ke halaman pembayaran setelah beberapa saat
+    setTimeout(() => {
+        router.push({ name: 'user-payment', params: { orderId: newOrder.id } });
+    }, 2000);
+
   } catch (error: any) {
     const errorMessage = error.response?.data?.message || "Terjadi kesalahan saat memproses pesanan.";
     Swal.fire({
