@@ -29,7 +29,9 @@
                   <div class="position-relative">
                     <img :src="menu.image_url || '/media/illustrations/blank.svg'" class="card-img-top rounded-top" alt="Menu Image" style="height: 180px; object-fit: cover"/>
                     <div class="position-absolute top-0 end-0 m-4">
-                        <span v-if="menu.stock > 0" class="badge badge-light-success fs-7">Tersedia</span>
+                        <span v-if="menu.stock > 0" class="badge badge-light-success fs-7">
+                          Stok: {{ menu.stock }}
+                        </span>
                         <span v-else class="badge badge-light-danger fs-7">Habis</span>
                     </div>
                   </div>
@@ -153,7 +155,7 @@ import { useRouter } from "vue-router";
 import ApiService from "@/core/services/ApiService";
 import Swal from "sweetalert2";
 
-// --- INTERFACES (Tipe Data) ---
+// --- INTERFACES ---
 interface Menu {
   id: number;
   name: string;
@@ -169,7 +171,7 @@ interface CartItem extends Menu {
   quantity: number;
 }
 
-// --- STATE MANAGEMENT ---
+// --- STATE ---
 const menus = ref<Menu[]>([]);
 const isLoading = ref(true);
 const cart = ref<CartItem[]>([]);
@@ -178,7 +180,7 @@ const guestName = ref<string>('');
 const isSubmitting = ref(false);
 const router = useRouter();
 
-// --- FUNGSI-FUNGSI API ---
+// --- API FUNCTIONS ---
 const fetchMenus = async () => {
   try {
     const response = await ApiService.get("/guest/menu");
@@ -204,42 +206,29 @@ const processOrder = async () => {
     return;
   }
   isSubmitting.value = true;
-  
-  // --- PERBAIKAN DI SINI ---
+
   const payload = {
-    // 1. Tambahkan room_id
-    room_id: activeRoom.value.id, 
-    
-    // 2. Sesuaikan payload items sesuai kebutuhan controller baru
+    room_id: activeRoom.value.id,
     items: cart.value.map(item => ({
       menu_id: item.id,
       quantity: item.quantity,
-      // price tidak perlu dikirim, karena backend akan mengambilnya dari database
     })),
   };
-  
+
   try {
     const response = await ApiService.post("/guest/orders", payload);
-    
-    // Asumsi backend mengembalikan objek order secara langsung atau di dalam `response.data`
-    // Jika backend Anda yang baru mengembalikan { message: '...', order: {...} }, maka `response.data.order` sudah benar
-    const newOrder = response.data.order || response.data; 
+    const newOrder = response.data.order || response.data;
 
-    // Kosongkan keranjang setelah berhasil membuat pesanan
-    cart.value = []; 
+    cart.value = [];
 
-    // Tampilkan notifikasi sukses sebelum redirect
-    Swal.fire({
+    await Swal.fire({
         text: "Pesanan berhasil dibuat! Anda akan diarahkan ke halaman pembayaran.",
         icon: "success",
         timer: 2000,
         showConfirmButton: false
     });
 
-    // Arahkan ke halaman pembayaran setelah beberapa saat
-    setTimeout(() => {
-        router.push({ name: 'user-payment', params: { orderId: newOrder.id } });
-    }, 2000);
+    router.push({ name: 'user-payment', params: { orderId: newOrder.id } });
 
   } catch (error: any) {
     const errorMessage = error.response?.data?.message || "Terjadi kesalahan saat memproses pesanan.";
@@ -255,7 +244,7 @@ const processOrder = async () => {
   }
 };
 
-// --- FUNGSI-FUNGSI KERANJANG ---
+// --- CART FUNCTIONS ---
 const addToCart = (menu: Menu) => {
   const itemInCart = cart.value.find((item) => item.id === menu.id);
   if (itemInCart) {
@@ -274,7 +263,9 @@ const addToCart = (menu: Menu) => {
 const updateQuantity = (menuId: number, amount: number) => {
   const itemInCart = cart.value.find((item) => item.id === menuId);
   if (!itemInCart) return;
+
   const newQuantity = itemInCart.quantity + amount;
+
   if (newQuantity <= 0) {
     cart.value = cart.value.filter(item => item.id !== menuId);
     return;
@@ -286,8 +277,9 @@ const updateQuantity = (menuId: number, amount: number) => {
   itemInCart.quantity = newQuantity;
 };
 
-// --- FUNGSI BANTUAN ---
+// --- HELPER FUNCTIONS ---
 const formatCurrency = (value: number) => {
+  if (!value) return "Rp 0";
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
     currency: "IDR",
@@ -313,4 +305,4 @@ onMounted(() => {
     isLoading.value = false;
   });
 });
-</script>
+</script>   

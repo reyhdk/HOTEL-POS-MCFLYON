@@ -10,13 +10,66 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Midtrans\Notification;
+use Midtrans\Snap; // <-- TAMBAHKAN ATAU PASTIKAN BARIS INI ADA
 use Throwable;
 
 class MidtransController extends Controller
 {
     /**
-     * Menangani notifikasi (webhook) yang dikirim oleh Midtrans.
+     * [FUNGSI BARU] Membuat transaksi Midtrans untuk berbagai jenis pesanan.
      */
+    public function createTransaction(Request $request)
+    {
+        $validated = $request->validate([
+            'order_id' => 'required|integer',
+            'order_type' => 'required|string|in:FOOD_ORDER,BOOKING',
+        ]);
+
+        try {
+            $order = null;
+            $user = $request->user();
+            $midtransOrderId = '';
+            $params = [];
+
+            if ($validated['order_type'] === 'FOOD_ORDER') {
+                $order = Order::findOrFail($validated['order_id']);
+                if ($order->user_id !== $user->id || $order->status !== 'pending') {
+                    throw new \Exception('Pesanan makanan tidak valid untuk pembayaran.');
+                }
+                $midtransOrderId = 'ORDER-' . $order->id . '-' . time();
+            }
+
+            if (!$order) {
+                throw new \Exception('Tipe pesanan tidak valid.');
+            }
+
+            $order->midtrans_order_id = $midtransOrderId;
+            $order->save();
+
+            $params = [
+                'transaction_details' => [
+                    'order_id' => $midtransOrderId,
+                    'gross_amount' => (int) $order->total_price,
+                ],
+                'customer_details' => [
+                    'first_name' => $user->name,
+                    'email' => $user->email,
+                ],
+            ];
+
+            // Baris ini tidak akan error lagi setelah 'use Midtrans\Snap;' ditambahkan
+            $snapToken = Snap::getSnapToken($params);
+
+            return response()->json(['snap_token' => $snapToken]);
+
+        } catch (Throwable $e) {
+            Log::error('Gagal membuat transaksi Midtrans: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal memulai pembayaran: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ... (method handleNotification dan lainnya tidak perlu diubah) ...
+
     public function handleNotification(Request $request)
     {
         try {
@@ -36,9 +89,6 @@ class MidtransController extends Controller
         }
     }
 
-    /**
-     * Memproses notifikasi khusus untuk Booking Kamar.
-     */
     private function handleBookingNotification(Notification $notification)
     {
         $booking = Booking::where('midtrans_order_id', $notification->order_id)->first();
@@ -51,9 +101,7 @@ class MidtransController extends Controller
             DB::transaction(function () use ($booking) {
                 $booking->status = 'paid';
                 $booking->save();
-
                 $booking->room()->update(['status' => 'occupied']);
-
                 CheckIn::create([
                     'room_id' => $booking->room_id,
                     'guest_id' => $booking->guest_id,
@@ -68,9 +116,6 @@ class MidtransController extends Controller
         }
     }
 
-    /**
-     * Memproses notifikasi khusus untuk Order Makanan.
-     */
     private function handleOrderNotification(Notification $notification)
     {
         $order = Order::where('midtrans_order_id', $notification->order_id)->first();
@@ -80,16 +125,12 @@ class MidtransController extends Controller
         }
 
         if (($notification->transaction_status == 'capture' || $notification->transaction_status == 'settlement') && $notification->fraud_status == 'accept') {
-            // Panggil fungsi untuk mengurangi stok dari GuestOrderController
             GuestOrderController::handleSuccessfulPayment($order);
-            
-            // Ubah status pesanan
-            $order->status = 'paid'; // atau 'processing' sesuai alur dapur Anda
-            
+            $order->status = 'paid';
         } else if (in_array($notification->transaction_status, ['cancel', 'expire', 'deny'])) {
             $order->status = 'cancelled';
         }
-        
+
         $order->save();
     }
 }

@@ -1,34 +1,16 @@
 <template>
   <div class="d-flex flex-column flex-center text-center h-100">
-    <div v-if="isLoading">
-      <h1 class="mb-4">Mempersiapkan Pembayaran...</h1>
-      <p class="fs-4 text-muted mb-5">Harap tunggu sebentar, kami sedang menghubungkan Anda ke gerbang pembayaran.</p>
-      <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
     </div>
-
-    <div v-if="error">
-      <i class="ki-duotone ki-shield-cross fs-5x text-danger mb-5">
-        <span class="path1"></span><span class="path2"></span>
-      </i>
-      <h1 class="mb-4">Gagal Memuat Pembayaran</h1>
-      <p class="fs-4 text-muted mb-5">{{ error }}</p>
-      <router-link to="/user/dashboard" class="btn btn-primary">Kembali ke Dashboard</router-link>
-    </div>
-  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import ApiService from '@/core/services/ApiService';
-import Swal from 'sweetalert2';
+import axios from '@/libs/axios';
+import { toast } from 'vue3-toastify';
 
-// Deklarasikan window.snap agar TypeScript tidak error
-declare global {
-  interface Window {
-    snap: any;
-  }
-}
+// ▼▼▼ TAMBAHKAN BARIS INI ▼▼▼
+declare const snap: any;
 
 const route = useRoute();
 const router = useRouter();
@@ -38,53 +20,43 @@ const error = ref<string | null>(null);
 const processPayment = async () => {
   const orderId = route.params.orderId;
 
-  if (!orderId) {
-    error.value = "ID Pesanan tidak ditemukan.";
-    isLoading.value = false;
-    return;
-  }
-
   try {
-    // 1. Minta Snap Token dari backend
-    const response = await ApiService.post('/midtrans/create-transaction', { order_id: orderId });
+    const payload = {
+      order_id: orderId,
+      order_type: 'FOOD_ORDER',
+    };
+
+    const response = await axios.post('/midtrans/create-transaction', payload);
     const snapToken = response.data.snap_token;
 
-    // 2. Buka popup pembayaran Midtrans
-    window.snap.pay(snapToken, {
-      onSuccess: function(result){
-        Swal.fire('Pembayaran Berhasil!', 'Terima kasih, pesanan Anda sedang diproses.', 'success');
-        router.push({ name: 'user-dashboard' });
+    isLoading.value = false;
+
+    // Baris ini tidak akan error lagi
+    snap.pay(snapToken, {
+      onSuccess: () => {
+        toast.success("Pembayaran berhasil!");
+        router.push('/user/food-order');
       },
-      onPending: function(result){
-        Swal.fire('Pembayaran Tertunda', 'Harap selesaikan pembayaran Anda.', 'warning');
-        router.push({ name: 'user-dashboard' });
+      onPending: () => {
+        toast.info("Menunggu pembayaran Anda.");
+        router.push('/user/food-order');
       },
-      onError: function(result){
-        Swal.fire('Pembayaran Gagal', 'Silakan coba lagi atau gunakan metode pembayaran lain.', 'error');
-        isLoading.value = false;
-        error.value = "Gagal memproses pembayaran.";
+      onError: () => {
+        toast.error("Pembayaran gagal.");
+        error.value = "Proses pembayaran gagal atau dibatalkan.";
       },
-      onClose: function(){
-        // Pengguna menutup popup tanpa menyelesaikan pembayaran
-        Swal.fire({
-          text: "Anda menutup jendela pembayaran. Apakah Anda ingin mencoba lagi?",
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonText: "Ya",
-          cancelButtonText: "Tidak, Kembali"
-        }).then((result) => {
-          if (result.isConfirmed) {
-            processPayment(); // Coba lagi
-          } else {
-            router.push({ name: 'user-dashboard' });
-          }
-        });
+      onClose: () => {
+        if (!error.value) {
+          toast.warn("Anda menutup jendela pembayaran.");
+          router.back();
+        }
       }
     });
 
   } catch (err: any) {
     isLoading.value = false;
-    error.value = err.response?.data?.message || "Gagal membuat transaksi pembayaran.";
+    error.value = err.response?.data?.message || "Terjadi kesalahan yang tidak diketahui.";
+    console.error("Gagal memulai pembayaran:", err);
   }
 };
 
