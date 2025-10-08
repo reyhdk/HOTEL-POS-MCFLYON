@@ -42,6 +42,12 @@ const MainMenuConfig: MenuItem[] = [
         keenthemesIcon: "book-open",
         roles: ["user"],
       },
+      {
+        heading: "Riwayat Pesanan",
+        route: "/user/food-order-history", // Sesuaikan dengan path rute yang Anda buat
+        keenthemesIcon: "book-open", // Ikon riwayat
+        roles: ["user"],
+      },
     ],
   },
 

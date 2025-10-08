@@ -47,6 +47,12 @@ const routes: Array<RouteRecordRaw> = [
         meta: { pageTitle: "Pesan Makanan", breadcrumbs: ["Dashboard", "Pesan Makanan"] },
       },
       {
+      path: "food-order-history",
+      name: "user-food-order-history",
+      component: () => import("@/pages/user-dashboard/food-order-history/Index.vue"),
+      meta: { pageTitle: "Riwayat Pesanan Makanan" },
+      },
+      {
       path: "room-service",
       name: "user-room-service",
       component: () => import("@/pages/user-dashboard/room-service/Index.vue"),

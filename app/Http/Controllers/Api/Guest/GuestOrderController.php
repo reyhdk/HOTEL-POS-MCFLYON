@@ -153,21 +153,14 @@ class GuestOrderController extends Controller
     /**
      * Menampilkan riwayat pesanan untuk kamar tamu yang sedang aktif.
      */
-    public function getOrderHistory(Request $request)
+ public function getOrderHistory(Request $request)
     {
-        $user = Auth::user();
-        $activeCheckIn = CheckIn::where('is_active', true)
-            ->whereHas('booking', fn($q) => $q->where('user_id', $user->id))
-            ->first();
-
-        if (!$activeCheckIn) {
-            return response()->json(['message' => 'Anda tidak memiliki sesi check-in yang aktif.'], 403);
-        }
-
-        $orders = Order::where('room_id', $activeCheckIn->room_id)
-                        ->with('items.menu')
-                        ->latest()
-                        ->get();
+        
+        $orders = $request->user()
+                          ->orders()
+                          ->with('items.menu')
+                          ->latest()
+                          ->get();
 
         return response()->json($orders);
     }
