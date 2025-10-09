@@ -17,112 +17,75 @@ class PermissionSeeder extends Seeder
         // Reset cached roles and permissions
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // 1. Definisikan semua permission yang ada, dikelompokkan berdasarkan fitur
+        // 1. Definisikan semua permission yang ada
+        $permissions = [
+            // Izin Grup Menu
+            'pos', 'reports', 'master', 'settings',
 
-        // Izin Induk/Grup untuk Menu Utama (agar menu accordion bisa tampil)
-        $groupPermissions = [
-            'pos',
-            'reports',
-            'master',
-            'settings',
-        ];
-
-        // Izin untuk Halaman Dashboard
-        $dashboardPermissions = [
+            // Izin Dashboard
             'view dashboard',
-        ];
 
-        // Izin untuk Fitur Master Data
-        $masterPermissions = [
+            // Izin Master Data
             'view rooms', 'create rooms', 'edit rooms', 'delete rooms',
             'view facilities', 'create facilities', 'edit facilities', 'delete facilities',
             'view guests', 'create guests', 'edit guests', 'delete guests',
             'view menus', 'create menus', 'edit menus', 'delete menus',
             'view users', 'create users', 'edit users', 'delete users',
             'view roles', 'create roles', 'edit roles', 'delete roles',
-        ];
 
-        // Izin untuk Fitur Point of Sale (POS)
-        $posPermissions = [
-            'create pos_orders',
-            'view online_orders',
-            'manage payments',
-            'view folios',
-        ];
+            // Izin POS
+            'create pos_orders', 'view online_orders', 'manage payments', 'view folios',
 
-        $serviceRequestPermissions = [
-            'manage service_requests', // Izin untuk mengelola permintaan layanan
-        ];
+            // Izin Layanan Kamar
+            'manage service_requests',
 
+            // Izin Laporan
+            'view transaction_history', 'view checkout_history',
 
-        // Izin untuk Fitur Laporan
-        $reportPermissions = [
-            'view transaction_history',
-            'view checkout_history', // Izin baru untuk melihat riwayat checkout
-
-        ];
-
-        // Izin untuk Fitur Pengaturan
-        $settingPermissions = [
+            // Izin Pengaturan
             'edit settings',
         ];
 
-        // Gabungkan semua permission menjadi satu array besar
-        $allPermissions = array_merge(
-            $groupPermissions,
-            $dashboardPermissions,
-            $masterPermissions,
-            $posPermissions,
-            $reportPermissions,
-            $serviceRequestPermissions,
-            $settingPermissions
-        );
-
-        // Buat semua permission yang telah didefinisikan ke dalam database
-        foreach ($allPermissions as $permissionName) {
+        // Buat semua permission ke dalam database
+        foreach ($permissions as $permissionName) {
             Permission::firstOrCreate(['name' => $permissionName, 'guard_name' => 'api']);
         }
-
         $this->command->info('Semua permission berhasil dibuat.');
 
-        // 2. Tentukan permission spesifik untuk setiap role
-        $permissionsByRole = [
-            // Admin mendapatkan semua permission yang ada
-            'admin' => $allPermissions,
+        // 2. Tentukan permission untuk setiap role
+        Role::findByName('admin', 'api')->syncPermissions($permissions);
+        $this->command->info('Memberikan SEMUA permission ke role: admin');
 
-            'receptionist' => [
-                'view dashboard',
-                'pos', 'create pos_orders', 'manage payments', 'view folios',
-                'master', 'view rooms', 'view guests', 'create guests', 'edit guests',
-                'manage service_requests',
-                'view checkout_history',
+        Role::findByName('receptionist', 'api')->syncPermissions([
+            'view dashboard',
+            'pos', 'create pos_orders', 'manage payments', 'view folios',
+            'master', 'view rooms', 'view guests', 'create guests', 'edit guests', 'view facilities',
+            'manage service_requests',
+            'view checkout_history',
+        ]);
+        $this->command->info('Memberikan permission ke role: receptionist');
 
-            ],
+        Role::findByName('chef', 'api')->syncPermissions([
+            'view dashboard',
+            'pos', 'view online_orders',
+            'master', 'view menus', 'create menus', 'edit menus',
+        ]);
+        $this->command->info('Memberikan permission ke role: chef');
 
-            'chef' => [
-                'view dashboard',
-                'pos', 'view online_orders',
-                'master', 'view menus', 'create menus', 'edit menus',
-            ],
+        // --- PENYESUAIAN UNTUK CLEANING SERVICE ---
+        Role::findByName('cleaning-service', 'api')->syncPermissions([
+            'view dashboard',
+            'master',
+            'view rooms',
+            'view facilities',
+            'manage service_requests',
+            'view guests',
+            'edit rooms',
+        ]);
+        $this->command->info('Memberikan permission ke role: cleaning-service');
 
-            'cleaning-service' => [
-                'view dashboard',
-                'master',
-                'view rooms',
-                'manage service_requests',
-            ],
-
-            // Role 'user' (tamu) tidak memiliki permission untuk panel admin
-            'user' => []
-        ];
-
-        // 3. Berikan permission tersebut ke setiap role yang sesuai
-        foreach ($permissionsByRole as $roleName => $permissionNames) {
-            $role = Role::whereName($roleName)->first();
-            if ($role) {
-                $role->syncPermissions($permissionNames);
-                $this->command->info("Memberikan permission ke role: {$roleName}");
-            }
-        }
+        // Role 'user' (tamu) tidak perlu permission admin
+        Role::findByName('user', 'api')->syncPermissions([]);
+        $this->command->info('Role "user" tidak diberikan permission admin.');
     }
 }

@@ -7,6 +7,7 @@ use App\Models\Room;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 
 class RoomController extends Controller
@@ -21,7 +22,10 @@ class RoomController extends Controller
             'checkIns' => function ($query) {
                 $query->where('is_active', true)->with('guest');
             },
-            'facilities' 
+            'facilities',
+            'serviceRequests' => function ($query) {
+            $query->where('service_name', 'Pembersihan Kamar')->where('status', 'pending');
+        }
         ])->latest()->get();
     }
 
@@ -49,7 +53,7 @@ class RoomController extends Controller
                 $q->whereHas('facilities', fn($subQuery) => $subQuery->where('facilities.id', $facilityId));
             }
         });
-        
+
         return $query->latest()->get();
     }
 
@@ -132,10 +136,10 @@ class RoomController extends Controller
             $path = $request->file('image')->store('public/rooms');
             $validatedData['image'] = $path;
         }
-        
+
         $room->update($validatedData);
         $room->facilities()->sync($request->input('facility_ids', []));
-        
+
         return response()->json($room->load('facilities'));
     }
 
@@ -151,12 +155,12 @@ class RoomController extends Controller
         if ($room->image) {
             Storage::delete($room->image);
         }
-        
+
         $room->delete();
-        
+
         return response()->json(null, 204);
     }
-    
+
     /**
      * Menandai kamar perlu dibersihkan setelah check-out.
      */
@@ -172,14 +176,33 @@ class RoomController extends Controller
     /**
      * Tamu meminta kamarnya dibersihkan.
      */
-    public function requestCleaning(Room $room)
-    {
-        if ($room->status !== 'occupied') {
-            return response()->json(['message' => 'Hanya kamar yang sedang terisi yang bisa meminta pembersihan.'], 409);
-        }
-        $room->update(['status' => 'request cleaning']);
-        return response()->json(['message' => 'Permintaan pembersihan kamar telah dicatat.']);
+    public function requestCleaning(Request $request, Room $room) // Tambahkan Request
+{
+    if ($room->status !== 'occupied') {
+        return response()->json(['message' => 'Hanya kamar yang sedang terisi yang bisa meminta pembersihan.'], 409);
     }
+
+    try {
+        DB::transaction(function () use ($room) {
+            // 1. Ubah status kamar
+            $room->update(['status' => 'request cleaning']);
+
+            // 2. Buat record ServiceRequest agar sinkron
+            \App\Models\ServiceRequest::create([
+                'room_id' => $room->id,
+                'user_id' => $room->checkIns()->where('is_active', true)->first()?->booking?->user_id, // Ambil user_id dari check-in aktif
+                'service_name' => 'Pembersihan Kamar',
+                'status' => 'pending',
+                'quantity' => 1, // Default quantity
+            ]);
+        });
+
+        return response()->json(['message' => 'Permintaan pembersihan kamar telah dicatat.']);
+    } catch (\Throwable $e) {
+        Log::error('Gagal membuat permintaan pembersihan manual: ' . $e->getMessage());
+        return response()->json(['message' => 'Gagal membuat permintaan.'], 500);
+    }
+}
 
     /**
      * Menandai kamar sudah bersih (logika cerdas).

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Database\Eloquent\Casts\Attribute; 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use App\Models\Booking;
 use App\Models\Facility;
 use App\Models\Order;
@@ -24,15 +24,15 @@ class Room extends Model
         'price_per_night',
         'description',
         'image',
-        'tersedia_mulai', 
-        'tersedia_sampai', 
+        'tersedia_mulai',
+        'tersedia_sampai',
     ];
 
     protected $casts = [
         'tersedia_mulai' => 'date',
         'tersedia_sampai' => 'date',
     ];
-    
+
     protected $appends = ['image_url'];
 
      protected function imageUrl(): Attribute
@@ -62,5 +62,10 @@ class Room extends Model
     public function checkIns(): HasMany
     {
         return $this->hasMany(CheckIn::class);
+    }
+    
+    public function serviceRequests(): HasMany
+    {
+        return $this->hasMany(ServiceRequest::class);
     }
 }

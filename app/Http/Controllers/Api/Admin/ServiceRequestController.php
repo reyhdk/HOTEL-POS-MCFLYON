@@ -1,26 +1,32 @@
 <?php
 
+// PASTIKAN NAMESPACE MENUNJUK KE 'Admin'
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ServiceRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ServiceRequestController extends Controller
 {
     /**
-     * Menampilkan daftar semua permintaan layanan.
+     * Menampilkan semua permintaan layanan untuk panel admin,
+     * dengan filter status.
      */
     public function index(Request $request)
     {
-        $query = ServiceRequest::with('room', 'user')->latest();
+        $query = ServiceRequest::with(['room', 'user'])->latest();
 
-        // Fitur filter berdasarkan status (opsional tapi bagus)
-        if ($request->has('status') && $request->status != '') {
+        // Tambahkan filter berdasarkan status jika ada
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        return $query->paginate(10);
+        $serviceRequests = $query->paginate(10); // Gunakan paginasi
+
+        return response()->json($serviceRequests);
     }
 
     /**
@@ -29,15 +35,19 @@ class ServiceRequestController extends Controller
     public function updateStatus(Request $request, ServiceRequest $serviceRequest)
     {
         $validated = $request->validate([
-            'status' => 'required|in:pending,processing,completed,cancelled',
+            'status' => 'required|string|in:pending,in_progress,completed,cancelled',
         ]);
 
-        $serviceRequest->status = $validated['status'];
-        $serviceRequest->save();
+        try {
+            $serviceRequest->update(['status' => $validated['status']]);
 
-        return response()->json([
-            'message' => 'Status permintaan berhasil diperbarui.',
-            'request' => $serviceRequest,
-        ]);
+            return response()->json([
+                'message' => 'Status permintaan berhasil diperbarui.',
+                'request' => $serviceRequest,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Gagal update status permintaan layanan: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal memperbarui status.'], 500);
+        }
     }
-}
+}   

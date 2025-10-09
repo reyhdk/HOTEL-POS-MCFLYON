@@ -75,8 +75,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/orders/{order}/pay', [GuestOrderController::class, 'processPayment']);
         Route::post('/service-requests', [ServiceRequestController::class, 'store']);
         Route::get('/service-requests', [ServiceRequestController::class, 'index']);
-        Route::get('/folio', [CheckoutController::class, 'getFolio']); // Perbaikan minor: Impor controller di atas
-        Route::post('/checkout', [CheckoutController::class, 'processCheckout']); // Perbaikan minor
+        Route::get('/folio', [CheckoutController::class, 'getFolio']);
+        Route::post('/checkout', [CheckoutController::class, 'processCheckout']);
     });
 
     // --- RUTE PANEL ADMIN (DILINDUNGI DENGAN PERMISSION) ---
@@ -118,15 +118,17 @@ Route::middleware('auth:api')->group(function () {
     // Manajemen Master Data
     Route::apiResource('menus', MenuController::class)->middleware('can:view menus');
     Route::apiResource('rooms', RoomController::class)->middleware('can:view rooms');
+    Route::post('/rooms/{room}/request-cleaning', [RoomController::class, 'requestCleaning'])->middleware('can:edit rooms');
+    Route::post('/rooms/{room}/mark-as-clean', [RoomController::class, 'markAsClean'])->middleware('can:edit rooms'); // <-- Semicolon ganda dihapus
+
     Route::apiResource('facilities', FacilityController::class)->middleware('can:view facilities');
     Route::apiResource('guests', GuestController::class)->middleware('can:view guests');
 
     Route::post('/midtrans/create-transaction', [MidtransController::class, 'createTransaction']);
-
 
     Route::prefix('master')->group(function () {
         Route::get('/all-roles', [UserController::class, 'getAllRoles'])->middleware('can:view roles');
         Route::apiResource('users', UserController::class)->scoped(['user' => 'uuid'])->middleware('can:view users');
         Route::apiResource('roles', RoleController::class)->middleware('can:view roles');
     });
-});
+}); 
