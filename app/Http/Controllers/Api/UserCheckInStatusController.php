@@ -21,10 +21,9 @@ class UserCheckInStatusController extends Controller
             ->whereHas('booking', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })
-             ->with(['room', 'booking.user']) // <-- PERUBAHAN DI SINI
-        ->first();
-
+            ->with(['room', 'booking.user']) // Logika ini sudah benar
+            ->first();
 
         return response()->json($activeCheckIn);
     }
-}
+} 
