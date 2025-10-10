@@ -44,6 +44,7 @@ class PermissionSeeder extends Seeder
 
             // Izin Pengaturan
             'edit settings',
+            'manage cleaning status',
         ];
 
         // Buat semua permission ke dalam database
@@ -79,6 +80,7 @@ class PermissionSeeder extends Seeder
             'view rooms',
             'view facilities',
             'manage service_requests',
+            'manage cleaning status',
             'view guests',
             'edit rooms',
         ]);

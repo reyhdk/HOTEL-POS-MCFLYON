@@ -118,8 +118,8 @@ Route::middleware('auth:api')->group(function () {
     // Manajemen Master Data
     Route::apiResource('menus', MenuController::class)->middleware('can:view menus');
     Route::apiResource('rooms', RoomController::class)->middleware('can:view rooms');
-    Route::post('/rooms/{room}/request-cleaning', [RoomController::class, 'requestCleaning'])->middleware('can:edit rooms');
-    Route::post('/rooms/{room}/mark-as-clean', [RoomController::class, 'markAsClean'])->middleware('can:edit rooms'); // <-- Semicolon ganda dihapus
+    Route::post('/rooms/{room}/request-cleaning', [RoomController::class, 'requestCleaning'])->middleware('can:manage cleaning status');
+    Route::post('/rooms/{room}/mark-as-clean', [RoomController::class, 'markAsClean'])->middleware('can:manage cleaning status'); // <-- Semicolon ganda dihapus
 
     Route::apiResource('facilities', FacilityController::class)->middleware('can:view facilities');
     Route::apiResource('guests', GuestController::class)->middleware('can:view guests');

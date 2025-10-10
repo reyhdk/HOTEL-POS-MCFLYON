@@ -176,30 +176,24 @@ class RoomController extends Controller
     /**
      * Tamu meminta kamarnya dibersihkan.
      */
-    public function requestCleaning(Request $request, Room $room)
+    public function requestCleaning(Request $request, Room $room) // Tambahkan Request
 {
     if ($room->status !== 'occupied') {
         return response()->json(['message' => 'Hanya kamar yang sedang terisi yang bisa meminta pembersihan.'], 409);
     }
 
-    // 1. Validasi input 'cleaning_time' dari frontend
-    $validated = $request->validate([
-        'cleaning_time' => 'required|date_format:H:i',
-    ]);
-
     try {
-        DB::transaction(function () use ($room, $validated) {
-            // 2. Ubah status kamar
+        DB::transaction(function () use ($room) {
+            // 1. Ubah status kamar
             $room->update(['status' => 'request cleaning']);
 
-            // 3. Buat record ServiceRequest DAN simpan waktunya
+            // 2. Buat record ServiceRequest agar sinkron
             \App\Models\ServiceRequest::create([
                 'room_id' => $room->id,
-                'user_id' => $room->checkIns()->where('is_active', true)->first()?->booking?->user_id,
+                'user_id' => $room->checkIns()->where('is_active', true)->first()?->booking?->user_id, // Ambil user_id dari check-in aktif
                 'service_name' => 'Pembersihan Kamar',
                 'status' => 'pending',
-                'quantity' => 1,
-                'cleaning_time' => $validated['cleaning_time'], // <-- Simpan waktu
+                'quantity' => 1, // Default quantity
             ]);
         });
 
@@ -215,17 +209,18 @@ class RoomController extends Controller
      */
     public function markAsClean(Room $room)
     {
-        if (!in_array($room->status, ['needs cleaning', 'request cleaning'])) {
-            return response()->json(['message' => 'Status kamar tidak valid untuk ditandai bersih.'], 409);
-        }
-
-        // Cek apakah masih ada sesi check-in aktif untuk kamar ini.
-        // Ini untuk kasus di mana 'request cleaning' diproses saat tamu masih di dalam.
-        $hasActiveCheckIn = $room->checkIns()->where('is_active', true)->exists();
-        $newStatus = $hasActiveCheckIn ? 'occupied' : 'available';
-
-        $room->update(['status' => $newStatus]);
-
-        return response()->json(['message' => 'Kamar telah ditandai bersih dan status diperbarui menjadi ' . $newStatus . '.']);
+    if (!in_array($room->status, ['needs cleaning', 'request cleaning', 'Dirty'])) {
+        return response()->json(['message' => 'Status kamar tidak valid untuk ditandai bersih.'], 409);
     }
+
+    // Cek apakah masih ada sesi check-in aktif untuk kamar ini.
+    $hasActiveCheckIn = $room->checkIns()->where('is_active', true)->exists();
+    
+    // Jika ada tamu, status kembali ke 'occupied'. Jika tidak ada (setelah checkout), status kembali ke 'available'.
+    $newStatus = $hasActiveCheckIn ? 'occupied' : 'available';
+
+    $room->update(['status' => $newStatus]);
+
+    return response()->json(['message' => 'Kamar telah ditandai bersih dan status diperbarui menjadi ' . $newStatus . '.']);
+}
 }
