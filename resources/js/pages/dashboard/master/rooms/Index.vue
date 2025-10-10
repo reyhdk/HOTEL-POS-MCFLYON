@@ -72,26 +72,21 @@
                   <button v-if="room.status === 'available'" @click="openCheckInModal(room)" class="btn btn-sm btn-light-success me-2">
                     Check-in
                   </button>
-
                   <button v-if="room.status === 'occupied'" @click="processCheckout(room)" class="btn btn-sm btn-light-warning me-2">
                     Check-out
                   </button>
-
                   <button v-if="room.status === 'occupied' && (!room.service_requests || room.service_requests.length === 0)"
                           @click="requestCleaning(room)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Minta Dibersihkan">
                     <i class="ki-duotone ki-brush fs-3"></i>
                   </button>
-
                   <button v-if="room.status === 'needs cleaning' || room.status === 'request cleaning'"
                           @click="markAsClean(room)" class="btn btn-sm btn-light-info me-2">
                     Tandai Bersih
                   </button>
-
                   <div v-if="room.status === 'request cleaning' && room.service_requests && room.service_requests.length > 0 && room.service_requests[0].cleaning_time"
                        class="badge badge-light-primary fw-semibold me-2">
                     {{ room.service_requests[0].cleaning_time.substring(0, 5) }}
                   </div>
-
                   <a href="#" @click.prevent="openEditRoomModal(room)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Edit">
                     <i class="ki-duotone ki-notepad-edit fs-3"></i>
                   </a>
@@ -118,25 +113,19 @@ import { Modal } from "bootstrap";
 import RoomModal from "./RoomModal.vue";
 import CheckInModal from "./CheckInModal.vue";
 
-// === PERBAIKAN URUTAN DI SINI ===
-
-// 1. Definisikan interface ServiceRequest TERLEBIH DAHULU
+// --- INTERFACES ---
 interface ServiceRequest {
   id: number;
   service_name: string;
   status: string;
   cleaning_time: string | null;
 }
-
-// 2. Definisikan interface lainnya
 interface Facility {
   id: number;
   name: string;
   icon: string | null;
   icon_url: string | null;
 }
-
-// 3. BARU definisikan interface Room yang menggunakan interface di atas
 interface Room {
   id: number;
   room_number: string;
@@ -149,21 +138,24 @@ interface Room {
   tersedia_mulai: string | null;
   tersedia_sampai: string | null;
   facilities: Facility[];
-  service_requests: ServiceRequest[]; // Baris ini tidak akan error lagi
+  service_requests: ServiceRequest[];
 }
-
-// === SELESAI ===
-
+// [BARU] Interface untuk konfigurasi Swal
+interface ConfirmActionConfig {
+  text: string;
+  icon: 'warning' | 'info' | 'question';
+  confirmButtonText: string;
+}
 
 // --- FUNGSI BANTUAN ---
 const formatDateSimple = (dateString: string | null): string => {
     if (!dateString) return '';
-    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
-    return new Date(dateString).toLocaleDateString('id-ID', options);
+    const date = new Date(dateString);
+    return `${date.getDate()} ${date.toLocaleString('id-ID', { month: 'short' })} ${date.getFullYear()}`;
 };
 const getAvailabilityPeriod = (room: Room): string => {
-    const start = formatDateSimple(room.tersedia_mulai);
-    const end = formatDateSimple(room.tersedia_sampai);
+    const start = room.tersedia_mulai ? formatDateSimple(room.tersedia_mulai) : null;
+    const end = room.tersedia_sampai ? formatDateSimple(room.tersedia_sampai) : null;
     if (start && end) return `${start} - ${end}`;
     if (start) return `Mulai ${start}`;
     if (end) return `Hingga ${end}`;
@@ -174,7 +166,7 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
 };
 const getStatusBadge = (status: string) => {
-  const statusMap = {
+  const statusMap: { [key: string]: string } = {
     available: 'badge badge-light-success',
     occupied: 'badge badge-light-danger',
     maintenance: 'badge badge-light-warning',
@@ -184,34 +176,31 @@ const getStatusBadge = (status: string) => {
   return statusMap[status] || 'badge badge-light';
 };
 const getStatusLabel = (status: string) => {
-    const labelMap = {
+    const labelMap: { [key: string]: string } = {
       'needs cleaning': 'Perlu Dibersihkan',
       'request cleaning': 'Minta Dibersihkan',
     };
-    const defaultLabel = status.charAt(0).toUpperCase() + status.slice(1);
-    return labelMap[status] || defaultLabel;
+    return labelMap[status] || status.replace(/-/g, ' ');
 };
 
-// --- STATE (VARIABEL REAKTIF) ---
+// --- STATE ---
 const rooms = ref<Room[]>([]);
 const loading = ref(true);
 const selectedRoom = ref<Room | null>(null);
 const searchQuery = ref("");
 
 const filteredRooms = computed(() => {
-  if (!searchQuery.value) {
-    return rooms.value;
-  }
+  if (!searchQuery.value) return rooms.value;
   return rooms.value.filter((room) =>
     room.room_number.toLowerCase().includes(searchQuery.value.toLowerCase())
   );
 });
 
-// --- FUNGSI-FUNGSI UTAMA ---
+// --- FUNGSI API & AKSI ---
 const getRooms = async () => {
   try {
     loading.value = true;
-    const { data } = await ApiService.get(`/rooms?_=${new Date().getTime()}`);
+    const { data } = await ApiService.get("/rooms");
     rooms.value = data;
   } catch (error) {
     rooms.value = [];
@@ -223,112 +212,101 @@ const getRooms = async () => {
 
 const refreshData = () => getRooms();
 
-const openAddRoomModal = () => {
-  selectedRoom.value = null;
-  const modalEl = document.getElementById("kt_modal_room");
-  if (modalEl) new Modal(modalEl).show();
-};
+const openModal = (modalId: string, room: Room | null = null) => {
+    selectedRoom.value = room ? { ...room } : null;
+    const modalEl = document.getElementById(modalId);
+    if (modalEl) new Modal(modalEl).show();
+}
 
-const openEditRoomModal = (room: Room) => {
-  selectedRoom.value = { ...room };
-  const modalEl = document.getElementById("kt_modal_room");
-  if (modalEl) new Modal(modalEl).show();
-};
+const openAddRoomModal = () => openModal('kt_modal_room');
+const openEditRoomModal = (room: Room) => openModal('kt_modal_room', room);
+const openCheckInModal = (room: Room) => openModal('kt_modal_check_in', room);
 
-const openCheckInModal = (room: Room) => {
-  selectedRoom.value = { ...room };
-  const modalEl = document.getElementById("kt_modal_check_in");
-  if (modalEl) new Modal(modalEl).show();
+const confirmAction = async (config: ConfirmActionConfig, callback: () => Promise<void>) => {
+    const result = await Swal.fire({
+        ...config,
+        showCancelButton: true,
+        buttonsStyling: false,
+        cancelButtonText: "Batal",
+        customClass: { confirmButton: "btn fw-bold btn-danger", cancelButton: "btn fw-bold btn-active-light-primary" },
+    });
+
+    if (result.isConfirmed) {
+        try {
+            await callback();
+            refreshData();
+        } catch (error: any) {
+            const message = error.response?.data?.message || 'Terjadi kesalahan.';
+            Swal.fire("Error!", message, "error");
+        }
+    }
 };
 
 const deleteRoom = (id: number) => {
-  Swal.fire({
-    text: "Apakah Anda yakin ingin menghapus kamar ini?",
-    icon: "warning",
-    showCancelButton: true,
-    buttonsStyling: false,
-    confirmButtonText: "Ya, Hapus",
-    cancelButtonText: "Batal",
-    customClass: { confirmButton: "btn fw-bold btn-danger", cancelButton: "btn fw-bold btn-active-light-primary" },
-  }).then(async (result) => {
-    if (result.isConfirmed) {
-      try {
+    confirmAction({
+        text: "Apakah Anda yakin ingin menghapus kamar ini?",
+        icon: "warning",
+        confirmButtonText: "Ya, Hapus"
+    }, async () => {
         await ApiService.delete(`/rooms/${id}`);
         Swal.fire("Berhasil!", "Data kamar telah dihapus.", "success");
-        refreshData();
-      } catch (error: any) {
-        const message = error.response?.data?.message || 'Gagal menghapus data kamar.';
-        Swal.fire("Error!", message, "error");
-      }
-    }
-  });
+    });
 };
 
-const processCheckout = async (room: Room) => {
-  Swal.fire({
-    text: `Apakah Anda yakin ingin melakukan check-out untuk kamar ${room.room_number}?`,
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "Ya, Check-out",
-    cancelButtonText: "Batal",
-  }).then(async (result) => {
-    if (result.isConfirmed) {
-      try {
+const processCheckout = (room: Room) => {
+    confirmAction({
+        text: `Apakah Anda yakin ingin melakukan check-out untuk kamar ${room.room_number}?`,
+        icon: "warning",
+        confirmButtonText: "Ya, Check-out"
+    }, async () => {
         await ApiService.post(`/check-out/${room.id}`, {});
         Swal.fire("Berhasil!", `Kamar ${room.room_number} telah berhasil check-out.`, "success");
-        refreshData();
-      } catch (error: any) {
-        const message = error.response?.data?.message || "Gagal melakukan check-out.";
-        Swal.fire("Error!", message, "error");
-      }
-    }
-  });
+    });
 };
 
-const requestCleaning = async (room: Room) => {
-  Swal.fire({
-    text: `Ubah status kamar ${room.room_number} menjadi "Minta Dibersihkan"?`,
-    icon: "info",
-    showCancelButton: true,
-    confirmButtonText: "Ya, Ubah Status",
-    cancelButtonText: "Batal",
-  }).then(async (result) => {
-    if (result.isConfirmed) {
-      try {
-        await ApiService.post(`/rooms/${room.id}/request-cleaning`, {});
-        Swal.fire("Berhasil!", `Status kamar ${room.room_number} telah diubah.`, "success");
-        refreshData();
-      } catch (error: any) {
-        const message = error.response?.data?.message || "Gagal mengubah status.";
-        Swal.fire("Error!", message, "error");
-      }
-    }
-  });
+const requestCleaning = (room: Room) => {
+    Swal.fire({
+        title: `Minta Pembersihan untuk Kamar ${room.room_number}`,
+        html: `<p class="fs-6">Masukkan waktu pembersihan yang dijadwalkan.</p><input type="time" id="swal-cleaning-time" class="form-control mt-3" autofocus>`,
+        icon: "info",
+        showCancelButton: true,
+        confirmButtonText: "Ya, Jadwalkan",
+        cancelButtonText: "Batal",
+        buttonsStyling: false,
+        customClass: { confirmButton: "btn fw-bold btn-primary", cancelButton: "btn fw-bold btn-active-light-primary" },
+        preConfirm: () => {
+            const timeInput = document.getElementById('swal-cleaning-time') as HTMLInputElement;
+            if (!timeInput.value) {
+                Swal.showValidationMessage('Waktu tidak boleh kosong');
+                return false;
+            }
+            return timeInput.value;
+        },
+    }).then(async (result) => {
+        if (result.isConfirmed && result.value) {
+            try {
+                await ApiService.post(`/rooms/${room.id}/request-cleaning`, { cleaning_time: result.value });
+                Swal.fire("Berhasil!", `Permintaan pembersihan untuk kamar ${room.room_number} telah dijadwalkan.`, "success");
+                refreshData();
+            } catch (error: any) {
+                const message = error.response?.data?.message || "Gagal mengubah status.";
+                Swal.fire("Error!", message, "error");
+            }
+        }
+    });
 };
 
-const markAsClean = async (room: Room) => {
-  Swal.fire({
-    text: `Apakah Anda yakin ingin menandai kamar ${room.room_number} sudah bersih?`,
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonText: "Ya, Sudah Bersih",
-    cancelButtonText: "Batal",
-  }).then(async (result) => {
-    if (result.isConfirmed) {
-      try {
+const markAsClean = (room: Room) => {
+    confirmAction({
+        text: `Apakah Anda yakin ingin menandai kamar ${room.room_number} sudah bersih?`,
+        icon: "question",
+        confirmButtonText: "Ya, Sudah Bersih"
+    }, async () => {
         await ApiService.post(`/rooms/${room.id}/mark-as-clean`, {});
         Swal.fire("Berhasil!", `Kamar ${room.room_number} telah ditandai bersih.`, "success");
-        refreshData();
-      } catch (error: any) {
-        const message = error.response?.data?.message || "Gagal menandai kamar bersih.";
-        Swal.fire("Error!", message, "error");
-      }
-    }
-  });
+    });
 };
 
 // --- LIFECYCLE HOOK ---
-onMounted(() => {
-  getRooms();
-});
+onMounted(getRooms);
 </script>

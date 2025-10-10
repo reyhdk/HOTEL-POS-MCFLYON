@@ -1,6 +1,5 @@
 <?php
 
-// PASTIKAN NAMESPACE MENUNJUK KE 'Admin'
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
@@ -12,7 +11,7 @@ use Throwable;
 class ServiceRequestController extends Controller
 {
     /**
-     * Menampilkan semua permintaan layanan untuk panel admin,
+     * Method #1: Menampilkan semua permintaan layanan untuk panel admin,
      * dengan filter status.
      */
     public function index(Request $request)
@@ -30,16 +29,28 @@ class ServiceRequestController extends Controller
     }
 
     /**
-     * Memperbarui status sebuah permintaan layanan.
+     * Method #2: Memperbarui status sebuah permintaan layanan.
      */
     public function updateStatus(Request $request, ServiceRequest $serviceRequest)
     {
         $validated = $request->validate([
-            'status' => 'required|string|in:pending,in_progress,completed,cancelled',
+            'status' => 'required|string|in:pending,processing,completed,cancelled',
         ]);
 
         try {
             $serviceRequest->update(['status' => $validated['status']]);
+
+            // [LOGIKA SINKRONISASI BARU]
+            // Jika status diubah menjadi 'completed' dan nama layanannya adalah 'Pembersihan Kamar'
+            if ($validated['status'] === 'completed' && $serviceRequest->service_name === 'Pembersihan Kamar') {
+                $room = $serviceRequest->room;
+                if ($room) {
+                    // Periksa apakah kamar masih ditempati atau tidak
+                    $hasActiveCheckIn = $room->checkIns()->where('is_active', true)->exists();
+                    $newRoomStatus = $hasActiveCheckIn ? 'occupied' : 'available';
+                    $room->update(['status' => $newRoomStatus]);
+                }
+            }
 
             return response()->json([
                 'message' => 'Status permintaan berhasil diperbarui.',
@@ -50,4 +61,4 @@ class ServiceRequestController extends Controller
             return response()->json(['message' => 'Gagal memperbarui status.'], 500);
         }
     }
-}   
+}

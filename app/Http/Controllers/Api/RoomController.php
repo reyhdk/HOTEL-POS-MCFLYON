@@ -176,24 +176,30 @@ class RoomController extends Controller
     /**
      * Tamu meminta kamarnya dibersihkan.
      */
-    public function requestCleaning(Request $request, Room $room) // Tambahkan Request
+    public function requestCleaning(Request $request, Room $room)
 {
     if ($room->status !== 'occupied') {
         return response()->json(['message' => 'Hanya kamar yang sedang terisi yang bisa meminta pembersihan.'], 409);
     }
 
+    // 1. Validasi input 'cleaning_time' dari frontend
+    $validated = $request->validate([
+        'cleaning_time' => 'required|date_format:H:i',
+    ]);
+
     try {
-        DB::transaction(function () use ($room) {
-            // 1. Ubah status kamar
+        DB::transaction(function () use ($room, $validated) {
+            // 2. Ubah status kamar
             $room->update(['status' => 'request cleaning']);
 
-            // 2. Buat record ServiceRequest agar sinkron
+            // 3. Buat record ServiceRequest DAN simpan waktunya
             \App\Models\ServiceRequest::create([
                 'room_id' => $room->id,
-                'user_id' => $room->checkIns()->where('is_active', true)->first()?->booking?->user_id, // Ambil user_id dari check-in aktif
+                'user_id' => $room->checkIns()->where('is_active', true)->first()?->booking?->user_id,
                 'service_name' => 'Pembersihan Kamar',
                 'status' => 'pending',
-                'quantity' => 1, // Default quantity
+                'quantity' => 1,
+                'cleaning_time' => $validated['cleaning_time'], // <-- Simpan waktu
             ]);
         });
 

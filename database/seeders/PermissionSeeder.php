@@ -59,7 +59,7 @@ class PermissionSeeder extends Seeder
         Role::findByName('receptionist', 'api')->syncPermissions([
             'view dashboard',
             'pos', 'create pos_orders', 'manage payments', 'view folios',
-            'master', 'view rooms', 'view guests', 'create guests', 'edit guests', 'view facilities',
+            'master', 'view rooms', 'view guests', 'create guests', 'edit guests', 'view facilities', 'edit rooms',
             'manage service_requests',
             'view checkout_history',
         ]);
