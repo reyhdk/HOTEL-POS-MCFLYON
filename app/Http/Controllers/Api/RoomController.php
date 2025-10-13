@@ -72,6 +72,25 @@ class RoomController extends Controller
         return $query->latest()->get();
     }
 
+ /**
+     * [BARU] Mengambil daftar kamar yang sedang ditempati untuk halaman Point of Sale.
+     */
+    public function getOccupiedRoomsForPos()
+    {
+        // Otorisasi: Pastikan user punya izin untuk membuat pesanan POS
+        $this->authorize('create', \App\Models\Order::class);
+
+        // Ambil kamar yang statusnya 'occupied' dan sertakan data check-in aktif beserta nama tamunya
+        $occupiedRooms = Room::where('status', 'occupied')
+                             ->with(['checkIns' => function ($query) {
+                                 $query->where('is_active', true)->with('guest');
+                             }])
+                             ->get();
+
+        return response()->json($occupiedRooms);
+    }
+
+
     /**
      * Menampilkan detail satu kamar untuk ADMIN.
      */

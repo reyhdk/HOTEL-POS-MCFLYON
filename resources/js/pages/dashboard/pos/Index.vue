@@ -35,7 +35,7 @@
                   </div>
                   <div class="fs-6 fw-bold text-dark mb-2">{{ menu.name }}</div>
                   <div class="fs-7 fw-semibold text-muted">{{ formatCurrency(menu.price) }}</div>
-                  
+
                   <div class="fs-8 fw-bold text-gray-500 mt-2">
                     Stok: {{ menu.stock }}
                   </div>
@@ -82,7 +82,7 @@
                   </el-select>
                 </div>
                 <div class="separator separator-dashed my-4"></div>
-                
+
                 <div class="flex-grow-1">
                     <div v-if="cart.length === 0" class="text-center text-muted d-flex align-items-center justify-content-center h-100">
                         Keranjang pesanan masih kosong.
@@ -103,7 +103,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="mt-auto">
                     <div class="separator separator-dashed my-8"></div>
                     <div class="d-flex flex-stack bg-light-primary rounded p-5 mb-5">
@@ -125,10 +125,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import axios from "@/libs/axios";
+import ApiService from "@/core/services/ApiService"; // Gunakan ApiService jika sudah ada
 import Swal from "sweetalert2";
 
-// Tipe Data yang Disesuaikan dan Lebih Akurat
+// --- INTERFACES (Tipe Data) ---
 interface Guest {
   id: number;
   name: string;
@@ -141,15 +141,13 @@ interface CheckIn {
 interface Room {
   id: number;
   room_number: string;
-  type: string;
-  status: string;
-  checkIns: CheckIn[]; // Menggunakan camelCase agar sesuai standar JavaScript
+  check_ins: CheckIn[]; // Menggunakan nama relasi dari JSON Laravel (snake_case)
 }
 interface Menu {
   id: number;
   name: string;
   price: number;
-  image_url: string | null; // Menggunakan image_url dari accessor
+  image_url: string | null;
   stock: number;
 }
 interface CartItem {
@@ -159,15 +157,15 @@ interface CartItem {
   quantity: number;
 }
 
-// Variabel Reaktif
+// --- STATE (Variabel Reaktif) ---
 const menus = ref<Menu[]>([]);
-const rooms = ref<Room[]>([]);
+const occupiedRooms = ref<Room[]>([]); // State khusus untuk kamar yang ditempati
 const cart = ref<CartItem[]>([]);
 const loading = ref({ menus: true, rooms: true, processing: false });
 const searchMenuQuery = ref("");
 const selectedRoomId = ref<number | null>(null);
 
-// Computed Properties
+// --- COMPUTED PROPERTIES ---
 const totalPrice = computed(() => {
   return cart.value.reduce((total, item) => total + item.price * item.quantity, 0);
 });
@@ -183,77 +181,52 @@ const filteredMenus = computed(() => {
   );
 });
 
-// [PERBAIKAN UTAMA] Logika ini dibuat lebih aman
-const occupiedRooms = computed(() => {
-  return rooms.value.filter(room =>
-    room.status === 'occupied' &&        // Cek status
-    Array.isArray(room.checkIns) &&      // Pastikan checkIns adalah array
-    room.checkIns.length > 0 &&          // Pastikan tidak kosong
-    room.checkIns.some(ci => ci.is_active) // Pastikan ada setidaknya satu yang aktif
-  );
-});
-
-// Fungsi-fungsi
-const getMenus = async () => {
+// --- FUNGSI-FUNGSI ---
+const fetchMenus = async () => {
   try {
     loading.value.menus = true;
-    const response = await axios.get("/menus");
-    menus.value = response.data;
+    const { data } = await ApiService.get("/menus");
+    menus.value = data;
   } catch (error) {
-    console.error("Gagal memuat menu:", error);
     Swal.fire("Error", "Gagal memuat data menu.", "error");
   } finally {
     loading.value.menus = false;
   }
 };
 
-const getRooms = async () => {
+// [DIPERBARUI] Menggunakan API endpoint baru yang lebih efisien
+const fetchOccupiedRooms = async () => {
   try {
     loading.value.rooms = true;
-    const response = await axios.get("/rooms");
-    if (Array.isArray(response.data)) {
-      rooms.value = response.data;
-    } else {
-      rooms.value = [];
-    }
+    const { data } = await ApiService.get("/pos/occupied-rooms");
+    occupiedRooms.value = data;
   } catch (error) {
-    console.error("Gagal memuat kamar:", error);
     Swal.fire("Error", "Gagal memuat data kamar.", "error");
-    rooms.value = [];
   } finally {
     loading.value.rooms = false;
   }
 };
 
-// [PERBAIKAN UTAMA] Logika ini dibuat lebih aman
+// [Disederhanakan] Logika ini aman karena API hanya mengirim kamar dengan check-in aktif
 const getRoomLabel = (room: Room): string => {
-  const activeCheckIn = room.checkIns?.find(ci => ci.is_active);
-  const guestName = activeCheckIn?.guest?.name || 'Tamu Belum Terdaftar';
+  const activeCheckIn = room.check_ins[0];
+  const guestName = activeCheckIn?.guest?.name || 'Tamu';
   return `${room.room_number} - ${guestName}`;
 };
 
 const addToCart = (menu: Menu) => {
   if (menu.stock <= 0) return;
-
   const existingItem = cart.value.find(item => item.menu_id === menu.id);
   if (existingItem) {
-    if (existingItem.quantity < menu.stock) {
-      existingItem.quantity++;
-    }
+    if (existingItem.quantity < menu.stock) existingItem.quantity++;
   } else {
-    cart.value.push({
-      menu_id: menu.id,
-      name: menu.name,
-      price: menu.price,
-      quantity: 1,
-    });
+    cart.value.push({ menu_id: menu.id, name: menu.name, price: menu.price, quantity: 1 });
   }
 };
 
 const updateQuantity = (item: CartItem, change: number) => {
   const menu = menus.value.find(m => m.id === item.menu_id);
   if (!menu) return;
-
   const newQuantity = item.quantity + change;
   if (newQuantity > 0 && newQuantity <= menu.stock) {
     item.quantity = newQuantity;
@@ -263,23 +236,19 @@ const updateQuantity = (item: CartItem, change: number) => {
 };
 
 const processOrder = async () => {
-  if (!canProcessOrder.value) {
-    Swal.fire("Perhatian", "Silakan pilih kamar dan tambahkan minimal satu item ke keranjang.", "warning");
-    return;
-  }
+  if (!canProcessOrder.value) return;
   loading.value.processing = true;
   const orderData = {
     room_id: selectedRoomId.value,
     items: cart.value.map(item => ({ menu_id: item.menu_id, quantity: item.quantity })),
   };
   try {
-    await axios.post('/orders', orderData);
+    await ApiService.post('/orders', orderData);
     Swal.fire("Berhasil!", "Pesanan berhasil dibuat dan tagihan ditambahkan ke folio kamar.", "success");
     cart.value = [];
     selectedRoomId.value = null;
-    await getMenus(); // Muat ulang menu untuk update stok
+    await fetchMenus(); // Muat ulang menu untuk update stok
   } catch (error: any) {
-    console.error("Gagal memproses pesanan:", error);
     const message = error.response?.data?.message || "Terjadi kesalahan saat memproses pesanan.";
     Swal.fire("Error!", message, "error");
   } finally {
@@ -289,11 +258,7 @@ const processOrder = async () => {
 
 const formatCurrency = (value: number) => {
   if (isNaN(value)) return "Rp 0";
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-  }).format(value);
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
 };
 
 const getMenuCardClass = (menu: Menu) => {
@@ -302,9 +267,9 @@ const getMenuCardClass = (menu: Menu) => {
   return 'bg-light-primary';
 };
 
-// Lifecycle Hook
+// --- LIFECYCLE HOOK ---
 onMounted(() => {
-  getMenus();
-  getRooms();
+  fetchMenus();
+  fetchOccupiedRooms(); // Panggil fungsi yang baru
 });
 </script>

@@ -96,6 +96,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancelOrder'])->middleware('can:manage payments');
     Route::get('/folios', [FolioController::class, 'index'])->middleware('can:view folios');
     Route::post('/folios/{room}/checkout', [FolioController::class, 'processFolioPaymentAndCheckout'])->middleware('can:manage payments');
+    Route::get('/pos/occupied-rooms', [RoomController::class, 'getOccupiedRoomsForPos'])->middleware('can:create pos_orders');
 
     // Manajemen Pesanan Online
     Route::get('/online-orders', [AdminOrderController::class, 'index'])->middleware('can:view online_orders');
@@ -131,4 +132,4 @@ Route::middleware('auth:api')->group(function () {
         Route::apiResource('users', UserController::class)->scoped(['user' => 'uuid'])->middleware('can:view users');
         Route::apiResource('roles', RoleController::class)->middleware('can:view roles');
     });
-}); 
+});

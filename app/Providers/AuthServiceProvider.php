@@ -15,6 +15,8 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
        \App\Models\Room::class => \App\Policies\RoomPolicy::class,
         \App\Models\Facility::class => \App\Policies\FacilityPolicy::class,
+        \App\Models\Order::class => \App\Policies\OrderPolicy::class, // <-- TAMBAHKAN INI
+
     ];
 
     /**
