@@ -15,7 +15,7 @@
         </div>
       </div>
       <div class="card-toolbar">
-        <button type="button" class="btn btn-primary" @click="openAddModal">
+        <button v-if="userHasPermission('create menus')" type="button" class="btn btn-primary" @click="openAddModal">
           <i class="ki-duotone ki-plus fs-2"></i> Tambah Menu
         </button>
       </div>
@@ -50,10 +50,10 @@
             <td>{{ formatCurrency(menu.price) }}</td>
             <td>{{ menu.stock }}</td>
             <td class="text-end">
-              <a href="#" @click.prevent="openEditModal(menu)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Edit">
+              <a href="#" v-if="userHasPermission('edit menus')" @click.prevent="openEditModal(menu)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Edit">
                 <i class="ki-duotone ki-pencil fs-3"></i>
               </a>
-              <a href="#" @click.prevent="deleteMenu(menu.id)" class="btn btn-icon btn-light-danger btn-sm" title="Hapus">
+              <a href="#" v-if="userHasPermission('delete menus')" @click.prevent="deleteMenu(menu.id)" class="btn btn-icon btn-light-danger btn-sm" title="Hapus">
                 <i class="ki-duotone ki-trash fs-3"></i>
               </a>
             </td>
@@ -68,12 +68,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import axios from "@/libs/axios"; // Pastikan path ini benar
+import { useAuthStore } from "@/stores/auth"; // <-- 1. Import auth store
+import axios from "@/libs/axios";
 import Swal from "sweetalert2";
 import { Modal } from "bootstrap";
 import MenuModal from "./MenuModal.vue";
 
-// [DIUBAH] Interface disesuaikan dengan data dari backend (accessor)
 interface Menu {
   id: number;
   name: string;
@@ -83,10 +83,16 @@ interface Menu {
   image_url: string | null;
 }
 
+const authStore = useAuthStore(); // <-- 2. Inisialisasi store
 const menus = ref<Menu[]>([]);
 const loading = ref(true);
 const selectedMenu = ref<Menu | null>(null);
 const searchQuery = ref("");
+
+// [BARU] Fungsi bantuan untuk mengecek izin user
+const userHasPermission = (permission: string): boolean => {
+  return authStore.user?.all_permissions?.includes(permission) ?? false;
+};
 
 const filteredMenus = computed(() => {
   if (!searchQuery.value) {
@@ -148,7 +154,6 @@ const deleteMenu = (id: number) => {
   });
 };
 
-// [DIUBAH] Fungsi untuk membuka modal (tambah & edit) disederhanakan
 const openModal = () => {
   const modalEl = document.getElementById("kt_modal_menu");
   if (modalEl) {
@@ -158,12 +163,12 @@ const openModal = () => {
 };
 
 const openAddModal = () => {
-  selectedMenu.value = null; // Kosongkan data untuk mode 'Tambah'
+  selectedMenu.value = null;
   openModal();
 };
 
 const openEditModal = (menu: Menu) => {
-  selectedMenu.value = { ...menu }; // Isi data untuk mode 'Edit'
+  selectedMenu.value = { ...menu };
   openModal();
 };
 

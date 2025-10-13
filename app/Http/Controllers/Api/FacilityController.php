@@ -6,22 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Facility;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Storage; // <-- 1. Jangan lupa import Storage
+use Illuminate\Support\Facades\Storage;
 
 class FacilityController extends Controller
 {
     /**
-     * [TAMBAHKAN INI]
-     * Menerapkan otorisasi berbasis permission secara otomatis.
+     * [DIHAPUS] Method __construct() dihapus untuk menghindari error.
      */
-    public function __construct()
-    {
-        $this->authorizeResource(Facility::class, 'facility');
-    }
-
 
     /**
-     * Menampilkan daftar semua fasilitas.
+     * Menampilkan daftar semua fasilitas (PUBLIK).
+     * Tidak ada otorisasi di sini.
      */
     public function index(): JsonResponse
     {
@@ -34,21 +29,21 @@ class FacilityController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        // 2. Sesuaikan validasi untuk menerima file gambar
+        // Otorisasi manual: Periksa apakah user punya izin 'create facilities'
+        $this->authorize('create', Facility::class);
+
         $validatedData = $request->validate([
             'name' => 'required|string|max:255|unique:facilities,name',
-            'icon' => 'nullable|image|mimes:svg,png,jpg|max:1024', // Validasi untuk gambar
+            'icon' => 'nullable|image|mimes:svg,png,jpg|max:1024',
             'description' => 'nullable|string',
         ]);
 
-        // 3. Proses upload gambar jika ada
         if ($request->hasFile('icon')) {
             $path = $request->file('icon')->store('public/facilities');
-            $validatedData['icon'] = $path; // Simpan path file ke database
+            $validatedData['icon'] = $path;
         }
 
         $facility = Facility::create($validatedData);
-
         return response()->json($facility, 201);
     }
 
@@ -57,6 +52,8 @@ class FacilityController extends Controller
      */
     public function show(Facility $facility): JsonResponse
     {
+        // Otorisasi manual: Periksa apakah user punya izin 'view facilities'
+        $this->authorize('view', $facility);
         return response()->json($facility);
     }
 
@@ -65,26 +62,24 @@ class FacilityController extends Controller
      */
     public function update(Request $request, Facility $facility): JsonResponse
     {
-        // 4. Sesuaikan validasi untuk update gambar
+        // Otorisasi manual: Periksa apakah user punya izin 'edit facilities'
+        $this->authorize('update', $facility);
+
         $validatedData = $request->validate([
             'name' => 'required|string|max:255|unique:facilities,name,' . $facility->id,
             'icon' => 'nullable|sometimes|image|mimes:svg,png,jpg|max:1024',
             'description' => 'nullable|string',
         ]);
 
-        // 5. Proses update gambar jika ada file baru
         if ($request->hasFile('icon')) {
-            // Hapus gambar lama terlebih dahulu
             if ($facility->icon) {
                 Storage::delete($facility->icon);
             }
-            // Simpan gambar baru
             $path = $request->file('icon')->store('public/facilities');
             $validatedData['icon'] = $path;
         }
 
         $facility->update($validatedData);
-
         return response()->json($facility);
     }
 
@@ -93,7 +88,9 @@ class FacilityController extends Controller
      */
     public function destroy(Facility $facility): JsonResponse
     {
-        // 6. Hapus juga file gambar dari storage
+        // Otorisasi manual: Periksa apakah user punya izin 'delete facilities'
+        $this->authorize('delete', $facility);
+
         if ($facility->icon) {
             Storage::delete($facility->icon);
         }

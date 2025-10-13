@@ -15,7 +15,7 @@
         </div>
       </div>
       <div class="card-toolbar">
-        <button type="button" class="btn btn-primary" @click="openAddRoomModal">
+        <button v-if="userHasPermission('create rooms')" type="button" class="btn btn-primary" @click="openAddRoomModal">
           <i class="ki-duotone ki-plus fs-2"></i> Tambah Kamar
         </button>
       </div>
@@ -69,34 +69,34 @@
               </td>
               <td class="text-end">
                 <div class="d-flex justify-content-end flex-shrink-0 align-items-center">
-                <button v-if="room.status === 'available' && userHasPermission('create pos_orders')"
-                        @click="openCheckInModal(room)" class="btn btn-sm btn-light-success me-2">
-                Check-in
-                </button>
+                  <button v-if="room.status === 'available' && userHasPermission('create pos_orders')"
+                          @click="openCheckInModal(room)" class="btn btn-sm btn-light-success me-2">
+                    Check-in
+                  </button>
 
-                <button v-if="room.status === 'occupied' && userHasPermission('create pos_orders')"
-                        @click="processCheckout(room)" class="btn btn-sm btn-light-warning me-2">
-                Check-out
-                </button>
+                  <button v-if="room.status === 'occupied' && userHasPermission('create pos_orders')"
+                          @click="processCheckout(room)" class="btn btn-sm btn-light-warning me-2">
+                    Check-out
+                  </button>
 
-                <button v-if="room.status === 'occupied' && (!room.service_requests || room.service_requests.length === 0) && userHasPermission('manage cleaning status')"
-                        @click="requestCleaning(room)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Minta Dibersihkan">
-                <i class="ki-duotone ki-brush fs-3"></i>
-                </button>
+                  <button v-if="room.status === 'occupied' && (!room.service_requests || room.service_requests.length === 0) && userHasPermission('manage cleaning status')"
+                          @click="requestCleaning(room)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Minta Dibersihkan">
+                    <i class="ki-duotone ki-brush fs-3"></i>
+                  </button>
 
-                <button v-if="['needs cleaning', 'request cleaning', 'dirty'].includes(room.status.toLowerCase()) && userHasPermission('manage cleaning status')"
-                        @click="markAsClean(room)" class="btn btn-sm btn-light-info me-2">
-                Tandai Bersih
-                </button>
-                  <div v-if="room.status === 'request cleaning' && room.service_requests && room.service_requests.length > 0 && room.service_requests[0].cleaning_time"
+                  <button v-if="['needs cleaning', 'request cleaning', 'dirty'].includes(room.status.toLowerCase()) && userHasPermission('manage cleaning status')"
+                          @click="markAsClean(room)" class="btn btn-sm btn-light-info me-2">
+                    Tandai Bersih
+                  </button>
+                    <div v-if="room.status === 'request cleaning' && room.service_requests && room.service_requests.length > 0 && room.service_requests[0].cleaning_time"
                        class="badge badge-light-primary fw-semibold me-2">
                     {{ room.service_requests[0].cleaning_time.substring(0, 5) }}
                   </div>
 
-                  <a href="#" @click.prevent="openEditRoomModal(room)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Edit">
+                  <a href="#" v-if="userHasPermission('edit rooms')" @click.prevent="openEditRoomModal(room)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Edit">
                     <i class="ki-duotone ki-notepad-edit fs-3"></i>
                   </a>
-                  <a href="#" @click.prevent="deleteRoom(room.id)" class="btn btn-icon btn-light-danger btn-sm" title="Hapus">
+                  <a href="#" v-if="userHasPermission('delete rooms')" @click.prevent="deleteRoom(room.id)" class="btn btn-icon btn-light-danger btn-sm" title="Hapus">
                     <i class="ki-duotone ki-trash-square fs-3"></i>
                   </a>
                 </div>

@@ -4,7 +4,7 @@
       <div class="card-title">
         </div>
       <div class="card-toolbar">
-        <button type="button" class="btn btn-primary" @click="openAddModal">
+        <button v-if="userHasPermission('create facilities')" type="button" class="btn btn-primary" @click="openAddModal">
           <i class="ki-duotone ki-plus fs-2"></i> Tambah Fasilitas
         </button>
       </div>
@@ -24,7 +24,6 @@
           <tr v-else-if="facilities.length === 0"><td colspan="4" class="text-center">Tidak ada data fasilitas.</td></tr>
           <tr v-for="facility in facilities" :key="facility.id">
             <td>{{ facility.name }}</td>
-            
             <td>
               <div v-if="facility.icon_url" class="symbol symbol-30px">
                 <img :src="facility.icon_url" :alt="facility.name" />
@@ -33,10 +32,10 @@
             </td>
             <td>{{ facility.description || '-' }}</td>
             <td class="text-end">
-              <a href="#" @click.prevent="openEditModal(facility)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Edit">
+              <a href="#" v-if="userHasPermission('edit facilities')" @click.prevent="openEditModal(facility)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Edit">
                 <i class="ki-duotone ki-notepad-edit fs-3"></i>
               </a>
-              <a href="#" @click.prevent="deleteFacility(facility.id)" class="btn btn-icon btn-light-danger btn-sm" title="Hapus">
+              <a href="#" v-if="userHasPermission('delete facilities')" @click.prevent="deleteFacility(facility.id)" class="btn btn-icon btn-light-danger btn-sm" title="Hapus">
                 <i class="ki-duotone ki-trash-square fs-3"></i>
               </a>
             </td>
@@ -51,30 +50,35 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { useAuthStore } from "@/stores/auth"; // <-- 1. Import auth store
 import axios from "@/libs/axios";
 import Swal from "sweetalert2";
 import { Modal } from "bootstrap";
 import FacilityModal from "./FacilityModal.vue";
 
-// [START] INTERFACE YANG DIUBAH
 interface Facility {
   id: number;
   name: string;
   icon: string | null;
   description: string | null;
-  icon_url: string | null; // Tambahkan properti ini
+  icon_url: string | null;
 }
-// [END] INTERFACE YANG DIUBAH
 
+const authStore = useAuthStore(); // <-- 2. Inisialisasi store
 const facilities = ref<Facility[]>([]);
 const loading = ref(true);
 const selectedFacility = ref<Facility | null>(null);
+
+// [BARU] Fungsi bantuan untuk mengecek izin user
+const userHasPermission = (permission: string): boolean => {
+  return authStore.user?.all_permissions?.includes(permission) ?? false;
+};
 
 const getFacilities = async () => {
   try {
     loading.value = true;
     const response = await axios.get("/facilities");
-    
+
     if (Array.isArray(response.data)) {
       facilities.value = response.data;
     } else {
@@ -100,7 +104,7 @@ const openAddModal = () => {
 };
 
 const openEditModal = (facility: Facility) => {
-  selectedFacility.value = { ...facility }; // Gunakan salinan untuk menghindari reaktivitas tak terduga
+  selectedFacility.value = { ...facility };
   const modalEl = document.getElementById("kt_modal_facility");
   if (modalEl) new Modal(modalEl).show();
 };
