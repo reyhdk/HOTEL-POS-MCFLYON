@@ -11,6 +11,16 @@ use Illuminate\Support\Facades\Storage; // <-- 1. Jangan lupa import Storage
 class FacilityController extends Controller
 {
     /**
+     * [TAMBAHKAN INI]
+     * Menerapkan otorisasi berbasis permission secara otomatis.
+     */
+    public function __construct()
+    {
+        $this->authorizeResource(Facility::class, 'facility');
+    }
+
+
+    /**
      * Menampilkan daftar semua fasilitas.
      */
     public function index(): JsonResponse
@@ -91,4 +101,4 @@ class FacilityController extends Controller
         $facility->delete();
         return response()->json(null, 204);
     }
-}   
+}

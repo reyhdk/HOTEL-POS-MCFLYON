@@ -62,6 +62,7 @@ class PermissionSeeder extends Seeder
             'pos', 'create pos_orders', 'manage payments', 'view folios',
             'master', 'view rooms', 'view guests', 'create guests', 'edit guests', 'view facilities', 'edit rooms',
             'manage service_requests',
+            'manage cleaning status',
             'view checkout_history',
         ]);
         $this->command->info('Memberikan permission ke role: receptionist');
@@ -82,7 +83,6 @@ class PermissionSeeder extends Seeder
             'manage service_requests',
             'manage cleaning status',
             'view guests',
-            'edit rooms',
         ]);
         $this->command->info('Memberikan permission ke role: cleaning-service');
 

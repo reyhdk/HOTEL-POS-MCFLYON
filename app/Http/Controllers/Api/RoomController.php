@@ -12,6 +12,21 @@ use Illuminate\Support\Facades\DB;
 
 class RoomController extends Controller
 {
+
+      /**
+     * [TAMBAHKAN INI]
+     * Menerapkan otorisasi berbasis permission secara otomatis.
+     */
+    public function __construct()
+    {
+        // 'view'   => 'view rooms' (untuk index dan show)
+        // 'create' => 'create rooms' (untuk store)
+        // 'update' => 'edit rooms' (untuk update)
+        // 'delete' => 'delete rooms' (untuk destroy)
+        $this->authorizeResource(Room::class, 'room');
+    }
+
+
     /**
      * Mengambil daftar semua kamar untuk panel admin (POS, Folio, dll).
      * INI ADALAH FUNGSI KUNCI UNTUK MASALAHMU.
@@ -209,13 +224,13 @@ class RoomController extends Controller
      */
     public function markAsClean(Room $room)
     {
-    if (!in_array($room->status, ['needs cleaning', 'request cleaning', 'Dirty'])) {
+    if (!in_array($room->status, ['needs cleaning', 'request cleaning', 'dirty'])) {
         return response()->json(['message' => 'Status kamar tidak valid untuk ditandai bersih.'], 409);
     }
 
     // Cek apakah masih ada sesi check-in aktif untuk kamar ini.
     $hasActiveCheckIn = $room->checkIns()->where('is_active', true)->exists();
-    
+
     // Jika ada tamu, status kembali ke 'occupied'. Jika tidak ada (setelah checkout), status kembali ke 'available'.
     $newStatus = $hasActiveCheckIn ? 'occupied' : 'available';
 

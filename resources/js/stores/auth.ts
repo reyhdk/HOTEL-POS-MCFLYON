@@ -11,6 +11,7 @@ export interface User {
   email: string;
   phone: string;
   photo_url?: string;
+  all_permissions: string[]; // <-- TAMBAHKAN BARIS INI
   role?: {
     id: number;
     name: string;
@@ -61,7 +62,7 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       const { data } = await ApiService.post("auth/login", credentials);
       // 'data.data' sekarang berisi { user, permissions, token }
-      setAuth(data.data, data.data.token); 
+      setAuth(data.data, data.data.token);
       handleRedirect(data.data.user);
     } catch (error: any) {
       purgeAuth();
@@ -118,7 +119,7 @@ export const useAuthStore = defineStore("auth", () => {
     isUserLoaded,
     userRole,
     permissions,// Expose permissions
-    hasPermission, 
+    hasPermission,
     login,
     logout,
     register,

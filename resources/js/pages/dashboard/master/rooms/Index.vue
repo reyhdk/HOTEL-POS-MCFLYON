@@ -69,26 +69,26 @@
               </td>
               <td class="text-end">
                 <div class="d-flex justify-content-end flex-shrink-0 align-items-center">
-                <button v-if="room.status === 'available' && userHasPermission('create pos_orders')" 
+                <button v-if="room.status === 'available' && userHasPermission('create pos_orders')"
                         @click="openCheckInModal(room)" class="btn btn-sm btn-light-success me-2">
                 Check-in
                 </button>
 
-                <button v-if="room.status === 'occupied' && userHasPermission('create pos_orders')" 
+                <button v-if="room.status === 'occupied' && userHasPermission('create pos_orders')"
                         @click="processCheckout(room)" class="btn btn-sm btn-light-warning me-2">
                 Check-out
                 </button>
 
-                <button v-if="room.status === 'occupied' && (!room.service_requests || room.service_requests.length === 0) && userHasPermission('manage cleaning status')" 
+                <button v-if="room.status === 'occupied' && (!room.service_requests || room.service_requests.length === 0) && userHasPermission('manage cleaning status')"
                         @click="requestCleaning(room)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Minta Dibersihkan">
                 <i class="ki-duotone ki-brush fs-3"></i>
                 </button>
 
-                <button v-if="['needs cleaning', 'request cleaning', 'dirty'].includes(room.status.toLowerCase()) && userHasPermission('manage cleaning status')" 
+                <button v-if="['needs cleaning', 'request cleaning', 'dirty'].includes(room.status.toLowerCase()) && userHasPermission('manage cleaning status')"
                         @click="markAsClean(room)" class="btn btn-sm btn-light-info me-2">
                 Tandai Bersih
-                </button>                  
-                  <div v-if="room.status === 'request cleaning' && room.service_requests && room.service_requests.length > 0 && room.service_requests[0].cleaning_time" 
+                </button>
+                  <div v-if="room.status === 'request cleaning' && room.service_requests && room.service_requests.length > 0 && room.service_requests[0].cleaning_time"
                        class="badge badge-light-primary fw-semibold me-2">
                     {{ room.service_requests[0].cleaning_time.substring(0, 5) }}
                   </div>
@@ -113,6 +113,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import { useAuthStore } from "@/stores/auth"; // <-- 1. Import auth store
 import ApiService from "@/core/services/ApiService";
 import Swal from "sweetalert2";
 import { Modal } from "bootstrap";
@@ -146,14 +147,28 @@ interface Room {
   facilities: Facility[];
   service_requests: ServiceRequest[];
 }
-// [BARU] Interface untuk konfigurasi Swal
 interface ConfirmActionConfig {
   text: string;
   icon: 'warning' | 'info' | 'question';
   confirmButtonText: string;
 }
 
+
+// --- STATE ---
+const authStore = useAuthStore(); // <-- 2. Inisialisasi store
+const rooms = ref<Room[]>([]);
+const loading = ref(true);
+const selectedRoom = ref<Room | null>(null);
+const searchQuery = ref("");
+
+
 // --- FUNGSI BANTUAN ---
+
+// [BARU] Fungsi bantuan untuk mengecek izin user
+const userHasPermission = (permission: string): boolean => {
+  return authStore.user?.all_permissions?.includes(permission) ?? false;
+};
+
 const formatDateSimple = (dateString: string | null): string => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -178,6 +193,7 @@ const getStatusBadge = (status: string) => {
     maintenance: 'badge badge-light-warning',
     'needs cleaning': 'badge badge-light-info',
     'request cleaning': 'badge badge-light-primary',
+    'dirty': 'badge badge-light-dark', // Tambahkan status dirty jika perlu
   };
   return statusMap[status] || 'badge badge-light';
 };
@@ -185,15 +201,11 @@ const getStatusLabel = (status: string) => {
     const labelMap: { [key: string]: string } = {
       'needs cleaning': 'Perlu Dibersihkan',
       'request cleaning': 'Minta Dibersihkan',
+      'dirty': 'Dirty',
     };
     return labelMap[status] || status.replace(/-/g, ' ');
 };
 
-// --- STATE ---
-const rooms = ref<Room[]>([]);
-const loading = ref(true);
-const selectedRoom = ref<Room | null>(null);
-const searchQuery = ref("");
 
 const filteredRooms = computed(() => {
   if (!searchQuery.value) return rooms.value;
@@ -202,18 +214,18 @@ const filteredRooms = computed(() => {
   );
 });
 
-// --- FUNGSI API & AKSI ---
+// --- FUNGSI-FUNGSI UTAMA ---
 const getRooms = async () => {
-  try {
-    loading.value = true;
-    const { data } = await ApiService.get("/rooms");
-    rooms.value = data;
-  } catch (error) {
-    rooms.value = [];
-    Swal.fire("Error", "Gagal memuat data kamar.", "error");
-  } finally {
-    loading.value = false;
-  }
+    try {
+        loading.value = true;
+        const { data } = await ApiService.get("/rooms");
+        rooms.value = data;
+    } catch (error) {
+        rooms.value = [];
+        Swal.fire("Error", "Gagal memuat data kamar.", "error");
+    } finally {
+        loading.value = false;
+    }
 };
 
 const refreshData = () => getRooms();
@@ -240,7 +252,7 @@ const confirmAction = async (config: ConfirmActionConfig, callback: () => Promis
     if (result.isConfirmed) {
         try {
             await callback();
-            refreshData();
+            await refreshData(); // Tambahkan await agar Swal menunggu data refresh
         } catch (error: any) {
             const message = error.response?.data?.message || 'Terjadi kesalahan.';
             Swal.fire("Error!", message, "error");
