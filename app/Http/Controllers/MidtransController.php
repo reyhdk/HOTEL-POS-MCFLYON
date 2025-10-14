@@ -10,13 +10,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Midtrans\Notification;
-use Midtrans\Snap; // <-- TAMBAHKAN ATAU PASTIKAN BARIS INI ADA
+use Midtrans\Snap;
 use Throwable;
 
 class MidtransController extends Controller
 {
     /**
-     * [FUNGSI BARU] Membuat transaksi Midtrans untuk berbagai jenis pesanan.
+     * Membuat transaksi Midtrans untuk berbagai jenis pesanan.
      */
     public function createTransaction(Request $request)
     {
@@ -29,7 +29,6 @@ class MidtransController extends Controller
             $order = null;
             $user = $request->user();
             $midtransOrderId = '';
-            $params = [];
 
             if ($validated['order_type'] === 'FOOD_ORDER') {
                 $order = Order::findOrFail($validated['order_id']);
@@ -57,9 +56,7 @@ class MidtransController extends Controller
                 ],
             ];
 
-            // Baris ini tidak akan error lagi setelah 'use Midtrans\Snap;' ditambahkan
             $snapToken = Snap::getSnapToken($params);
-
             return response()->json(['snap_token' => $snapToken]);
 
         } catch (Throwable $e) {
@@ -68,8 +65,9 @@ class MidtransController extends Controller
         }
     }
 
-    // ... (method handleNotification dan lainnya tidak perlu diubah) ...
-
+    /**
+     * Menangani notifikasi (webhook) yang dikirim oleh Midtrans.
+     */
     public function handleNotification(Request $request)
     {
         try {
@@ -89,6 +87,9 @@ class MidtransController extends Controller
         }
     }
 
+    /**
+     * Memproses notifikasi khusus untuk Booking Kamar.
+     */
     private function handleBookingNotification(Notification $notification)
     {
         $booking = Booking::where('midtrans_order_id', $notification->order_id)->first();
@@ -102,13 +103,18 @@ class MidtransController extends Controller
                 $booking->status = 'paid';
                 $booking->save();
                 $booking->room()->update(['status' => 'occupied']);
-                CheckIn::create([
-                    'room_id' => $booking->room_id,
-                    'guest_id' => $booking->guest_id,
-                    'booking_id' => $booking->id,
-                    'check_in_time' => now(),
-                    'is_active' => true
-                ]);
+
+                // --- PERBAIKAN UTAMA DI SINI ---
+                // Gunakan firstOrCreate untuk mencegah data check-in duplikat
+                CheckIn::firstOrCreate(
+                    ['booking_id' => $booking->id], // Cari berdasarkan booking_id
+                    [
+                        'room_id' => $booking->room_id,
+                        'guest_id' => $booking->guest_id,
+                        'check_in_time' => now(),
+                        'is_active' => true
+                    ]
+                );
             });
         } else if (in_array($notification->transaction_status, ['cancel', 'expire', 'deny'])) {
             $booking->status = 'cancelled';
@@ -116,6 +122,9 @@ class MidtransController extends Controller
         }
     }
 
+    /**
+     * Memproses notifikasi khusus untuk Order Makanan.
+     */
     private function handleOrderNotification(Notification $notification)
     {
         $order = Order::where('midtrans_order_id', $notification->order_id)->first();

@@ -15,6 +15,7 @@ class Order extends Model
     protected $fillable = [
         'room_id',
         'user_id',
+        'guest_id',
         'total_price',
         'midtrans_order_id',
     ];
@@ -43,4 +44,11 @@ class Order extends Model
     {
         return $this->hasMany(OrderItem::class);
     }
+    /**
+     * Sebuah Order dimiliki oleh satu Guest.
+     */
+    public function guest(): BelongsTo
+    {
+        return $this->belongsTo(Guest::class);
+    }   
 }

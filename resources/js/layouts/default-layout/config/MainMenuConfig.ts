@@ -85,7 +85,7 @@ const MainMenuConfig: MenuItem[] = [
           },
 
           {
-            heading: "Pesanan Online",
+            heading: "Pesanan Masuk",
             route: "/admin/online-orders",
             name: "view online_orders", // [DIBENARKAN] Ditambahkan 'name'
             roles: ["admin"],

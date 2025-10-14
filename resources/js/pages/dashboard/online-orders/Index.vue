@@ -2,7 +2,7 @@
   <div class="card">
     <div class="card-header border-0 pt-6">
       <div class="card-title">
-        <h2>Pesanan Online Masuk</h2>
+        <h2>Pesanan Masuk</h2>
       </div>
     </div>
     <div class="card-body pt-0">
@@ -24,7 +24,7 @@
         </thead>
         <tbody class="fw-semibold text-gray-600">
           <tr v-if="orders.length === 0">
-            <td colspan="7" class="text-center">Belum ada pesanan online yang masuk.</td>
+            <td colspan="7" class="text-center">Belum ada pesanan yang masuk.</td>
           </tr>
           <tr v-for="order in orders" :key="order.id">
             <td>#{{ order.id }}</td>
