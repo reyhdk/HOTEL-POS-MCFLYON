@@ -113,8 +113,17 @@
                   <span class="text-primary fs-4">{{ formatCurrency(grandTotal) }}</span>
                 </div>
 
+                <div class="my-5">
+                    <label class="fs-6 fw-semibold mb-3 d-block">Metode Pembayaran</label>
+                    <el-radio-group v-model="selectedPaymentMethod" class="w-100">
+                        <el-radio-button label="pay_now_midtrans" class="flex-fill">Bayar Sekarang</el-radio-button>
+                        <el-radio-button label="pay_at_checkout" class="flex-fill">Tambahkan ke Tagihan</el-radio-button>
+                    </el-radio-group>
+                </div>
                 <button class="btn btn-primary w-100 mt-5" @click="processOrder" :disabled="isSubmitting || cart.length === 0">
-                  <span v-if="!isSubmitting">Lanjutkan ke Pembayaran</span>
+                  <span v-if="!isSubmitting">
+                    {{ selectedPaymentMethod === 'pay_now_midtrans' ? 'Lanjutkan ke Pembayaran' : 'Konfirmasi Pesanan' }}
+                  </span>
                   <span v-else>
                     <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                     Memproses...
@@ -130,6 +139,7 @@
 </template>
 
 <style scoped>
+/* ... (style Anda tidak berubah) ... */
 .list-enter-active,
 .list-leave-active {
   transition: all 0.3s ease;
@@ -154,6 +164,9 @@ import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import ApiService from "@/core/services/ApiService";
 import Swal from "sweetalert2";
+import { toast } from 'vue3-toastify';
+
+declare const snap: any;
 
 // --- INTERFACES ---
 interface Menu {
@@ -179,6 +192,7 @@ const activeRoom = ref<Room | null>(null);
 const guestName = ref<string>('');
 const isSubmitting = ref(false);
 const router = useRouter();
+const selectedPaymentMethod = ref('pay_now_midtrans'); // <-- State baru
 
 // --- API FUNCTIONS ---
 const fetchMenus = async () => {
@@ -213,38 +227,45 @@ const processOrder = async () => {
       menu_id: item.id,
       quantity: item.quantity,
     })),
+    payment_method: selectedPaymentMethod.value, // <-- Kirim metode pembayaran
   };
 
   try {
     const response = await ApiService.post("/guest/orders", payload);
-    const newOrder = response.data.order || response.data;
 
-    cart.value = [];
-
-    await Swal.fire({
-        text: "Pesanan berhasil dibuat! Anda akan diarahkan ke halaman pembayaran.",
-        icon: "success",
-        timer: 2000,
-        showConfirmButton: false
-    });
-
-    router.push({ name: 'user-payment', params: { orderId: newOrder.id } });
-
+    if (response.data.snap_token) {
+        isSubmitting.value = false;
+        snap.pay(response.data.snap_token, {
+            onSuccess: () => {
+                Swal.fire("Berhasil!", "Pembayaran berhasil dan pesanan Anda sedang diproses.", "success");
+                resetForm();
+            },
+            onPending: () => {
+                toast.info("Menunggu pembayaran Anda.");
+                resetForm();
+            },
+            onError: () => toast.error("Pembayaran gagal."),
+        });
+    } else {
+        Swal.fire("Berhasil!", "Pesanan berhasil ditambahkan ke tagihan kamar Anda.", "success");
+        resetForm();
+    }
   } catch (error: any) {
     const errorMessage = error.response?.data?.message || "Terjadi kesalahan saat memproses pesanan.";
-    Swal.fire({
-      text: errorMessage,
-      icon: "error",
-      buttonsStyling: false,
-      confirmButtonText: "Coba Lagi",
-      customClass: { confirmButton: "btn btn-danger" },
-    });
+    Swal.fire({ text: errorMessage, icon: "error" });
   } finally {
-    isSubmitting.value = false;
+    if (isSubmitting.value) {
+        isSubmitting.value = false;
+    }
   }
 };
 
-// --- CART FUNCTIONS ---
+const resetForm = () => {
+    cart.value = [];
+    fetchMenus();
+};
+
+// --- FUNGSI-FUNGSI LAIN (tidak berubah) ---
 const addToCart = (menu: Menu) => {
   const itemInCart = cart.value.find((item) => item.id === menu.id);
   if (itemInCart) {
@@ -259,7 +280,6 @@ const addToCart = (menu: Menu) => {
     }
   }
 };
-
 const updateQuantity = (menuId: number, amount: number) => {
   const itemInCart = cart.value.find((item) => item.id === menuId);
   if (!itemInCart) return;
@@ -276,8 +296,6 @@ const updateQuantity = (menuId: number, amount: number) => {
   }
   itemInCart.quantity = newQuantity;
 };
-
-// --- HELPER FUNCTIONS ---
 const formatCurrency = (value: number) => {
   if (!value) return "Rp 0";
   return new Intl.NumberFormat("id-ID", {
@@ -286,8 +304,6 @@ const formatCurrency = (value: number) => {
     minimumFractionDigits: 0,
   }).format(value);
 };
-
-// --- COMPUTED PROPERTIES ---
 const cartTotal = computed(() => {
   return cart.value.reduce((total, item) => total + item.price * item.quantity, 0);
 });
@@ -305,4 +321,4 @@ onMounted(() => {
     isLoading.value = false;
   });
 });
-</script>   
+</script>

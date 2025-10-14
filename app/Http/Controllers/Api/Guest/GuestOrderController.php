@@ -41,10 +41,9 @@ class GuestOrderController extends Controller
             'active_room' => $activeCheckIn->room
         ]);
     }
-    
+
     /**
-     * Menyimpan pesanan makanan baru dari tamu dengan status 'pending'.
-     * Stok BELUM dikurangi di sini.
+     * Menyimpan pesanan makanan baru dari tamu dengan pilihan pembayaran.
      */
     public function store(Request $request)
     {
@@ -61,6 +60,7 @@ class GuestOrderController extends Controller
             'items' => 'required|array|min:1',
             'items.*.menu_id' => 'required|exists:menus,id',
             'items.*.quantity' => 'required|integer|min:1',
+            'payment_method' => 'required|string|in:pay_at_checkout,pay_now_midtrans', // Validasi pilihan pembayaran
         ]);
 
         try {
@@ -79,58 +79,54 @@ class GuestOrderController extends Controller
                     $orderItemsData[] = ['menu_id' => $menu->id, 'quantity' => $item['quantity'], 'price' => $menu->price];
                 }
 
+                // Tentukan status pesanan berdasarkan metode pembayaran
+                $status = ($validated['payment_method'] === 'pay_at_checkout') ? 'unpaid' : 'pending';
+
                 $order = Order::create([
                     'room_id' => $activeCheckIn->room_id,
                     'user_id' => $user->id,
+                    'guest_id' => $activeCheckIn->guest_id, // Simpan guest_id
                     'total_price' => $totalPrice,
-                    'status' => 'pending',
+                    'status' => $status, // Status dinamis
                 ]);
 
                 $order->items()->createMany($orderItemsData);
+
+                // Langsung kurangi stok karena pesanan sudah dikonfirmasi
+                foreach ($order->items as $item) {
+                    Menu::find($item->menu_id)->decrement('stock', $item->quantity);
+                }
+
                 return $order;
             });
 
-            return response()->json($order->load('items.menu'), 201);
+            // Jika tamu memilih 'Bayar Sekarang', buat token Midtrans
+            if ($validated['payment_method'] === 'pay_now_midtrans') {
+                $midtransOrderId = 'ORDER-' . $order->id . '-' . time();
+                $order->midtrans_order_id = $midtransOrderId;
+                $order->save();
+
+                $params = [
+                    'transaction_details' => [
+                        'order_id' => $midtransOrderId,
+                        'gross_amount' => (int) $order->total_price,
+                    ],
+                    'customer_details' => [
+                        'first_name' => $user->name,
+                        'email' => $user->email,
+                    ],
+                ];
+
+                $snapToken = Snap::getSnapToken($params);
+                return response()->json(['snap_token' => $snapToken], 201);
+            }
+
+            // Jika tamu memilih 'Bayar saat Checkout'
+            return response()->json(['message' => 'Pesanan berhasil ditambahkan ke tagihan kamar.'], 201);
+
         } catch (Throwable $e) {
-            Log::error('Gagal membuat pesanan makanan: ' . $e->getMessage());
+            Log::error('Gagal membuat pesanan makanan oleh tamu: ' . $e->getMessage());
             return response()->json(['message' => 'Gagal membuat pesanan.'], 500);
-        }
-    }
-
-    /**
-     * Memproses pembayaran Midtrans untuk pesanan yang sudah ada.
-     * Fungsi ini akan menghasilkan snap_token.
-     */
-    public function processPayment(Request $request, Order $order)
-    {
-        if ($order->user_id !== $request->user()->id || $order->status !== 'pending') {
-            return response()->json(['message' => 'Pesanan ini tidak valid untuk dibayar.'], 403);
-        }
-
-        try {
-            $midtransOrderId = 'ORDER-' . $order->id . '-' . time();
-
-            $params = [
-                'transaction_details' => [
-                    'order_id' => $midtransOrderId,
-                    'gross_amount' => (int) $order->total_price,
-                ],
-                'customer_details' => [
-                    'first_name' => $request->user()->name,
-                    'email' => $request->user()->email,
-                ],
-            ];
-            
-            $snapToken = Snap::getSnapToken($params);
-            
-            $order->midtrans_order_id = $midtransOrderId;
-            $order->save();
-
-            return response()->json(['snap_token' => $snapToken]);
-
-        } catch (Throwable $e) {
-            Log::error('Gagal memproses pembayaran pesanan: ' . $e->getMessage());
-            return response()->json(['message' => 'Gagal memproses pembayaran.'], 500);
         }
     }
 
@@ -155,7 +151,7 @@ class GuestOrderController extends Controller
      */
  public function getOrderHistory(Request $request)
     {
-        
+
         $orders = $request->user()
                           ->orders()
                           ->with('items.menu')
