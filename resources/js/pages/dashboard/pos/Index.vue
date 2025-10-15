@@ -241,7 +241,8 @@ const processOrder = async () => {
   const orderData = {
     room_id: selectedRoomId.value,
     items: cart.value.map(item => ({ menu_id: item.menu_id, quantity: item.quantity })),
-  };
+    payment_method: 'pay_at_checkout', // Tambahkan baris ini
+};
   try {
     await ApiService.post('/orders', orderData);
     Swal.fire("Berhasil!", "Pesanan berhasil dibuat dan tagihan ditambahkan ke folio kamar.", "success");

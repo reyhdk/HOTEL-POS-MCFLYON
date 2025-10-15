@@ -14,7 +14,6 @@ class FolioController extends Controller
      */
     public function index()
     {
-        // 1. Ambil semua kamar yang ditempati, beserta SEMUA relasinya (check-in, tamu, pesanan)
         $occupiedRooms = Room::whereHas('checkIns', function ($query) {
             $query->where('is_active', true);
         })
@@ -22,25 +21,25 @@ class FolioController extends Controller
             'checkIns' => function ($query) {
                 $query->where('is_active', true)->with('guest');
             },
-            'orders.items.menu'
+            // [PERBAIKAN UTAMA]
+            // Sekarang kita hanya mengambil pesanan yang statusnya 'unpaid' dari database.
+            // Pesanan yang 'paid', 'pending', atau 'cancelled' tidak akan masuk folio.
+            'orders' => function ($query) {
+                $query->where('status', 'pending')->with('items.menu');
+            },
         ])
         ->get();
 
-        // [PERBAIKAN UTAMA]
-        // 2. Proses setiap kamar untuk menyaring pesanan yang relevan saja
+        // [PERBAIKAN KEDUA]
+        // Kode di bawah ini menjadi lebih sederhana dan aman karena data 'orders' sudah bersih.
         $occupiedRooms->each(function ($room) {
-            // Cari data check-in yang aktif untuk kamar ini
             $activeCheckIn = $room->checkIns->firstWhere('is_active', true);
 
             if ($activeCheckIn) {
-                // Saring koleksi 'orders' yang sudah di-load.
-                // Hanya ambil pesanan yang dibuat SETELAH tamu ini check-in.
+                // Filter berdasarkan tanggal check-in tetap penting untuk histori.
                 $relevantOrders = $room->orders->where('created_at', '>=', $activeCheckIn->created_at);
-                
-                // Ganti relasi 'orders' yang lama dengan pesanan yang sudah disaring
                 $room->setRelation('orders', $relevantOrders);
             } else {
-                // Jika (karena alasan aneh) tidak ada check-in aktif, kosongkan pesanannya
                 $room->setRelation('orders', collect());
             }
         });

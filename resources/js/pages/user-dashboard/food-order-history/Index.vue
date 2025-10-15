@@ -22,11 +22,11 @@
             <div class="d-flex flex-wrap flex-stack mb-4">
               <div>
                 <h4 class="fw-bold">Pesanan #{{ order.id }}</h4>
-                <span class="text-muted fs-7">{{ formatDate(order.created_at) }}</span>
+                <span class="text-muted fs-7">{{ formatDateTime(order.created_at) }}</span>
               </div>
               <div class="d-flex flex-column align-items-end">
-                <span :class="getStatusBadgeClass(order.status)" class="badge fs-6">{{ order.status }}</span>
-                <span class="fw-bolder text-primary fs-5 mt-2">{{ formatCurrency(order.total_price) }}</span>
+                <span :class="getStatusBadgeClass(order.status)" class="fs-6 text-capitalize">{{ order.status }}</span>
+                <span class="fw-bolder text-primary fs-5 mt-2">{{ formatCurrency(order.total_price * 1.1) }}</span>
               </div>
             </div>
             
@@ -48,21 +48,22 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import axios from '@/libs/axios'; // Pastikan path ini benar
+import ApiService from "@/core/services/ApiService"; // Menggunakan ApiService agar konsisten
 import { toast } from 'vue3-toastify';
 
 // State
 const orders = ref<any[]>([]);
 const isLoading = ref(true);
 
-// API Call
 const fetchOrderHistory = async () => {
   try {
     isLoading.value = true;
-    const response = await axios.get('/guest/orders');
-    orders.value = response.data;
+    // [DIPERBAIKI] Menggunakan endpoint yang benar sesuai api.php
+    const { data } = await ApiService.get('/guest/orders'); 
+    orders.value = data;
   } catch (error) {
     toast.error("Gagal memuat riwayat pesanan.");
+    console.error(error);
   } finally {
     isLoading.value = false;
   }
@@ -74,20 +75,25 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
 };
 
-const formatDate = (dateString: string) => {
+// [PENYESUAIAN] Menggunakan fungsi format dari modal admin agar konsisten
+const formatDateTime = (dateString: string) => {
   if (!dateString) return '';
-  return new Date(dateString).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' });
+  const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+  return new Date(dateString).toLocaleDateString('id-ID', options).replace('pukul', '');
 };
 
+// [DIPERBAIKI] Menyesuaikan nama status agar cocok dengan yang diupdate oleh Admin
 const getStatusBadgeClass = (status: string) => {
   const statusMap = {
     pending: 'badge-light-warning',
-    paid: 'badge-light-info',
+    paid: 'badge-light-primary',
     processing: 'badge-light-primary',
-    delivered: 'badge-light-success',
+    delivering: 'badge-light-info',   // Diubah dari 'delivered' menjadi 'delivering'
+    completed: 'badge-light-success', // Ditambahkan status 'completed'
     cancelled: 'badge-light-danger',
   };
-  return statusMap[status] || 'badge-light-secondary';
+  // Pastikan ada 'badge' di depan agar styling dasar diterapkan
+  return `badge ${statusMap[status] || 'badge-light-dark'}`;
 };
 
 // Lifecycle Hook

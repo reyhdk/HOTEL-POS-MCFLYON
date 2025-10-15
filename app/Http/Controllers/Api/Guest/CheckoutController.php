@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\Api\Guest;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Models\CheckIn;
-use App\Models\Order; // <-- Tambahkan ini
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Midtrans\Snap; // <-- Tambahkan ini
-use Throwable;    
+use Illuminate\Support\Facades\Log;
+use Midtrans\Snap;
+use Throwable;
 
 class CheckoutController extends Controller
 {
@@ -22,18 +24,19 @@ class CheckoutController extends Controller
         $activeCheckIn = $this->getActiveCheckIn($user);
 
         if (!$activeCheckIn) {
-            return response()->json(['message' => 'Anda tidak memiliki sesi check-in yang aktif.'], 404);
+            return response()->json(null, 404); // Kirim null jika tidak ada sesi aktif
         }
 
-        // Ambil semua pesanan makanan yang statusnya 'unpaid'
+        // Ambil semua pesanan makanan yang statusnya 'unpaid' milik user ini
         $unpaidOrders = Order::where('user_id', $user->id)
-                             ->where('status', 'unpaid')
+                             ->where('status', 'pending')
                              ->with('items.menu')
                              ->get();
 
         // Hitung total sisa tagihan dari pesanan makanan
         $totalUnpaid = $unpaidOrders->sum('total_price');
 
+        // Kembalikan data folio yang dinamis dan akurat
         return response()->json([
             'room' => $activeCheckIn->room,
             'booking' => $activeCheckIn->booking,
@@ -54,7 +57,7 @@ class CheckoutController extends Controller
             return response()->json(['message' => 'Sesi check-in tidak ditemukan.'], 404);
         }
 
-        $totalUnpaid = Order::where('user_id', $user->id)->where('status', 'unpaid')->sum('total_price');
+        $totalUnpaid = Order::where('user_id', $user->id)->where('status', 'pending')->sum('total_price');
 
         // Jika tidak ada tagihan, langsung proses checkout
         if ($totalUnpaid <= 0) {
@@ -65,7 +68,7 @@ class CheckoutController extends Controller
             });
             return response()->json(['message' => 'Checkout berhasil! Tidak ada tagihan yang perlu dibayar.']);
         }
-
+        
         try {
             $midtransOrderId = 'CHECKOUT-' . $activeCheckIn->booking_id . '-' . time();
             $params = [
@@ -82,6 +85,7 @@ class CheckoutController extends Controller
             $snapToken = Snap::getSnapToken($params);
             $activeCheckIn->booking->update(['midtrans_checkout_id' => $midtransOrderId]);
             return response()->json(['snap_token' => $snapToken]);
+            
         } catch (Throwable $e) {
             Log::error('Gagal memproses checkout: ' . $e->getMessage());
             return response()->json(['message' => 'Gagal memulai proses checkout.'], 500);

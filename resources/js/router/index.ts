@@ -23,7 +23,7 @@ const routes: Array<RouteRecordRaw> = [
     meta: { middleware: "auth", role: "user" },
     children: [
       {
-        path: "dashboard",
+        path: "dashboard",      
         name: "user-dashboard",
         component: () => import("@/pages/user-dashboard/Index.vue"),
         meta: { pageTitle: "Dasbor" },

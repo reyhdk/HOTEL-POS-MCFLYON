@@ -46,4 +46,8 @@ class Booking extends Model
 {
     return $this->belongsTo(Guest::class);
 }
+    public function scopeCompleted($query)
+    {
+        return $query->where('status', 'completed');
+    }
 }

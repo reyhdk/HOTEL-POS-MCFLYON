@@ -6,14 +6,12 @@
     </p>
 
     <div v-if="isLoading" class="text-center py-20">
-      <span class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></span>
+      <span class="spinner-border text-primary"></span>
     </div>
 
     <div v-else-if="!folio" class="card shadow-sm">
-        <div class="card-body text-center d-flex flex-column justify-content-center p-10" style="min-height: 400px;">
-            <i class="ki-duotone ki-information fs-5x text-muted mb-5">
-                <span class="path1"></span><span class="path2"></span><span class="path3"></span>
-            </i>
+        <div class="card-body text-center p-10">
+            <i class="ki-duotone ki-information fs-5x text-muted mb-5"></i>
             <h3 class="fs-4 text-gray-800">Tidak Ada Sesi Aktif</h3>
             <p class="fs-6 text-muted">Fitur ini hanya tersedia untuk tamu yang sedang check-in.</p>
         </div>
@@ -89,7 +87,6 @@ import { useRouter } from "vue-router";
 
 declare const snap: any;
 
-// Interface yang disesuaikan dengan respons backend baru
 interface Order {
     id: number;
     created_at: string;
@@ -110,7 +107,6 @@ const router = useRouter();
 const fetchFolio = async () => {
   isLoading.value = true;
   try {
-    // [PERBAIKAN] Langsung ambil dari 'data', bukan 'data.folio'
     const { data } = await ApiService.get('/guest/folio');
     folio.value = data;
   } catch (error: any) {
@@ -126,11 +122,7 @@ const fetchFolio = async () => {
 const submitCheckout = async () => {
     isProcessing.value = true;
     try {
-        // === PERBAIKAN DI SINI ===
-        // Tambahkan objek kosong {} sebagai argumen kedua
         const { data } = await ApiService.post("/guest/checkout", {});
-        // =========================
-
         if (data.snap_token) {
             isProcessing.value = false;
             snap.pay(data.snap_token, {

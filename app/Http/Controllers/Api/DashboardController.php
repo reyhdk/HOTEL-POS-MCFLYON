@@ -25,11 +25,14 @@ class DashboardController extends Controller
             $currentYear = Carbon::now()->year;
 
             // --- PENDAPATAN ---
-            $todaysBookingRevenue = Booking::where('status', 'paid')->whereDate('updated_at', $today)->sum('total_price');
+            // [PERBAIKAN] Menggunakan scope 'completed' untuk pendapatan booking yang sudah selesai
+            $todaysBookingRevenue = Booking::completed()->whereDate('updated_at', $today)->sum('total_price');
+            $monthlyBookingRevenue = Booking::completed()->whereMonth('updated_at', $currentMonth)->whereYear('updated_at', $currentYear)->sum('total_price');
+            $yearlyBookingRevenue = Booking::completed()->whereYear('updated_at', $currentYear)->sum('total_price');
+
+            // Pendapatan dari pesanan makanan tetap menggunakan status 'paid'
             $todaysOrderRevenue = Order::where('status', 'paid')->whereDate('updated_at', $today)->sum('total_price');
-            $monthlyBookingRevenue = Booking::where('status', 'paid')->whereMonth('updated_at', $currentMonth)->whereYear('updated_at', $currentYear)->sum('total_price');
             $monthlyOrderRevenue = Order::where('status', 'paid')->whereMonth('updated_at', $currentMonth)->whereYear('updated_at', $currentYear)->sum('total_price');
-            $yearlyBookingRevenue = Booking::where('status', 'paid')->whereYear('updated_at', $currentYear)->sum('total_price');
             $yearlyOrderRevenue = Order::where('status', 'paid')->whereYear('updated_at', $currentYear)->sum('total_price');
 
             // --- PESANAN ---
@@ -75,8 +78,19 @@ class DashboardController extends Controller
             $startDate = Carbon::now()->subDays(6)->startOfDay();
             $endDate = Carbon::now()->endOfDay();
 
-            $bookingSales = Booking::query()->select(DB::raw('DATE(updated_at) as date'), DB::raw('SUM(total_price) as total'))->where('status', 'paid')->whereBetween('updated_at', [$startDate, $endDate])->groupBy('date')->pluck('total', 'date');
-            $orderSales = Order::query()->select(DB::raw('DATE(updated_at) as date'), DB::raw('SUM(total_price) as total'))->where('status', 'paid')->whereBetween('updated_at', [$startDate, $endDate])->groupBy('date')->pluck('total', 'date');
+            // [PERBAIKAN] Menggunakan scope 'completed' untuk data penjualan booking
+            $bookingSales = Booking::completed()
+                ->select(DB::raw('DATE(updated_at) as date'), DB::raw('SUM(total_price) as total'))
+                ->whereBetween('updated_at', [$startDate, $endDate])
+                ->groupBy('date')
+                ->pluck('total', 'date');
+
+            $orderSales = Order::query()
+                ->select(DB::raw('DATE(updated_at) as date'), DB::raw('SUM(total_price) as total'))
+                ->where('status', 'paid')
+                ->whereBetween('updated_at', [$startDate, $endDate])
+                ->groupBy('date')
+                ->pluck('total', 'date');
 
             $labels = [];
             $seriesData = [];
