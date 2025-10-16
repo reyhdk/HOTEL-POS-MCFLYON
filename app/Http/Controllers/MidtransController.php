@@ -97,28 +97,40 @@ class MidtransController extends Controller
      * [LENGKAPI FUNGSI INI] Menangani notifikasi pembayaran checkout.
      */
     private function handleCheckoutNotification(Notification $notification)
-    {
-        // Cari booking berdasarkan ID checkout yang kita simpan
-        $booking = Booking::where('midtrans_checkout_id', $notification->order_id)->first();
+{
+    // Cari booking berdasarkan ID checkout yang kita simpan saat membuat token
+    $booking = Booking::where('midtrans_checkout_id', $notification->order_id)->first();
 
-        if (!$booking || $booking->status === 'completed') return; // Jangan proses jika sudah selesai
-
-        if (($notification->transaction_status == 'capture' || $notification->transaction_status == 'settlement') && $notification->fraud_status == 'accept') {
-            DB::transaction(function () use ($booking) {
-                // 1. Ubah status semua pesanan 'unpaid' menjadi 'paid'
-                Order::where('booking_id', $booking->id)->where('status', 'unpaid')->update(['status' => 'paid']);
-
-                // 2. Tandai booking sebagai selesai
-                $booking->update(['status' => 'completed']);
-
-                // 3. Ubah status kamar menjadi 'dirty'
-                $booking->room()->update(['status' => 'dirty']);
-
-                // 4. Nonaktifkan sesi check-in
-                CheckIn::where('booking_id', $booking->id)->where('is_active', true)->update(['is_active' => false, 'check_out_time' => now()]);
-            });
-        }
+    // Jangan proses jika booking tidak ditemukan atau sudah selesai
+    if (!$booking || $booking->status === 'completed') {
+        return;
     }
+
+    // Hanya proses jika transaksi dari Midtrans benar-benar sukses
+    if (($notification->transaction_status == 'capture' || $notification->transaction_status == 'settlement') && $notification->fraud_status == 'accept') {
+        DB::transaction(function () use ($booking) {
+            // [PERBAIKAN UTAMA DI SINI]
+            // Definisikan semua status tagihan yang mungkin ada, sama seperti di FolioController
+            $billableStatuses = ['pending', 'processing', 'delivering', 'completed'];
+            
+            // Ubah status SEMUA tagihan yang relevan menjadi 'paid'
+            Order::where('booking_id', $booking->id)
+                 ->whereIn('status', $billableStatuses) // Gunakan whereIn agar semua status terambil
+                 ->update(['status' => 'paid']);
+
+            // Tandai booking sebagai 'completed' agar masuk dasbor
+            $booking->update(['status' => 'completed']);
+
+            // Ubah status kamar menjadi 'dirty'
+            $booking->room()->update(['status' => 'dirty']);
+
+            // Nonaktifkan sesi check-in
+            CheckIn::where('booking_id', $booking->id)
+                   ->where('is_active', true)
+                   ->update(['is_active' => false, 'check_out_time' => now()]);
+        });
+    }
+}
 
     /**
      * Memproses notifikasi khusus untuk Booking Kamar.

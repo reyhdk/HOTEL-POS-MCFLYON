@@ -10,11 +10,11 @@
     </div>
 
     <div v-else-if="!folio" class="card shadow-sm">
-        <div class="card-body text-center p-10">
-            <i class="ki-duotone ki-information fs-5x text-muted mb-5"></i>
-            <h3 class="fs-4 text-gray-800">Tidak Ada Sesi Aktif</h3>
-            <p class="fs-6 text-muted">Fitur ini hanya tersedia untuk tamu yang sedang check-in.</p>
-        </div>
+      <div class="card-body text-center p-10">
+        <i class="ki-duotone ki-information fs-5x text-muted mb-5"></i>
+        <h3 class="fs-4 text-gray-800">Tidak Ada Sesi Aktif</h3>
+        <p class="fs-6 text-muted">Fitur ini hanya tersedia untuk tamu yang sedang check-in.</p>
+      </div>
     </div>
 
     <div v-else class="card card-flush shadow-sm">
@@ -85,6 +85,7 @@ import { toast } from 'vue3-toastify';
 import Swal from "sweetalert2";
 import { useRouter } from "vue-router";
 
+// Pastikan skrip Midtrans sudah dimuat di index.html Anda
 declare const snap: any;
 
 interface Order {
@@ -111,7 +112,7 @@ const fetchFolio = async () => {
     folio.value = data;
   } catch (error: any) {
     if (error.response?.status !== 404) {
-        toast.error("Gagal memuat data folio.");
+      toast.error("Gagal memuat data folio.");
     }
     folio.value = null;
   } finally {
@@ -120,28 +121,43 @@ const fetchFolio = async () => {
 };
 
 const submitCheckout = async () => {
-    isProcessing.value = true;
-    try {
-        const { data } = await ApiService.post("/guest/checkout", {});
-        if (data.snap_token) {
-            isProcessing.value = false;
-            snap.pay(data.snap_token, {
-                onSuccess: () => {
-                    Swal.fire("Berhasil!", "Pembayaran berhasil dan Anda telah check-out.", "success")
-                    .then(() => router.push({ name: 'user-dashboard' }));
-                },
-                onClose: () => {
-                    toast.warn("Proses checkout dibatalkan.");
-                }
-            });
-        } else {
-            Swal.fire("Berhasil!", data.message || "Anda telah berhasil check-out.", "success")
-            .then(() => router.push({ name: 'user-dashboard' }));
+  isProcessing.value = true;
+  try {
+    const { data } = await ApiService.post("/guest/checkout", {});
+
+    // Kasus 1: Ada tagihan yang harus dibayar, Midtrans mengembalikan snap_token
+    if (data.snap_token) {
+      // Panggil Midtrans Snap
+      snap.pay(data.snap_token, {
+        onSuccess: () => {
+          isProcessing.value = false; // Matikan loading
+          Swal.fire("Berhasil!", "Pembayaran berhasil dan Anda telah check-out.", "success")
+            .then(() => router.push({ name: 'user-dashboard' })); // Arahkan ke dasbor
+        },
+        onPending: () => {
+          isProcessing.value = false; // Matikan loading
+          toast.info("Menunggu pembayaran Anda.");
+        },
+        onError: () => {
+          isProcessing.value = false; // Matikan loading
+          toast.error("Pembayaran gagal diproses.");
+        },
+        onClose: () => {
+          isProcessing.value = false; // Matikan loading saat jendela ditutup
+          toast.warn("Proses checkout dibatalkan.");
         }
-    } catch (error: any) {
-        toast.error(error.response?.data?.message || "Gagal memproses checkout.");
-        isProcessing.value = false;
+      });
+    } 
+    // Kasus 2: Tidak ada tagihan (Express Checkout)
+    else {
+      Swal.fire("Berhasil!", data.message || "Anda telah berhasil check-out.", "success")
+        .then(() => router.push({ name: 'user-dashboard' }));
+      // Tidak perlu set isProcessing false di sini karena halaman akan segera redirect
     }
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || "Gagal memproses checkout.");
+    isProcessing.value = false; // Matikan loading jika ada error
+  }
 };
 
 const formatCurrency = (value: number | undefined) => {
