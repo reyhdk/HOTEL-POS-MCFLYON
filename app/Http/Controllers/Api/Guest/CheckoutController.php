@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\Guest;
 
 use App\Http\Controllers\Controller;
-use App\Models\Booking;
 use App\Models\CheckIn;
 use App\Models\Order;
 use Illuminate\Http\Request;
@@ -24,29 +23,29 @@ class CheckoutController extends Controller
         $activeCheckIn = $this->getActiveCheckIn($user);
 
         if (!$activeCheckIn) {
-            return response()->json(null, 404); // Kirim null jika tidak ada sesi aktif
+            return response()->json(null, 404);
         }
 
-        // Ambil semua pesanan makanan yang statusnya 'unpaid' milik user ini
-        $unpaidOrders = Order::where('user_id', $user->id)
-                             ->where('status', 'pending')
-                             ->with('items.menu')
-                             ->get();
+        // [PERBAIKAN] Standarkan pencarian status agar sama dengan Folio Admin
+        $billableStatuses = ['pending', 'processing', 'delivering', 'completed'];
 
-        // Hitung total sisa tagihan dari pesanan makanan
-        $totalUnpaid = $unpaidOrders->sum('total_price');
+        $billableOrders = Order::where('user_id', $user->id)
+                            ->whereIn('status', $billableStatuses) // Gunakan whereIn
+                            ->with('items.menu')
+                            ->get();
 
-        // Kembalikan data folio yang dinamis dan akurat
+        $totalBill = $billableOrders->sum('total_price');
+
         return response()->json([
             'room' => $activeCheckIn->room,
             'booking' => $activeCheckIn->booking,
-            'unpaid_orders' => $unpaidOrders,
-            'total_unpaid' => (int) $totalUnpaid,
+            'unpaid_orders' => $billableOrders, // Kirim data tagihan
+            'total_unpaid' => (int) $totalBill, // Kirim total tagihan
         ]);
     }
 
     /**
-     * Memproses pembayaran akhir saat checkout dan menghasilkan snap_token jika ada tagihan.
+     * Memproses pembayaran akhir saat checkout.
      */
     public function processCheckout(Request $request)
     {
@@ -57,37 +56,37 @@ class CheckoutController extends Controller
             return response()->json(['message' => 'Sesi check-in tidak ditemukan.'], 404);
         }
 
-        $totalUnpaid = Order::where('user_id', $user->id)->where('status', 'pending')->sum('total_price');
+        // [PERBAIKAN] Hitung tagihan dari semua status yang relevan
+        $billableStatuses = ['pending', 'processing', 'delivering', 'completed'];
+        $totalBill = Order::where('user_id', $user->id)->whereIn('status', $billableStatuses)->sum('total_price');
 
-        // Jika tidak ada tagihan, langsung proses checkout
-        if ($totalUnpaid <= 0) {
+        // Jika tidak ada tagihan sama sekali
+        if ($totalBill <= 0) {
             DB::transaction(function () use ($activeCheckIn) {
                 $activeCheckIn->update(['is_active' => false, 'check_out_time' => now()]);
                 $activeCheckIn->room()->update(['status' => 'dirty']);
-                $activeCheckIn->booking()->update(['status' => 'completed']);
+                if ($activeCheckIn->booking) {
+                    $activeCheckIn->booking->update(['status' => 'completed']);
+                }
             });
             return response()->json(['message' => 'Checkout berhasil! Tidak ada tagihan yang perlu dibayar.']);
         }
-        
+
+        // Jika ada tagihan, buat transaksi Midtrans
         try {
             $midtransOrderId = 'CHECKOUT-' . $activeCheckIn->booking_id . '-' . time();
             $params = [
-                'transaction_details' => [
-                    'order_id' => $midtransOrderId,
-                    'gross_amount' => (int) $totalUnpaid,
-                ],
-                'customer_details' => [
-                    'first_name' => $user->name,
-                    'email' => $user->email,
-                ],
+                'transaction_details' => [ 'order_id' => $midtransOrderId, 'gross_amount' => (int) $totalBill ],
+                'customer_details' => [ 'first_name' => $user->name, 'email' => $user->email, ],
             ];
-
             $snapToken = Snap::getSnapToken($params);
-            $activeCheckIn->booking->update(['midtrans_checkout_id' => $midtransOrderId]);
+            if ($activeCheckIn->booking) {
+                $activeCheckIn->booking->update(['midtrans_checkout_id' => $midtransOrderId]);
+            }
             return response()->json(['snap_token' => $snapToken]);
-            
+
         } catch (Throwable $e) {
-            Log::error('Gagal memproses checkout: ' . $e->getMessage());
+            Log::error('Gagal memproses checkout tamu: ' . $e->getMessage());
             return response()->json(['message' => 'Gagal memulai proses checkout.'], 500);
         }
     }

@@ -45,60 +45,60 @@ class GuestOrderController extends Controller
     /**
      * Menyimpan pesanan makanan baru dari tamu dengan pilihan pembayaran.
      */
-    public function store(Request $request)
-    {
-        $user = Auth::user();
-        $activeCheckIn = CheckIn::where('is_active', true)
-            ->whereHas('booking', fn($q) => $q->where('user_id', $user->id))
-            ->first();
+public function store(Request $request)
+{
+    $user = Auth::user();
+    $activeCheckIn = CheckIn::where('is_active', true)
+        ->whereHas('booking', fn($q) => $q->where('user_id', $user->id))
+        ->first();
 
-        if (!$activeCheckIn) {
-            return response()->json(['message' => 'Anda harus sedang check-in untuk dapat membuat pesanan.'], 403);
-        }
+    if (!$activeCheckIn) {
+        return response()->json(['message' => 'Anda harus sedang check-in untuk dapat membuat pesanan.'], 403);
+    }
 
-        $validated = $request->validate([
-            'items' => 'required|array|min:1',
-            'items.*.menu_id' => 'required|exists:menus,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'payment_method' => 'required|string|in:pay_at_checkout,pay_now_midtrans', // Validasi pilihan pembayaran
-        ]);
+    $validated = $request->validate([
+        'items' => 'required|array|min:1',
+        'items.*.menu_id' => 'required|exists:menus,id',
+        'items.*.quantity' => 'required|integer|min:1',
+        'payment_method' => 'required|string|in:pay_at_checkout,pay_now_midtrans',
+    ]);
 
-        try {
-            $order = DB::transaction(function () use ($validated, $activeCheckIn, $user) {
-                $totalPrice = 0;
-                $orderItemsData = [];
+    try {
+        $order = DB::transaction(function () use ($validated, $activeCheckIn, $user) {
+            $totalPrice = 0;
+            $orderItemsData = [];
 
-                foreach ($validated['items'] as $item) {
-                    $menu = Menu::find($item['menu_id']);
-                    if ($menu->stock < $item['quantity']) {
-                        throw ValidationException::withMessages([
-                            'items' => "Stok untuk menu '{$menu->name}' tidak mencukupi. Sisa stok: {$menu->stock}."
-                        ]);
-                    }
-                    $totalPrice += $menu->price * $item['quantity'];
-                    $orderItemsData[] = ['menu_id' => $menu->id, 'quantity' => $item['quantity'], 'price' => $menu->price];
+            foreach ($validated['items'] as $item) {
+                $menu = Menu::find($item['menu_id']);
+                if ($menu->stock < $item['quantity']) {
+                    throw ValidationException::withMessages([
+                        'items' => "Stok untuk menu '{$menu->name}' tidak mencukupi."
+                    ]);
                 }
+                $totalPrice += $menu->price * $item['quantity'];
+                $orderItemsData[] = ['menu_id' => $menu->id, 'quantity' => $item['quantity'], 'price' => $menu->price];
+            }
 
-                // Tentukan status pesanan berdasarkan metode pembayaran
-                $status = ($validated['payment_method'] === 'pay_at_checkout') ? 'unpaid' : 'pending';
+            // [PERBAIKAN UTAMA] Standarkan status menjadi 'pending' untuk semua tagihan
+            $status = 'pending';
 
-                $order = Order::create([
-                    'room_id' => $activeCheckIn->room_id,
-                    'user_id' => $user->id,
-                    'guest_id' => $activeCheckIn->guest_id, // Simpan guest_id
-                    'total_price' => $totalPrice,
-                    'status' => $status, // Status dinamis
-                ]);
+            $order = Order::create([
+                'room_id' => $activeCheckIn->room_id,
+                'user_id' => $user->id,
+                'guest_id' => $activeCheckIn->guest_id,
+                'total_price' => $totalPrice,
+                'status' => $status,
+                'booking_id' => $activeCheckIn->booking_id,
+            ]);
 
-                $order->items()->createMany($orderItemsData);
+            $order->items()->createMany($orderItemsData);
 
-                // Langsung kurangi stok karena pesanan sudah dikonfirmasi
-                foreach ($order->items as $item) {
-                    Menu::find($item->menu_id)->decrement('stock', $item->quantity);
-                }
+            foreach ($order->items as $item) {
+                Menu::find($item->menu_id)->decrement('stock', $item->quantity);
+            }
 
-                return $order;
-            });
+            return $order;
+        });
 
             // Jika tamu memilih 'Bayar Sekarang', buat token Midtrans
             if ($validated['payment_method'] === 'pay_now_midtrans') {

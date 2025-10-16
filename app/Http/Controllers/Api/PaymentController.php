@@ -9,33 +9,46 @@ use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
+    /**
+     * Mendapatkan daftar pesanan yang menunggu pembayaran
+     */
     public function getPendingOrders()
     {
-        $orders = Order::where('status', 'pending')
-                        ->with('room', 'items.menu')
+        // PERBAIKAN: Tampilkan semua order yang belum dibayar
+        $billableStatuses = ['pending', 'processing', 'delivering'];
+
+        $orders = Order::whereIn('status', $billableStatuses)
+                        ->with('room', 'items.menu', 'user')
                         ->latest()
                         ->get();
         return response()->json($orders);
     }
 
+    /**
+     * Memproses pembayaran pesanan individual (bukan melalui folio)
+     */
     public function processPayment(Request $request, Order $order)
     {
         $request->validate([
             'payment_method' => 'required|string',
         ]);
 
+        // PERBAIKAN: Cek apakah order masih bisa dibayar
+        $billableStatuses = ['pending', 'processing', 'delivering'];
+
+        if (!in_array($order->status, $billableStatuses)) {
+            return response()->json(['message' => 'Pesanan ini tidak bisa dibayar (status: ' . $order->status . ')'], 400);
+        }
+
         DB::beginTransaction();
 
         try {
-            // 1. Ubah status pesanan menjadi 'completed'
-            $order->status = 'completed';
+            // Ubah status menjadi 'paid' (konsisten dengan folio)
+            $order->status = 'paid';
             $order->save();
 
-            // 2. LOGIKA PENGURANGAN STOK DIHAPUS DARI SINI
-            // Stok sudah dikurangi saat pesanan dibuat.
-
             DB::commit();
-            return response()->json(['message' => 'Pembayaran berhasil.']);
+            return response()->json(['message' => 'Pembayaran berhasil.', 'order' => $order]);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -43,22 +56,24 @@ class PaymentController extends Controller
         }
     }
 
+    /**
+     * Membatalkan pesanan yang masih pending
+     */
     public function cancelOrder(Order $order)
     {
-        if ($order->status !== 'pending') {
-            return response()->json(['message' => 'Hanya pesanan yang belum lunas yang bisa dibatalkan.'], 400);
+        // PERBAIKAN: Hanya order yang belum dibayar bisa dibatalkan
+        $billableStatuses = ['pending', 'processing', 'delivering'];
+
+        if (!in_array($order->status, $billableStatuses)) {
+            return response()->json(['message' => 'Hanya pesanan yang belum dibayar yang bisa dibatalkan.'], 400);
         }
 
         DB::beginTransaction();
         try {
-            // ==================================================
-            // PERUBAHAN DI SINI: Stok dikembalikan saat pesanan dibatalkan
-            // ==================================================
+            // Kembalikan stok
             foreach ($order->items as $item) {
-                // 'increment' adalah cara aman untuk menambah nilai di database
                 $item->menu()->increment('stock', $item->quantity);
             }
-            // ==================================================
 
             // Ubah status pesanan menjadi 'cancelled'
             $order->status = 'cancelled';
@@ -74,15 +89,14 @@ class PaymentController extends Controller
         }
     }
 
+    /**
+     * Mendapatkan riwayat transaksi yang sudah selesai
+     */
     public function getTransactionHistory()
     {
-        $orders = Order::whereIn('status', ['completed', 'cancelled'])
-                        ->with('room', 'items.menu')
-
-
-
-
-                        
+        // PERBAIKAN: Tambahkan 'paid' ke dalam filter
+        $orders = Order::whereIn('status', ['paid', 'cancelled'])
+                        ->with('room', 'items.menu', 'user')
                         ->latest()
                         ->get();
         return response()->json($orders);

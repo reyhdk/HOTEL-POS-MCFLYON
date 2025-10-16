@@ -11,27 +11,27 @@
       <div v-else-if="folios.length === 0" class="text-center text-muted py-10">
         Tidak ada tamu yang sedang check-in.
       </div>
-      
+
       <div v-else class="accordion" id="kt_accordion_folios">
         <div v-for="(folio, index) in folios" :key="folio.id" class="accordion-item">
           <h2 class="accordion-header" :id="`header_folio_${folio.id}`">
-            <button 
-              class="accordion-button fs-4 fw-semibold" 
+            <button
+              class="accordion-button fs-4 fw-semibold"
               :class="{ 'collapsed': index !== 0 }"
-              type="button" 
-              data-bs-toggle="collapse" 
+              type="button"
+              data-bs-toggle="collapse"
               :data-bs-target="`#body_folio_${folio.id}`"
               :aria-expanded="index === 0 ? 'true' : 'false'">
               Kamar {{ folio.room_number }} - <span class="text-primary mx-2">{{ getGuestName(folio) }}</span>
               <span class="ms-auto badge badge-light-primary">Total Tagihan: {{ formatCurrency(calculateTotalBill(folio.orders)) }}</span>
             </button>
           </h2>
-          <div :id="`body_folio_${folio.id}`" 
-               class="accordion-collapse collapse" 
+          <div :id="`body_folio_${folio.id}`"
+               class="accordion-collapse collapse"
                :class="{ 'show': index === 0 }"
                data-bs-parent="#kt_accordion_folios">
             <div class="accordion-body">
-              <div v-if="!folio.orders || folio.orders.length === 0" class="text-muted text-center py-5">
+              <div v-if="!folio.orders || !Array.isArray(folio.orders) || folio.orders.length === 0" class="text-muted text-center py-5">
                 Belum ada tagihan untuk tamu ini.
               </div>
               <div v-else>
@@ -65,10 +65,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import axios from "@/libs/axios"; // Pastikan path ini benar
+import ApiService from "@/core/services/ApiService"; // Diubah menggunakan ApiService agar konsisten
 import Swal from "sweetalert2";
 
-// Tipe data disederhanakan dan diperjelas
+// ... (Interface Anda sudah benar) ...
 interface Guest { id: number; name: string; }
 interface CheckIn { id: number; guest: Guest; is_active: boolean; }
 interface MenuItem { id: number; name: string; }
@@ -78,18 +78,18 @@ interface FolioData {
   id: number;
   room_number: string;
   checkIns: CheckIn[];
-  orders: Order[];
+  orders: Order[] | null; // Izinkan orders menjadi null
 }
 
 const folios = ref<FolioData[]>([]);
 const loading = ref(true);
-const isCheckoutLoading = ref(false); // State loading khusus untuk tombol checkout
+const isCheckoutLoading = ref(false);
 
 const getFolios = async () => {
   try {
     loading.value = true;
-    const response = await axios.get("/folios");
-    folios.value = response.data;
+    const { data } = await ApiService.get("/folios");
+    folios.value = data;
   } catch (error) {
     console.error("Gagal memuat data folio:", error);
     Swal.fire("Error!", "Gagal memuat data folio dari server.", "error");
@@ -103,7 +103,14 @@ const getGuestName = (folio: FolioData) => {
     return activeCheckIn?.guest?.name || 'Tamu';
 };
 
-const calculateTotalBill = (orders: Order[] = []): number => {
+// [FUNGSI UTAMA YANG DIPERBAIKI]
+const calculateTotalBill = (orders: Order[] | null): number => {
+  // Cek dulu apakah 'orders' adalah sebuah Array.
+  // Jika bukan (misalnya null atau object), maka totalnya adalah 0.
+  if (!Array.isArray(orders)) {
+    return 0;
+  }
+  // Jika ini adalah array (meskipun kosong), .reduce() akan aman untuk dijalankan.
   return orders.reduce((total, order) => total + Number(order.total_price), 0);
 };
 
@@ -126,8 +133,7 @@ const processFolioCheckout = (folio: FolioData) => {
         cancelButtonText: "Batal",
         customClass: { confirmButton: "btn fw-bold btn-primary", cancelButton: "btn fw-bold btn-active-light-primary" },
     };
-    
-    // Jika ada tagihan, ubah pesan konfirmasi
+
     if (totalBill > 0) {
         confirmationConfig.title = `Konfirmasi Pembayaran & Check-out`;
         confirmationConfig.html = `Anda akan memproses pembayaran sebesar <strong>${formatCurrency(totalBill)}</strong> dan check-out untuk <strong>${guestName}</strong> dari kamar <strong>${folio.room_number}</strong>. Lanjutkan?`;
@@ -145,7 +151,9 @@ const processFolioCheckout = (folio: FolioData) => {
 const executeCheckout = async (folio: FolioData) => {
     isCheckoutLoading.value = true;
     try {
-        await axios.post(`/folios/${folio.id}/checkout`);
+        // [PERBAIKAN DI SINI] Tambahkan objek kosong {} sebagai argumen kedua
+        await ApiService.post(`/folios/${folio.id}/checkout`, {});
+
         Swal.fire("Berhasil!", "Pembayaran sukses dan tamu telah check-out.", "success");
         getFolios(); // Refresh daftar folio
     } catch (error: any) {

@@ -16,82 +16,70 @@ use Throwable;
 class CheckInController extends Controller
 {
     public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'room_id' => 'required|exists:rooms,id',
-            'guest_id' => 'required|exists:guests,id',
-            'check_in_date' => 'required|date|after_or_equal:today',
-            'check_out_date' => 'required|date|after:check_in_date',
-            'payment_method' => 'required|string|in:cash,midtrans',
-        ]);
+{
+    $validated = $request->validate([
+        'room_id' => 'required|exists:rooms,id',
+        'guest_id' => 'required|exists:guests,id',
+        'check_in_date' => 'required|date|after_or_equal:today',
+        'check_out_date' => 'required|date|after:check_in_date',
+        'payment_method' => 'required|string|in:cash,midtrans',
+    ]);
 
-        $room = Room::findOrFail($validated['room_id']);
-        if ($room->status !== 'available') {
-            return response()->json(['message' => 'Kamar ini tidak tersedia untuk check-in.'], 409);
-        }
+    $room = Room::findOrFail($validated['room_id']);
+    if ($room->status !== 'available') {
+        return response()->json(['message' => 'Kamar ini tidak tersedia untuk check-in.'], 409);
+    }
 
-        try {
-            $checkInDate = Carbon::parse($validated['check_in_date']);
-            $checkOutDate = Carbon::parse($validated['check_out_date']);
+    try {
+        $checkInDate = Carbon::parse($validated['check_in_date']);
+        $checkOutDate = Carbon::parse($validated['check_out_date']);
+        $durationInNights = $checkOutDate->diffInDays($checkInDate);
+        $totalPrice = $room->price_per_night * $durationInNights;
 
-            // --- PERBAIKAN DI SINI ---
-            // Kalkulasi harga harus ada di luar transaction agar bisa diakses oleh Midtrans
-            $durationInNights = $checkOutDate->diffInDays($checkInDate);
-            $totalPrice = $room->price_per_night * $durationInNights;
-
-            $booking = null;
-
-            if ($validated['payment_method'] === 'cash') {
-                DB::transaction(function () use ($validated, $checkInDate, $checkOutDate, $totalPrice, $room) {
-                    $booking = Booking::create([
-                        'room_id' => $room->id, 'guest_id' => $validated['guest_id'], 'user_id' => auth()->id(),
-                        'check_in_date' => $checkInDate, 'check_out_date' => $checkOutDate,
-                        'total_price' => $totalPrice, 'status' => 'paid',
-                    ]);
-                    CheckIn::create([
-                        'booking_id' => $booking->id, 'room_id' => $room->id, 'guest_id' => $validated['guest_id'],
-                        'check_in_time' => now(), 'is_active' => true,
-                    ]);
-                    $room->update(['status' => 'occupied']);
-                });
-                return response()->json(['message' => 'Check-in berhasil dicatat dengan pembayaran tunai.'], 201);
-            }
-
-            if ($validated['payment_method'] === 'midtrans') {
+        if ($validated['payment_method'] === 'cash') {
+            DB::transaction(function () use ($validated, $checkInDate, $checkOutDate, $totalPrice, $room) {
                 $booking = Booking::create([
                     'room_id' => $room->id, 'guest_id' => $validated['guest_id'], 'user_id' => auth()->id(),
                     'check_in_date' => $checkInDate, 'check_out_date' => $checkOutDate,
-                    'total_price' => $totalPrice, 'status' => 'pending',
+                    'total_price' => $totalPrice,
+                    // [PERBAIKAN DI SINI] Ubah status menjadi 'completed' agar langsung masuk dasbor
+                    'status' => 'completed',
                 ]);
-
-                $midtransOrderId = 'BOOK-' . $booking->id . '-' . time();
-                $booking->midtrans_order_id = $midtransOrderId;
-                $booking->save();
-
-                $guest = $booking->guest;
-
-                // Pastikan $params diisi dengan benar
-                $params = [
-                    'transaction_details' => [
-                        'order_id' => $midtransOrderId,
-                        'gross_amount' => (int) $totalPrice,
-                    ],
-                    'customer_details' => [
-                        'first_name' => $guest->name,
-                        'email' => $guest->email,
-                        'phone' => $guest->phone_number,
-                    ],
-                ];
-
-                $snapToken = Snap::getSnapToken($params);
-                return response()->json(['snap_token' => $snapToken]);
-            }
-
-        } catch (Throwable $e) {
-            Log::error('Gagal melakukan check-in manual: ' . $e->getMessage());
-            return response()->json(['message' => 'Terjadi kesalahan saat proses check-in.'], 500);
+                CheckIn::create([
+                    'booking_id' => $booking->id, 'room_id' => $room->id, 'guest_id' => $validated['guest_id'],
+                    'check_in_time' => now(), 'is_active' => true,
+                ]);
+                $room->update(['status' => 'occupied']);
+            });
+            return response()->json(['message' => 'Check-in berhasil dicatat dengan pembayaran tunai.'], 201);
         }
+
+        if ($validated['payment_method'] === 'midtrans') {
+            $booking = Booking::create([
+                'room_id' => $room->id, 'guest_id' => $validated['guest_id'], 'user_id' => auth()->id(),
+                'check_in_date' => $checkInDate, 'check_out_date' => $checkOutDate,
+                'total_price' => $totalPrice, 'status' => 'pending',
+            ]);
+
+            $midtransOrderId = 'BOOK-' . $booking->id . '-' . time();
+            $booking->midtrans_order_id = $midtransOrderId;
+            $booking->save();
+
+            $guest = $booking->guest;
+            $params = [
+                'transaction_details' => [ 'order_id' => $midtransOrderId, 'gross_amount' => (int) $totalPrice, ],
+                'customer_details' => [ 'first_name' => $guest->name, 'email' => $guest->email, 'phone' => $guest->phone_number, ],
+            ];
+
+            $snapToken = Snap::getSnapToken($params);
+            return response()->json(['snap_token' => $snapToken]);
+        }
+
+    } catch (Throwable $e) {
+        Log::error('Gagal melakukan check-in manual: ' . $e->getMessage());
+        return response()->json(['message' => 'Terjadi kesalahan saat proses check-in.'], 500);
     }
+}
 
     /**
      * Menangani proses check-out manual oleh admin/resepsionis.
