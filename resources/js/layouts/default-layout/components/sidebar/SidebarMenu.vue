@@ -1,13 +1,5 @@
 <template>
   <div class="app-sidebar-menu overflow-hidden flex-column-fluid">
-    <div class="px-3 py-4 bg-success text-white fw-bold">
-      <p class="m-0">--- DEBUG FINAL V2 ---</p>
-      <p class="m-0">
-        Role Terdeteksi: <strong class="fs-4">{{ userRole }}</strong>
-      </p>
-      <p class="m-0">Jumlah Menu Tampil: {{ filteredMenu.length }}</p>
-    </div>
-
     <div
       id="kt_app_sidebar_menu_wrapper"
       class="app-sidebar-wrapper hover-scroll-overlay-y my-5"
@@ -122,9 +114,6 @@ const route = useRoute();
 const scrollElRef = ref<null | HTMLElement>(null);
 const authStore = useAuthStore();
 
-// =======================================================
-// ▼▼▼ LOGIKA FILTER MENU BARU BERBASIS PERMISSION ▼▼▼
-// =======================================================
 const userRole = computed(() => authStore.userRole);
 
 const filteredMenu = computed(() => {
@@ -135,7 +124,7 @@ const filteredMenu = computed(() => {
 
     if (section.pages) {
       for (const page of section.pages) {
-        // Logika Pengecekan Baru:
+        // Logika Pengecekan:
         // 1. Jika menu untuk user biasa, cek rolenya.
         // 2. Jika menu untuk admin, cek PERMISSION-nya.
         
@@ -168,8 +157,6 @@ const filteredMenu = computed(() => {
 
   return result;
 });
-// =======================================================
-
 
 onMounted(() => {
   if (scrollElRef.value) {
