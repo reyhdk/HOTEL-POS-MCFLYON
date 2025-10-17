@@ -47,7 +47,7 @@ class MenuController extends Controller
     {
        $validatedData = $request->validate([
             'name' => 'required|string|max:255|unique:menus,name,' . $menu->id,
-            // 'category' => 'required|string|max:255',
+            'category' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'image' => 'nullable|sometimes', // 'sometimes' agar tidak wajib diupdate
