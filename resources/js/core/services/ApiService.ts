@@ -3,6 +3,7 @@ import axios from "axios";
 import VueAxios from "vue-axios";
 import JwtService from "@/core/services/JwtService";
 import { useAuthStore } from "@/stores/auth";
+import router from "@/router"; // ▼▼▼ [DIBENARKAN] TAMBAHKAN IMPORT INI ▼▼▼
 
 class ApiService {
   public static vueInstance: App;
@@ -13,65 +14,61 @@ class ApiService {
     ApiService.vueInstance.axios.defaults.baseURL = import.meta.env.VITE_APP_API_URL;
 
     // --- INTERCEPTOR UNTUK REQUEST ---
-    // Menempelkan token ke setiap request yang memerlukan autentikasi
     ApiService.vueInstance.axios.interceptors.request.use(
       (config) => {
         const token = JwtService.getToken();
-        if (token) {
+
+        if (token && !config.url?.includes('/auth/login') && !config.url?.includes('/auth/register')) {
           config.headers["Authorization"] = `Bearer ${token}`;
         }
+
         return config;
       },
       (error) => Promise.reject(error)
     );
 
-    // --- INTERCEPTOR UNTUK RESPONSE (PENYESUAIAN PENTING) ---
-    // Menangani error 401 (Unauthorized) secara global
+    // --- INTERCEPTOR UNTUK RESPONSE ---
     ApiService.vueInstance.axios.interceptors.response.use(
-      (response) => response, // Jika berhasil, teruskan response
+      (response) => response,
       (error) => {
-        // Jika error adalah 401 (token tidak valid/kedaluwarsa)
         if (error.response && error.response.status === 401) {
           const authStore = useAuthStore();
-          authStore.logout(); // Panggil aksi logout dari Pinia store
+          // [FIX] 'router' sekarang sudah dikenali setelah di-import
+          if (router.currentRoute.value.name !== "sign-in") {
+            authStore.logout();
+          }
         }
         return Promise.reject(error);
       }
     );
   }
 
-  // Metode untuk melakukan query (GET dengan parameter)
+  // ... (sisa metode: query, get, post, dll. tidak berubah) ...
   public static query(resource: string, params: any) {
     return ApiService.vueInstance.axios.get(resource, { params });
   }
 
-  // Metode untuk GET request standar
   public static get(resource: string, slug = "") {
     const url = slug ? `${resource}/${slug}` : resource;
     return ApiService.vueInstance.axios.get(url);
   }
 
-  // Metode untuk POST request
   public static post(resource: string, params: any) {
     return ApiService.vueInstance.axios.post(`${resource}`, params);
   }
 
-  // Metode untuk UPDATE request (menggunakan slug)
   public static update(resource: string, slug: string, params: any) {
     return ApiService.vueInstance.axios.put(`${resource}/${slug}`, params);
   }
 
-  // Metode untuk PUT request standar
   public static put(resource: string, params: any) {
     return ApiService.vueInstance.axios.put(`${resource}`, params);
   }
 
-  // [DIBENARKAN] Metode untuk PATCH request ditambahkan di sini
   public static patch(resource: string, params: any) {
     return ApiService.vueInstance.axios.patch(resource, params);
   }
 
-  // Metode untuk DELETE request
   public static delete(resource: string) {
     return ApiService.vueInstance.axios.delete(resource);
   }

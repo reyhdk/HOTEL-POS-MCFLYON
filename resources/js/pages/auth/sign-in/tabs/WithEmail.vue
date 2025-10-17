@@ -66,39 +66,39 @@
 import { ref } from "vue";
 import { ErrorMessage, Field, Form as VForm } from "vee-validate";
 import { useAuthStore } from "@/stores/auth";
-import { useRouter } from "vue-router";
+// import { useRouter } from "vue-router"; // Tidak lagi diperlukan
 import * as Yup from "yup";
 import Swal from "sweetalert2";
 
 const store = useAuthStore();
-const router = useRouter();
+// const router = useRouter(); // Tidak lagi diperlukan, redirect diurus oleh auth.ts
 const submitButton = ref<HTMLButtonElement | null>(null);
 
 const passwordFieldType = ref("password");
 
-// Skema validasi
+// Skema validasi (sudah benar)
 const loginSchema = Yup.object().shape({
   email: Yup.string().email("Email tidak valid").required("Email wajib diisi").label("Email"),
   password: Yup.string().min(8, "Password minimal 8 karakter").required("Password wajib diisi").label("Password"),
 });
 
-// Fungsi untuk toggle visibilitas password
+// Fungsi untuk toggle visibilitas password (sudah benar)
 const togglePasswordVisibility = () => {
   passwordFieldType.value = passwordFieldType.value === "password" ? "text" : "password";
 };
 
-// Fungsi saat form di-submit
+// ▼▼▼ [DIBENARKAN] FUNGSI SUBMIT DENGAN PENANGANAN ERROR YANG BENAR ▼▼▼
 const onSubmitLogin = async (values: any) => {
   if (submitButton.value) {
     submitButton.value.disabled = true;
     submitButton.value.setAttribute("data-kt-indicator", "on");
   }
 
-  // Panggil aksi login dari store
-  await store.login(values);
+  try {
+    // 1. Mencoba untuk login
+    await store.login(values);
 
-  // Cek apakah ada error setelah mencoba login
-  if (store.isAuthenticated) {
+    // 2. Jika berhasil (tidak ada error), tampilkan notifikasi sukses
     Swal.fire({
       text: "Login berhasil!",
       icon: "success",
@@ -106,24 +106,26 @@ const onSubmitLogin = async (values: any) => {
       position: 'top-end',
       showConfirmButton: false,
       timer: 1500,
-    }).then(() => {
-      // Logika pengalihan cerdas akan ditangani oleh router/auth store
     });
-  } else {
-    // Tampilkan pesan error dari store
+    // Pengalihan halaman akan diurus secara otomatis oleh auth.ts
+
+  } catch (error) {
+    // 3. Jika store.login() gagal, blok ini akan dijalankan
     Swal.fire({
-      text: store.errors as string,
+      text: store.errors as string || "Email atau password salah.",
       icon: "error",
       buttonsStyling: false,
       confirmButtonText: "Coba Lagi",
-      customClass: { confirmButton: "btn btn-primary" },
+      customClass: { confirmButton: "btn btn-danger" },
     });
-  }
 
-  // Aktifkan kembali tombol
-  submitButton.value?.removeAttribute("data-kt-indicator");
-  if (submitButton.value) {
-    submitButton.value.disabled = false;
+  } finally {
+    // 4. Blok ini akan SELALU berjalan, baik login sukses maupun gagal
+    // Pastikan tombol submit selalu aktif kembali
+    if (submitButton.value) {
+      submitButton.value.disabled = false;
+      submitButton.value.removeAttribute("data-kt-indicator");
+    }
   }
 };
 </script>

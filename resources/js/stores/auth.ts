@@ -11,7 +11,7 @@ export interface User {
   email: string;
   phone: string;
   photo_url?: string;
-  all_permissions: string[]; // <-- TAMBAHKAN BARIS INI
+  all_permissions: string[];
   role?: {
     id: number;
     name: string;
@@ -23,21 +23,19 @@ export const useAuthStore = defineStore("auth", () => {
   const errors = ref<any>({});
   const user = ref<User | null>(null);
   const isAuthenticated = ref(!!JwtService.getToken());
-  // ▼▼▼ TAMBAHKAN STATE UNTUK PERMISSIONS ▼▼▼
   const permissions = ref<string[]>([]);
 
   const isUserLoaded = computed(() => !!user.value);
   const userRole = computed(() => user.value?.role?.name || '');
 
-  // ▼▼▼ TAMBAHKAN COMPUTED PROPERTY UNTUK MENGECEK PERMISSION ▼▼▼
   const hasPermission = computed(() => {
     return (permissionName: string) => permissions.value.includes(permissionName);
   });
 
   function setAuth(authData: any, token?: string) {
     isAuthenticated.value = true;
+    // PASTIKAN OBJEK USER DIAMBIL DARI authData.user
     user.value = authData.user;
-    // ▼▼▼ SIMPAN PERMISSIONS KE DALAM STATE ▼▼▼
     permissions.value = authData.permissions || [];
     errors.value = {};
     if (token) {
@@ -48,22 +46,36 @@ export const useAuthStore = defineStore("auth", () => {
   function purgeAuth() {
     isAuthenticated.value = false;
     user.value = null;
-    // ▼▼▼ KOSONGKAN JUGA PERMISSIONS SAAT LOGOUT ▼▼▼
     permissions.value = [];
     errors.value = {};
     JwtService.destroyToken();
   }
 
-  function handleRedirect(loggedInUser: User) {
-    // ... (Fungsi ini tidak perlu diubah)
+  // ▼▼▼ [DIBENARKAN] FUNGSI REDIRECT YANG "PINTAR" ▼▼▼
+  function handleRedirect() {
+    if (!user.value) return;
+
+    // Variabel 'role' bisa berupa string atau undefined
+    const role = user.value?.role?.name;
+    const staffRoles = ['admin', 'receptionist', 'chef', 'cleaning-service'];
+
+    // [FIX] Tambahkan 'role &&' untuk memastikan 'role' tidak undefined
+    // sebelum memanggil .includes()
+    if (role && staffRoles.includes(role)) {
+      router.push({ name: 'admin-dashboard' });
+    } else if (role === 'user') {
+      router.push({ name: 'user-dashboard' });
+    } else {
+      // Jika role tidak ada atau tidak dikenali, arahkan ke halaman login
+      router.push({ name: 'sign-in' });
+    }
   }
 
   async function login(credentials: any) {
     try {
       const { data } = await ApiService.post("auth/login", credentials);
-      // 'data.data' sekarang berisi { user, permissions, token }
       setAuth(data.data, data.data.token);
-      handleRedirect(data.data.user);
+      handleRedirect(); // <-- [DIBENARKAN] Panggil tanpa parameter
     } catch (error: any) {
       purgeAuth();
       errors.value = error.response?.data?.message || "Email atau password salah.";
@@ -74,10 +86,9 @@ export const useAuthStore = defineStore("auth", () => {
   async function register(credentials: any) {
     try {
       const { data } = await ApiService.post("auth/register", credentials);
-      const newUser = data.data.user;
-      const token = data.data.token;
-      setAuth(newUser, token);
-      handleRedirect(newUser);
+      // [DIBENARKAN] Kirim seluruh objek data.data ke setAuth
+      setAuth(data.data, data.data.token);
+      handleRedirect(); // <-- [DIBENARKAN] Panggil tanpa parameter
     } catch (error: any) {
       errors.value = error.response?.data?.errors || { message: ["Gagal mendaftar."] };
       throw error;
@@ -86,7 +97,6 @@ export const useAuthStore = defineStore("auth", () => {
 
   async function logout() {
     try {
-      // Hanya panggil API logout jika ada token
       if(JwtService.getToken()){
         await ApiService.delete("auth/logout");
       }
@@ -98,7 +108,7 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-    async function verifyAuth() {
+  async function verifyAuth() {
     if (!JwtService.getToken()) {
       purgeAuth();
       return;
@@ -118,11 +128,11 @@ export const useAuthStore = defineStore("auth", () => {
     isAuthenticated,
     isUserLoaded,
     userRole,
-    permissions,// Expose permissions
+    permissions,
     hasPermission,
     login,
     logout,
     register,
     verifyAuth,
   };
-}); // End of defineStore
+});
