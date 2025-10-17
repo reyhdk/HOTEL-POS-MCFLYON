@@ -49,12 +49,12 @@
           </div>
           <div class="separator separator-dashed my-5"></div>
         </div>
-        
+
         <div class="d-flex justify-content-between align-items-center mb-5">
           <span class="fs-5 fw-bold text-gray-800">Total Sisa Tagihan:</span>
           <span class="fs-3 fw-bolder text-primary">{{ formatCurrency(folio.total_unpaid) }}</span>
         </div>
-        
+
         <div v-if="folio.total_unpaid <= 0" class="notice d-flex bg-light-success rounded border-success border border-dashed p-6 mt-6">
           <i class="ki-duotone ki-shield-tick fs-2tx text-success me-4"><span class="path1"></span><span class="path2"></span></i>
           <div class="d-flex flex-stack flex-grow-1">
@@ -85,7 +85,6 @@ import { toast } from 'vue3-toastify';
 import Swal from "sweetalert2";
 import { useRouter } from "vue-router";
 
-// Pastikan skrip Midtrans sudah dimuat di index.html Anda
 declare const snap: any;
 
 interface Order {
@@ -120,43 +119,102 @@ const fetchFolio = async () => {
   }
 };
 
+// Fungsi untuk polling status checkout
+const waitForCheckoutCompletion = async (maxAttempts = 20, delayMs = 2000): Promise<boolean> => {
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+
+    try {
+      const { data } = await ApiService.get('/guest/folio');
+
+      // Jika folio tidak ditemukan (404), berarti checkout berhasil
+      if (!data) {
+        return true;
+      }
+
+      // Jika masih ada folio dan total_unpaid = 0, checkout berhasil
+      if (data.total_unpaid === 0 && (!data.unpaid_orders || data.unpaid_orders.length === 0)) {
+        return true;
+      }
+    } catch (error: any) {
+      // Status 404 berarti tidak ada sesi aktif = checkout berhasil
+      if (error.response?.status === 404) {
+        return true;
+      }
+    }
+  }
+
+  return false; // Timeout
+};
+
 const submitCheckout = async () => {
   isProcessing.value = true;
   try {
     const { data } = await ApiService.post("/guest/checkout", {});
 
-    // Kasus 1: Ada tagihan yang harus dibayar, Midtrans mengembalikan snap_token
+    // Kasus 1: Ada tagihan yang harus dibayar
     if (data.snap_token) {
-      // Panggil Midtrans Snap
       snap.pay(data.snap_token, {
-        onSuccess: () => {
-          isProcessing.value = false; // Matikan loading
-          Swal.fire("Berhasil!", "Pembayaran berhasil dan Anda telah check-out.", "success")
-            .then(() => router.push({ name: 'user-dashboard' })); // Arahkan ke dasbor
+        onSuccess: async () => {
+          // PERBAIKAN: Jangan langsung redirect, tunggu webhook diproses dulu
+          Swal.fire({
+            title: 'Memproses Pembayaran',
+            html: 'Mohon tunggu, kami sedang memverifikasi pembayaran Anda...',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            didOpen: () => {
+              Swal.showLoading();
+            }
+          });
+
+          // Tunggu webhook Midtrans diproses (polling status)
+          const isCompleted = await waitForCheckoutCompletion();
+
+          isProcessing.value = false;
+
+          if (isCompleted) {
+            Swal.fire({
+              title: "Berhasil!",
+              text: "Pembayaran berhasil dan Anda telah check-out.",
+              icon: "success",
+              confirmButtonText: "OK"
+            }).then(() => {
+              router.push({ name: 'user-dashboard' });
+            });
+          } else {
+            Swal.fire({
+              title: "Mohon Tunggu",
+              text: "Pembayaran sedang diproses. Silakan cek status di dashboard Anda.",
+              icon: "info",
+              confirmButtonText: "OK"
+            }).then(() => {
+              router.push({ name: 'user-dashboard' });
+            });
+          }
         },
         onPending: () => {
-          isProcessing.value = false; // Matikan loading
+          isProcessing.value = false;
           toast.info("Menunggu pembayaran Anda.");
         },
         onError: () => {
-          isProcessing.value = false; // Matikan loading
+          isProcessing.value = false;
           toast.error("Pembayaran gagal diproses.");
         },
         onClose: () => {
-          isProcessing.value = false; // Matikan loading saat jendela ditutup
+          isProcessing.value = false;
           toast.warn("Proses checkout dibatalkan.");
         }
       });
-    } 
+    }
     // Kasus 2: Tidak ada tagihan (Express Checkout)
     else {
+      isProcessing.value = false;
       Swal.fire("Berhasil!", data.message || "Anda telah berhasil check-out.", "success")
         .then(() => router.push({ name: 'user-dashboard' }));
-      // Tidak perlu set isProcessing false di sini karena halaman akan segera redirect
     }
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Gagal memproses checkout.");
-    isProcessing.value = false; // Matikan loading jika ada error
+    isProcessing.value = false;
   }
 };
 
@@ -164,6 +222,7 @@ const formatCurrency = (value: number | undefined) => {
   if (value === undefined || isNaN(value)) return "Rp 0";
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
 };
+
 const formatDate = (dateString: string) => {
   if (!dateString) return '';
   return new Date(dateString).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' });

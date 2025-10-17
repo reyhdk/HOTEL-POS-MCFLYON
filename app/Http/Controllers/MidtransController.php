@@ -74,6 +74,12 @@ class MidtransController extends Controller
             $notification = new Notification();
             $orderId = $notification->order_id;
 
+            Log::info('Midtrans Notification Received', [
+                'order_id' => $orderId,
+                'transaction_status' => $notification->transaction_status,
+                'fraud_status' => $notification->fraud_status ?? 'N/A'
+            ]);
+
             if (str_starts_with($orderId, 'BOOK-')) {
                 $this->handleBookingNotification($notification);
             } else if (str_starts_with($orderId, 'ORDER-')) {
@@ -91,80 +97,135 @@ class MidtransController extends Controller
     }
 
     /**
- * [FUNGSI BARU] Menangani notifikasi pembayaran checkout.
- */
-/**
-     * [LENGKAPI FUNGSI INI] Menangani notifikasi pembayaran checkout.
+     * [PERBAIKAN] Menangani notifikasi pembayaran checkout.
      */
     private function handleCheckoutNotification(Notification $notification)
-{
-    // Cari booking berdasarkan ID checkout yang kita simpan saat membuat token
-    $booking = Booking::where('midtrans_checkout_id', $notification->order_id)->first();
+    {
+        // Format order_id: CHECKOUT-{booking_id}-{timestamp}
+        // Contoh: CHECKOUT-123-1634567890
+        $parts = explode('-', $notification->order_id);
 
-    // Jangan proses jika booking tidak ditemukan atau sudah selesai
-    if (!$booking || $booking->status === 'completed') {
-        return;
+        if (count($parts) < 3) {
+            Log::error('Invalid checkout order_id format: ' . $notification->order_id);
+            return;
+        }
+
+        $bookingId = $parts[1]; // Ambil booking_id dari order_id
+
+        // Cari booking berdasarkan ID yang di-extract
+        $booking = Booking::find($bookingId);
+
+        if (!$booking) {
+            Log::warning('Booking tidak ditemukan untuk checkout: ' . $notification->order_id);
+            return;
+        }
+
+        // Update midtrans_checkout_id jika belum ada
+        if (!$booking->midtrans_checkout_id) {
+            $booking->midtrans_checkout_id = $notification->order_id;
+            $booking->save();
+        }
+
+        // Cek apakah checkout ini sudah pernah diproses
+        // dengan mengecek apakah check-in sudah tidak aktif
+        $checkIn = CheckIn::where('booking_id', $booking->id)->first();
+
+        if ($checkIn && !$checkIn->is_active && $checkIn->check_out_time) {
+            Log::info('Checkout sudah diproses sebelumnya: ' . $notification->order_id);
+            return;
+        }
+
+        // Hanya proses jika transaksi sukses
+        $isSuccess = in_array($notification->transaction_status, ['capture', 'settlement'])
+                     && ($notification->fraud_status == 'accept' || !isset($notification->fraud_status));
+
+        if (!$isSuccess) {
+            Log::info('Transaction not successful', [
+                'order_id' => $notification->order_id,
+                'status' => $notification->transaction_status,
+                'fraud' => $notification->fraud_status ?? 'N/A'
+            ]);
+            return;
+        }
+
+        try {
+            DB::transaction(function () use ($booking, $notification) {
+                // Definisikan semua status tagihan yang perlu dibayar
+                $billableStatuses = ['pending', 'processing', 'delivering', 'completed'];
+
+                // Update SEMUA order milik user ini yang masih unpaid
+                $updatedOrders = Order::where('user_id', $booking->user_id)
+                     ->whereIn('status', $billableStatuses)
+                     ->update(['status' => 'paid']);
+
+                Log::info('Orders updated to paid', [
+                    'booking_id' => $booking->id,
+                    'user_id' => $booking->user_id,
+                    'orders_updated' => $updatedOrders
+                ]);
+
+                // Update booking status
+                $booking->update(['status' => 'completed']);
+
+                // Update room status
+                if ($booking->room) {
+                    $booking->room->update(['status' => 'dirty']);
+                }
+
+                // Nonaktifkan check-in
+                CheckIn::where('booking_id', $booking->id)
+                       ->where('is_active', true)
+                       ->update([
+                           'is_active' => false,
+                           'check_out_time' => now()
+                       ]);
+
+                Log::info('Checkout completed successfully', [
+                    'booking_id' => $booking->id,
+                    'order_id' => $notification->order_id
+                ]);
+            });
+        } catch (Throwable $e) {
+            Log::error('Error processing checkout notification: ' . $e->getMessage(), [
+                'order_id' => $notification->order_id,
+                'booking_id' => $booking->id
+            ]);
+            throw $e;
+        }
     }
-
-    // Hanya proses jika transaksi dari Midtrans benar-benar sukses
-    if (($notification->transaction_status == 'capture' || $notification->transaction_status == 'settlement') && $notification->fraud_status == 'accept') {
-        DB::transaction(function () use ($booking) {
-            // [PERBAIKAN UTAMA DI SINI]
-            // Definisikan semua status tagihan yang mungkin ada, sama seperti di FolioController
-            $billableStatuses = ['pending', 'processing', 'delivering', 'completed'];
-            
-            // Ubah status SEMUA tagihan yang relevan menjadi 'paid'
-            Order::where('booking_id', $booking->id)
-                 ->whereIn('status', $billableStatuses) // Gunakan whereIn agar semua status terambil
-                 ->update(['status' => 'paid']);
-
-            // Tandai booking sebagai 'completed' agar masuk dasbor
-            $booking->update(['status' => 'completed']);
-
-            // Ubah status kamar menjadi 'dirty'
-            $booking->room()->update(['status' => 'dirty']);
-
-            // Nonaktifkan sesi check-in
-            CheckIn::where('booking_id', $booking->id)
-                   ->where('is_active', true)
-                   ->update(['is_active' => false, 'check_out_time' => now()]);
-        });
-    }
-}
 
     /**
      * Memproses notifikasi khusus untuk Booking Kamar.
      */
     private function handleBookingNotification(Notification $notification)
-{
-    $booking = Booking::where('midtrans_order_id', $notification->order_id)->first();
+    {
+        $booking = Booking::where('midtrans_order_id', $notification->order_id)->first();
 
-    if (!$booking || $booking->status !== 'pending') {
-        return;
-    }
+        if (!$booking || $booking->status !== 'pending') {
+            return;
+        }
 
-    if (($notification->transaction_status == 'capture' || $notification->transaction_status == 'settlement') && $notification->fraud_status == 'accept') {
-        DB::transaction(function () use ($booking) {
-            // [PERBAIKAN DI SINI] Ubah status menjadi 'completed' agar langsung masuk dasbor
-            $booking->status = 'completed';
+        if (($notification->transaction_status == 'capture' || $notification->transaction_status == 'settlement') && $notification->fraud_status == 'accept') {
+            DB::transaction(function () use ($booking) {
+                $booking->status = 'completed';
+                $booking->save();
+                $booking->room()->update(['status' => 'occupied']);
+
+                CheckIn::firstOrCreate(
+                    ['booking_id' => $booking->id],
+                    [
+                        'room_id' => $booking->room_id,
+                        'guest_id' => $booking->guest_id,
+                        'check_in_time' => now(),
+                        'is_active' => true
+                    ]
+                );
+            });
+        } else if (in_array($notification->transaction_status, ['cancel', 'expire', 'deny'])) {
+            $booking->status = 'cancelled';
             $booking->save();
-            $booking->room()->update(['status' => 'occupied']);
-
-            CheckIn::firstOrCreate(
-                ['booking_id' => $booking->id],
-                [
-                    'room_id' => $booking->room_id,
-                    'guest_id' => $booking->guest_id,
-                    'check_in_time' => now(),
-                    'is_active' => true
-                ]
-            );
-        });
-    } else if (in_array($notification->transaction_status, ['cancel', 'expire', 'deny'])) {
-        $booking->status = 'cancelled';
-        $booking->save();
+        }
     }
-}
 
     /**
      * Memproses notifikasi khusus untuk Order Makanan.
