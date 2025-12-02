@@ -170,7 +170,7 @@ export default defineComponent({
 
     const chartSeries = computed(() => [{ name: "Pendapatan", data: chartData.value.series }]);
 
-    onMounted(() => {
+    onMounted(() => { 
       getStats();
       getChartData();
     });

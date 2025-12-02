@@ -75,7 +75,7 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       const { data } = await ApiService.post("auth/login", credentials);
       setAuth(data.data, data.data.token);
-      handleRedirect(); // <-- [DIBENARKAN] Panggil tanpa parameter
+      //handleRedirect(); // <-- [DIBENARKAN] Panggil tanpa parameter
     } catch (error: any) {
       purgeAuth();
       errors.value = error.response?.data?.message || "Email atau password salah.";
@@ -88,7 +88,7 @@ export const useAuthStore = defineStore("auth", () => {
       const { data } = await ApiService.post("auth/register", credentials);
       // [DIBENARKAN] Kirim seluruh objek data.data ke setAuth
       setAuth(data.data, data.data.token);
-      handleRedirect(); // <-- [DIBENARKAN] Panggil tanpa parameter
+      //handleRedirect(); // <-- [DIBENARKAN] Panggil tanpa parameter
     } catch (error: any) {
       errors.value = error.response?.data?.errors || { message: ["Gagal mendaftar."] };
       throw error;
@@ -134,5 +134,6 @@ export const useAuthStore = defineStore("auth", () => {
     logout,
     register,
     verifyAuth,
+    handleRedirect,
   };
 });
