@@ -92,6 +92,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/orders', [OrderController::class, 'store'])->middleware('can:create pos_orders');
     Route::get('/pending-orders', [PaymentController::class, 'getPendingOrders'])->middleware('can:manage payments');
     Route::get('/transaction-history', [PaymentController::class, 'getTransactionHistory'])->middleware('can:view transaction_history');
+    Route::get('/transaction-history/export', [PaymentController::class, 'exportReport']);
     Route::post('/orders/{order}/pay', [PaymentController::class, 'processPayment'])->middleware('can:manage payments');
     Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancelOrder'])->middleware('can:manage payments');
     Route::get('/folios', [FolioController::class, 'index'])->middleware('can:view folios');
