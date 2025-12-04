@@ -54,6 +54,7 @@ Route::prefix('auth')->group(function () {
 // RUTE TERAUTENTIKASI (PERLU LOGIN)
 // ==================================================
 Route::post('/midtrans/notification', [MidtransController::class, 'handleNotification']);
+
 Route::middleware('auth:api')->group(function () {
 
     // Auth & User Profile
@@ -91,18 +92,34 @@ Route::middleware('auth:api')->group(function () {
     // POS & Pesanan
     Route::post('/orders', [OrderController::class, 'store'])->middleware('can:create pos_orders');
     Route::get('/pending-orders', [PaymentController::class, 'getPendingOrders'])->middleware('can:manage payments');
+    
+    // Riwayat Transaksi & Export
     Route::get('/transaction-history', [PaymentController::class, 'getTransactionHistory'])->middleware('can:view transaction_history');
-    Route::get('/transaction-history/export', [PaymentController::class, 'exportReport']);
+    Route::get('/transaction-history/export', [PaymentController::class, 'exportReport'])->middleware('can:view transaction_history'); // [UPDATED] Tambah middleware security
+
     Route::post('/orders/{order}/pay', [PaymentController::class, 'processPayment'])->middleware('can:manage payments');
     Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancelOrder'])->middleware('can:manage payments');
     Route::get('/folios', [FolioController::class, 'index'])->middleware('can:view folios');
     Route::post('/folios/{room}/checkout', [FolioController::class, 'processFolioPaymentAndCheckout'])->middleware('can:manage payments');
     Route::get('/pos/occupied-rooms', [RoomController::class, 'getOccupiedRoomsForPos'])->middleware('can:create pos_orders');
 
-    // Manajemen Pesanan Online
+    // =============================================================
+    // [PERBAIKAN UTAMA] Agar sesuai dengan Frontend OrderDetailModal
+    // =============================================================
+    
+    // 1. List Pesanan Masuk (Online Orders)
     Route::get('/online-orders', [AdminOrderController::class, 'index'])->middleware('can:view online_orders');
     Route::get('/online-orders/{order}', [AdminOrderController::class, 'show'])->middleware('can:view online_orders');
-    Route::patch('/online-orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->middleware('can:view online_orders');
+    
+    // 2. Update Status Dapur (Masak, Antar, Selesai)
+    // Frontend memanggil: PUT /api/admin/orders/{id}/status
+    Route::put('/admin/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->middleware('can:view online_orders');
+
+    // 3. Pembayaran Manual (POS / Admin)
+    // Frontend memanggil: POST /api/admin/orders/{id}/pay
+    Route::post('/admin/orders/{order}/pay', [AdminOrderController::class, 'markAsPaid'])->middleware('can:manage payments');
+
+    // =============================================================
 
 
     // Manajemen Permintaan Layanan (Untuk Staf)
@@ -121,7 +138,7 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('menus', MenuController::class)->middleware('can:view menus');
     Route::apiResource('rooms', RoomController::class)->middleware('can:view rooms');
     Route::post('/rooms/{room}/request-cleaning', [RoomController::class, 'requestCleaning'])->middleware('can:manage cleaning status');
-    Route::post('/rooms/{room}/mark-as-clean', [RoomController::class, 'markAsClean'])->middleware('can:manage cleaning status'); // <-- Semicolon ganda dihapus
+    Route::post('/rooms/{room}/mark-as-clean', [RoomController::class, 'markAsClean'])->middleware('can:manage cleaning status'); 
 
     Route::apiResource('facilities', FacilityController::class)->middleware('can:view facilities');
     Route::apiResource('guests', GuestController::class)->middleware('can:view guests');

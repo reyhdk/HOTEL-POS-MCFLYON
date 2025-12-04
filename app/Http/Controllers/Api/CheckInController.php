@@ -82,33 +82,52 @@ class CheckInController extends Controller
 }
 
     /**
-     * Menangani proses check-out manual oleh admin/resepsionis.
+     * Proses Check-out Tamu & Pelunasan Folio Otomatis
      */
-    public function checkout(Room $room)
+    public function checkout(Request $request, Room $room)
     {
+        // Default metode bayar checkout adalah 'cash' jika admin tidak memilih
+        $paymentMethod = $request->input('payment_method', 'cash');
+
         if ($room->status !== 'occupied') {
             return response()->json(['message' => 'Kamar ini tidak sedang ditempati.'], 409);
         }
 
         try {
-            DB::transaction(function () use ($room) {
-                $activeCheckIn = CheckIn::where('room_id', $room->id)->where('is_active', true)->first();
+            DB::transaction(function () use ($room, $paymentMethod) {
+                // 1. Ambil data CheckIn aktif
+                $activeCheckIn = CheckIn::where('room_id', $room->id)
+                                        ->where('is_active', true)
+                                        ->first();
+
                 if ($activeCheckIn) {
+                    // 2. [KRUSIAL] Lunasi semua Order 'titipan' tamu ini
+                    // Cari order yang statusnya belum 'paid' & belum 'cancelled'
+                    \App\Models\Order::where('room_id', $room->id)
+                        ->where('guest_id', $activeCheckIn->guest_id)
+                        ->whereNotIn('status', ['paid', 'cancelled']) 
+                        ->update([
+                            'status' => 'paid',            // Ubah jadi Paid agar masuk Riwayat
+                            'payment_method' => $paymentMethod, // Ikut metode bayar checkout
+                            'updated_at' => now()
+                        ]);
+
+                    // 3. Selesaikan CheckIn
                     $activeCheckIn->update([
                         'is_active' => false,
                         'check_out_time' => now(),
                     ]);
                 }
 
-                // Ubah status kamar menjadi 'dirty' setelah check-out
+                // 4. Tandai kamar kotor
                 $room->update(['status' => 'dirty']);
             });
 
-            return response()->json(['message' => 'Check-out berhasil. Kamar ditandai perlu dibersihkan.']);
+            return response()->json(['message' => 'Check-out berhasil. Semua tagihan folio telah dilunasi dan masuk Riwayat Transaksi.']);
 
         } catch (Throwable $e) {
-            Log::error('Gagal melakukan check-out manual: ' . $e->getMessage());
-            return response()->json(['message' => 'Terjadi kesalahan saat proses check-out.'], 500);
+            Log::error('Gagal checkout: ' . $e->getMessage());
+            return response()->json(['message' => 'Terjadi kesalahan saat checkout.'], 500);
         }
     }
 }

@@ -227,22 +227,49 @@ class MidtransController extends Controller
         }
     }
 
-    /**
+   /**
      * Memproses notifikasi khusus untuk Order Makanan.
      */
     private function handleOrderNotification(Notification $notification)
     {
+        // Cari order berdasarkan ID unik yang tadi kita simpan
         $order = Order::where('midtrans_order_id', $notification->order_id)->first();
 
-        if (!$order || $order->status !== 'pending') {
+        // [PERBAIKAN] Jangan tolak jika statusnya 'processing', 'delivering', atau 'completed'.
+        // Hanya tolak jika pesanan tidak ditemukan atau SUDAH LUNAS.
+        if (!$order || $order->status === 'paid') {
             return;
         }
 
-        if (($notification->transaction_status == 'capture' || $notification->transaction_status == 'settlement') && $notification->fraud_status == 'accept') {
-            GuestOrderController::handleSuccessfulPayment($order);
-            $order->status = 'paid';
-        } else if (in_array($notification->transaction_status, ['cancel', 'expire', 'deny'])) {
+        // Cek status transaksi dari Midtrans
+        $transactionStatus = $notification->transaction_status;
+        $fraudStatus = $notification->fraud_status;
+
+        $isPaid = false;
+
+        if ($transactionStatus == 'capture') {
+            if ($fraudStatus == 'challenge') {
+                // Handle challenge
+            } else if ($fraudStatus == 'accept') {
+                $isPaid = true;
+            }
+        } else if ($transactionStatus == 'settlement') {
+            $isPaid = true;
+        } else if ($transactionStatus == 'cancel' || $transactionStatus == 'deny' || $transactionStatus == 'expire') {
             $order->status = 'cancelled';
+        } else if ($transactionStatus == 'pending') {
+            // Menunggu pembayaran, biarkan saja
+        }
+
+        if ($isPaid) {
+            // [PENTING] Update status jadi PAID dan catat methodnya
+            $order->update([
+                'status' => 'paid',
+                'payment_method' => 'qris', // atau 'midtrans'
+                'updated_at' => now()
+            ]);
+            
+            // Opsional: Jika ada logic lain (seperti notifikasi ke dapur), masukkan di sini
         }
 
         $order->save();

@@ -11,23 +11,30 @@ class Order extends Model
 {
     use HasFactory;
 
-    // Izinkan pengisian massal untuk kolom ini
+    /**
+     * Izinkan pengisian massal untuk kolom ini.
+     * PENTING: Kolom 'status' dan 'payment_method' wajib ada di sini
+     * agar fitur pembayaran berfungsi.
+     */
     protected $fillable = [
         'room_id',
         'user_id',
         'guest_id',
+        'booking_id',       // Tambahan: Agar bisa menyimpan ID Booking saat check-in
         'total_price',
         'midtrans_order_id',
+        'status',           // Tambahan: Agar bisa ubah status jadi 'paid'
+        'payment_method',   // Tambahan: Agar bisa simpan 'cash'/'qris'
+        'updated_at'        // Tambahan: Agar waktu bayar bisa dimanipulasi
     ];
 
-   /**
-     * [BARU] Mendapatkan user yang membuat pesanan online.
+    /**
+     * Mendapatkan user yang membuat pesanan online.
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
-
 
     /**
      * Mendapatkan kamar yang memiliki pesanan ini.
@@ -44,11 +51,20 @@ class Order extends Model
     {
         return $this->hasMany(OrderItem::class);
     }
+
     /**
      * Sebuah Order dimiliki oleh satu Guest.
      */
     public function guest(): BelongsTo
     {
         return $this->belongsTo(Guest::class);
-    }   
+    }
+    
+    /**
+     * (Opsional) Relasi ke Booking jika diperlukan kedepannya
+     */
+    public function booking(): BelongsTo
+    {
+        return $this->belongsTo(Booking::class);
+    }
 }
