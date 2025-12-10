@@ -191,8 +191,8 @@ const loadingGuests = ref(false);
 const guests = ref<Guest[]>([]);
 
 const paymentMethods = ref<PaymentMethod[]>([
-    { label: 'Tunai', value: 'cash', icon: 'ki-duotone ki-wallet', desc: 'Bayar di kasir' },
-    { label: 'QRIS / TF', value: 'midtrans', icon: 'ki-duotone ki-scan-barcode', desc: 'Auto Payment' }
+    { label: 'Tunai', value: 'cash', icon: 'ki-duotone ki-wallet', desc: 'Bayar di Receptionist' },
+    { label: 'QRIS', value: 'midtrans', icon: 'ki-duotone ki-scan-barcode', desc: 'Auto Payment' }
 ]);
 
 // ===== FORM DATA =====
@@ -202,7 +202,7 @@ const getInitialFormData = (): FormData => ({
     check_in_date: '',
     check_out_date: '',
     payment_method: 'cash',
-    is_incognito: false, // ✅ PENTING: Default value harus ada
+    is_incognito: false,
 });
 
 const formData = ref<FormData>(getInitialFormData());
