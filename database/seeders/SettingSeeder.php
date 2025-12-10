@@ -3,30 +3,29 @@
 namespace Database\Seeders;
 
 use App\Models\Setting;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class SettingSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        DB::table('settings')->truncate();
-
-        Setting::create([
-            'app' => 'e-SAKIP DLH',
-            'description' =>  'Aplikasi e-SAKIP Dinas Lingkungan Hidup',
-            'logo' =>  '/media/logo.png',
-            'bg_auth' =>  '/media/misc/bg-auth.jpg',
-            'banner' =>  '/media/misc/banner.jpg',
-            'pemerintah' =>  'Pemerintah Provinsi Jawa Timur',
-            'dinas' =>  'Dinas Lingkungan Hidup',
-            'alamat' =>  '',
-            'telepon' =>  '',
-            'email' =>  '',
-        ]);
+        // Jangan truncate, cek dulu apakah sudah ada data
+        $existing = Setting::first();
+        
+        if (!$existing) {
+            Setting::create([
+                'app' => 'HotelMcflyon',
+                'description' => 'McflyonHotel – Nyaman, Modern, dan Strategis.',
+                'logo' => null, // ✅ NULL
+                'bg_auth' => null, // ✅ NULL
+                'bg_landing' => null, // ✅ NULL
+                'pemerintah' => 'McFlyon Hotel',
+                'dinas' => 'Hospitality Services',
+                'alamat' => 'Jl. Bungkal Gg. II No. 25B Kec/Kel. Sambikerep Kota Surabaya',
+                'telepon' => '085174323674',
+                'email' => 'admin@mcflyon.co.id',
+            ]);
+        }
     }
 }

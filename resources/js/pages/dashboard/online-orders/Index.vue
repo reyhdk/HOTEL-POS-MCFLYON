@@ -1,109 +1,121 @@
 <template>
-  <div class="d-flex flex-column gap-5 page-container">
+  <div class="d-flex flex-column gap-5 anim-fade-in">
     
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-4 mb-2 anim-slide-down">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-4 mb-4 anim-slide-down">
        <div>
-          <h1 class="text-dark fw-bolder fs-2 m-0">Live Orders</h1>
-          <p class="text-gray-400 fw-bold fs-7 m-0">Kitchen Display System</p>
+          <h1 class="text-gray-900 fw-bolder fs-2 m-0">Pesanan Masuk</h1>
+          <p class="text-gray-500 fw-bold fs-7 m-0">Kitchen Display System (KDS)</p>
        </div>
 
-       <div class="d-flex align-items-center gap-3 w-100 w-md-auto">
-          <div class="d-none d-xl-flex bg-white p-1 rounded-pill shadow-sm anim-fade-in delay-100">
+       <div class="d-flex flex-column flex-sm-row align-items-center gap-3 w-100 w-md-auto">
+          <div class="nav nav-pills bg-light rounded-pill p-1 shadow-sm">
              <button 
                 v-for="(label, key) in statusOptions" :key="key"
                 @click="filters.status = key"
-                class="btn btn-sm rounded-pill px-3 fw-bold transition-fast fs-8"
-                :class="filters.status === key ? 'bg-orange text-white' : 'text-gray-500 hover-text-dark'"
+                class="nav-link btn btn-sm rounded-pill fw-bold fs-8 px-4 transition-all"
+                :class="filters.status === key ? 'bg-orange text-white shadow-sm' : 'text-gray-500 hover-text-gray-800'"
              >
                 {{ label }}
              </button>
           </div>
 
-          <div class="position-relative w-100 w-md-200px anim-fade-in delay-200">
-             <i class="bi bi-search position-absolute top-50 ms-3 translate-middle-y text-gray-400 fs-8"></i>
+          <div class="position-relative w-100 w-md-250px">
+             <i class="bi bi-search position-absolute top-50 ms-3 translate-middle-y text-gray-400"></i>
              <input 
                 type="text" 
                 v-model="filters.search" 
-                class="form-control form-control-solid ps-9 rounded-pill border-0 bg-white shadow-sm fs-7"
-                placeholder="Cari..."
+                class="form-control form-control-solid ps-10 rounded-pill border-0"
+                placeholder="Cari Kamar / Tamu..."
              />
           </div>
        </div>
     </div>
 
-    <div class="row g-4">
+    <div class="position-relative min-h-300px">
        
-       <div v-if="isLoading && orders.length === 0" class="col-12 py-10 text-center">
-          <div class="spinner-border text-orange" role="status"></div>
+       <div v-if="isLoading" class="py-20 text-center">
+          <div class="spinner-border text-orange mb-3" role="status"></div>
+          <p class="text-gray-500 fw-semibold">Memuat pesanan...</p>
        </div>
 
-       <div v-else-if="filteredOrders.length === 0" class="col-12 py-15 text-center anim-fade-up">
-           <img src="https://cdn-icons-png.flaticon.com/512/7486/7486744.png" class="opacity-25 h-100px mb-3" alt="Empty">
-           <div class="text-gray-400 fw-bold">Belum ada pesanan untuk status ini.</div>
+       <div v-else-if="filteredOrders.length === 0" class="card card-dashed border-gray-300 bg-light rounded-4 py-15 text-center anim-fade-up">
+           <div class="mb-4">
+              <div class="symbol symbol-60px">
+                 <div class="symbol-label bg-light-warning text-warning rounded-circle">
+                    <i class="bi bi-inbox fs-2x"></i>
+                 </div>
+              </div>
+           </div>
+           <h4 class="text-gray-800 fw-bold">Tidak Ada Pesanan</h4>
+           <span class="text-gray-400 fs-7">Belum ada pesanan masuk dengan status yang dipilih.</span>
        </div>
 
-       <TransitionGroup name="staggered-list" tag="div" class="contents" style="display: contents;">
-          <div 
-             class="col-12 col-md-6 col-lg-4 col-xl-3" 
-             v-for="(order, index) in filteredOrders" 
-             :key="order.id"
-             :style="{ '--delay': `${index * 0.1}s` }" 
-          >
-             <div class="h-100 anim-staggered-item"> 
-                 <div 
-                    class="card h-100 border-0 shadow-sm rounded-4 cursor-pointer hover-float bg-white position-relative overflow-hidden"
-                    @click="showDetails(order)"
-                 >
-                    <div class="card-body p-5 d-flex flex-column align-items-center">
-                        
-                        <div class="d-flex justify-content-between align-items-center w-100 mb-4">
-                           <span class="badge px-3 py-2 rounded-pill fs-9 fw-bolder text-uppercase" :class="getStatusClass(order.status)">
-                              {{ order.status }}
-                           </span>
-                           <span class="text-gray-400 fs-8 fw-bold">
-                              <i class="bi bi-clock me-1 fs-9"></i> {{ formatTime(order.created_at) }}
-                           </span>
-                        </div>
+       <div v-else class="row g-4">
+          <TransitionGroup name="staggered-list" tag="div" class="contents" style="display: contents;">
+             
+             <div 
+                class="col-12 col-md-6 col-lg-4 col-xl-3" 
+                v-for="(order, index) in filteredOrders" 
+                :key="order.id"
+                :style="{ '--delay': `${index * 0.1}s` }"
+             >
+                <div class="h-100 anim-staggered-item"> 
+                    
+                    <div 
+                       class="card h-100 border-0 shadow-sm rounded-4 cursor-pointer hover-elevate position-relative overflow-hidden card-adaptive"
+                       @click="openDetail(order)"
+                    >
+                       <div class="position-absolute top-0 start-0 h-100 w-4px bg-orange rounded-start"></div>
 
-                        <div class="mb-4 text-center w-100">
-                           <div class="symbol symbol-65px mb-3">
-                              <div class="symbol-label bg-light-orange text-orange rounded-circle">
-                                 <i class="bi bi-door-open fs-2x"></i>
+                       <div class="card-body p-5 d-flex flex-column align-items-center">
+                           
+                           <div class="d-flex justify-content-between w-100 mb-4">
+                              <span class="badge px-3 py-1 rounded-pill fs-9 fw-bolder text-uppercase" :class="getStatusClass(order.status)">
+                                 {{ order.status }}
+                              </span>
+                              <span class="text-gray-500 fs-9 fw-bold bg-light px-2 py-1 rounded">
+                                 {{ formatTime(order.created_at) }}
+                              </span>
+                           </div>
+
+                           <div class="text-center mb-4">
+                              <div class="symbol symbol-60px mb-3">
+                                 <div class="symbol-label bg-light-orange text-orange rounded-circle">
+                                    <i class="bi bi-receipt-cutoff fs-2x"></i>
+                                 </div>
+                              </div>
+                              <h3 class="fw-bolder text-gray-900 fs-4 mb-1">
+                                 {{ order.room ? `Kamar ${order.room.room_number}` : 'Take Away' }}
+                              </h3>
+                              <div class="text-gray-500 fw-semibold fs-8 text-truncate mw-100 px-2">
+                                 <i class="bi bi-person me-1"></i> {{ getGuestName(order) }}
                               </div>
                            </div>
-                           
-                           <h3 class="fw-bolder text-dark fs-3 mb-1">
-                              {{ order.room ? `Kamar ${order.room.room_number}` : 'Take Away' }}
-                           </h3>
-                           <div class="text-gray-400 fw-bold fs-8 text-truncate mw-100 px-2">
-                              {{ getGuestName(order) }}
-                           </div>
-                        </div>
 
-                        <div class="separator separator-dashed border-gray-300 w-100 mb-4"></div>
+                           <div class="separator separator-dashed border-gray-300 w-100 mb-4"></div>
 
-                        <div class="d-flex justify-content-between align-items-center w-100 mt-auto">
-                           <div class="d-flex align-items-center text-orange fw-bold fs-7">
-                              <i class="bi bi-basket-fill me-2 fs-6"></i>
-                              <span>{{ order.items.length }} Item</span>
+                           <div class="d-flex justify-content-between align-items-center w-100 mt-auto bg-light rounded-3 px-3 py-2 border border-dashed border-gray-300">
+                              <div class="d-flex align-items-center text-orange fw-bold fs-8">
+                                 <span class="symbol symbol-20px me-2 bg-orange text-white rounded-circle d-flex align-items-center justify-content-center fs-9 fw-bolder">
+                                     {{ order.items.length }}
+                                 </span>
+                                 <span>Item</span>
+                              </div>
+                              <div class="text-gray-800 fw-bolder fs-7">
+                                 {{ formatPrice(order.total_price) }}
+                              </div>
                            </div>
-                           <div class="text-dark fw-bolder fs-5">
-                              {{ formatPrice(order.total_price) }}
-                           </div>
-                        </div>
+                       </div>
                     </div>
-                 </div>
+                </div>
              </div>
-          </div>
-       </TransitionGroup>
 
+          </TransitionGroup>
+       </div>
     </div>
 
     <OrderDetailModal 
-      v-if="selectedOrder"
-      :show="selectedOrder !== null" 
-      :order="selectedOrder" 
-      @close="selectedOrder = null"
+      ref="detailModalRef"
       @orderUpdated="fetchOrders"
     />
 
@@ -117,15 +129,15 @@ import OrderDetailModal from "./OrderDetailModal.vue";
 
 const orders = ref<any[]>([]);
 const isLoading = ref(true);
-const selectedOrder = ref<any | null>(null);
 const filters = reactive({ search: '', status: '' });
+const detailModalRef = ref<InstanceType<typeof OrderDetailModal> | null>(null);
 
 const statusOptions: Record<string, string> = {
-    '': 'All', 'pending': 'Pending', 'processing': 'Cook', 'delivering': 'Send', 'completed': 'Done', 'paid': 'Paid'
+    '': 'Semua', 'pending': 'Baru', 'processing': 'Proses', 'delivering': 'Antar', 'completed': 'Selesai'
 };
 
 const fetchOrders = async () => {
-  isLoading.value = true;
+  if(orders.value.length === 0) isLoading.value = true;
   try {
     const { data } = await ApiService.get("/online-orders");
     orders.value = data.filter((o: any) => o.status !== 'cancelled');
@@ -133,7 +145,9 @@ const fetchOrders = async () => {
   finally { isLoading.value = false; }
 };
 
-const showDetails = (order: any) => { selectedOrder.value = order; };
+const openDetail = (order: any) => { 
+    if (detailModalRef.value) detailModalRef.value.open(order);
+};
 
 const filteredOrders = computed(() => {
    return orders.value.filter(order => {
@@ -153,78 +167,57 @@ const formatTime = (d: string) => new Date(d).toLocaleTimeString('id-ID', { hour
 
 const getStatusClass = (s: string) => {
     const map: Record<string, string> = {
-        pending: 'bg-light-warning text-warning', processing: 'bg-light-info text-info',
-        delivering: 'bg-light-primary text-primary', completed: 'bg-light-success text-success',
-        paid: 'bg-light-dark text-gray-600'
+        pending: 'badge-light-warning text-warning', 
+        processing: 'badge-light-info text-info',
+        delivering: 'badge-light-primary text-primary', 
+        completed: 'badge-light-success text-success',
+        paid: 'badge-light-dark text-gray-700'
     };
-    return map[s] || 'bg-light text-gray-500';
+    return map[s] || 'badge-light text-gray-500';
 };
 
 onMounted(fetchOrders);
 </script>
 
 <style scoped>
-/* UTILS */
+/* COLORS */
 .text-orange { color: #ff6b00 !important; }
 .bg-orange { background-color: #ff6b00 !important; }
 .bg-light-orange { background-color: #fff5f0 !important; }
-.hover-text-dark:hover { color: #181c32 !important; }
-.fs-2x { font-size: 2rem !important; }
+[data-bs-theme="dark"] .bg-light-orange { background-color: rgba(255, 107, 0, 0.15) !important; }
 
-/* CARD HOVER */
-.hover-float { transition: transform 0.25s ease, box-shadow 0.25s ease; }
-.hover-float:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.08) !important; }
-.separator-dashed { border-bottom-style: dashed !important; border-bottom-width: 1px !important; }
+/* ADAPTIVE CARD */
+.card-adaptive { background-color: #fff; }
+[data-bs-theme="dark"] .card-adaptive { background-color: #1e1e2d; }
+[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
+[data-bs-theme="dark"] .bg-light { background-color: #2b2b40 !important; }
 
-/* --- ANIMATIONS START --- */
+/* HOVER EFFECT */
+.hover-elevate { transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease; }
+.hover-elevate:hover { transform: translateY(-8px); box-shadow: 0 15px 30px rgba(0,0,0,0.08) !important; }
+.transition-all { transition: all 0.3s ease; }
 
-/* 1. Header Slide Down */
-.anim-slide-down {
-    animation: slideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    opacity: 0;
-    transform: translateY(-20px);
+/* --- ANIMASI (SAMA PERSIS DENGAN FOLIO) --- */
+
+/* 1. Page Load Fade In */
+.anim-fade-in { animation: fadeIn 0.8s ease-out forwards; }
+
+/* 2. Header Slide Down */
+.anim-slide-down { animation: slideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; transform: translateY(-20px); }
+
+/* 3. Empty State Fade Up */
+.anim-fade-up { animation: fadeUp 0.6s ease-out forwards; opacity: 0; }
+
+/* 4. Staggered Item Animation (Kartu muncul satu-satu) */
+.anim-staggered-item { 
+    animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+    opacity: 0; 
+    transform: translateY(40px); 
+    animation-delay: var(--delay); /* Ini kuncinya! */
 }
 
-/* 2. Generic Fade In */
-.anim-fade-in {
-    animation: fadeIn 0.8s ease-out forwards;
-    opacity: 0;
-}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideDown { to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
 
-/* 3. Staggered Item Animation (Kartu muncul satu-satu) */
-.anim-staggered-item {
-    animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    opacity: 0;
-    transform: translateY(30px);
-    animation-delay: var(--delay); /* Delay dinamis dari v-for index */
-}
-
-/* Keyframes Definitions */
-@keyframes slideDown {
-    to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-    to { opacity: 1; }
-}
-
-@keyframes fadeUp {
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Utility delays */
-.delay-100 { animation-delay: 0.1s; }
-.delay-200 { animation-delay: 0.2s; }
-
-/* Transition Group (untuk animasi saat filter berubah/hapus) */
-.staggered-list-enter-active,
-.staggered-list-leave-active {
-  transition: all 0.4s ease;
-}
-.staggered-list-enter-from,
-.staggered-list-leave-to {
-  opacity: 0;
-  transform: scale(0.9);
-}
-/* --- ANIMATIONS END --- */
 </style>

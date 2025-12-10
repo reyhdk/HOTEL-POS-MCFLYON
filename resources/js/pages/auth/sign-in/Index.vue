@@ -3,20 +3,27 @@
     
     <div 
       class="d-flex flex-lg-row-fluid w-lg-50 bgi-size-cover bgi-position-center order-1 order-lg-1 position-relative h-100 anim-fade-in"
-      style="background-image: url('https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1470&auto=format&fit=crop');"
+      :style="backgroundStyle"
     >
       <div class="d-flex flex-column flex-center py-7 py-lg-15 px-5 px-md-15 w-100 h-100 bg-gradient-overlay">
+        
         <div class="mb-10 text-center">
-             <img v-if="setting?.logo" :src="setting?.logo" class="h-70px mb-4" alt="Logo"/>
+             <img v-if="setting?.logo" :src="setting.logo" class="h-70px mb-4" alt="Logo"/>
+             <i v-else class="fas fa-hotel fa-4x text-white mb-4"></i>
+
              <h1 class="text-white display-4 fw-bolder text-shadow">
                 {{ setting?.app || 'McFlyon Hotel' }}
              </h1>
         </div>
-        <p class="text-white fs-4 opacity-75 text-center fw-light" style="max-width: 500px;">
-          "Experience luxury and comfort in every stay. Manage your hotel operations with ease."
-        </p>
+
+        <div class="text-center" style="max-width: 500px;">
+            <p class="text-white fs-4 opacity-75 fw-light">
+              "Experience luxury and comfort in every stay. Manage your hotel operations with ease."
+            </p>
+        </div>
+
         <div class="mt-auto text-white opacity-50 fs-7">
-          &copy; 2026 McFlyon System. By@reyhdk_
+          &copy; {{ new Date().getFullYear() }} {{ setting?.app || 'McFlyon System' }}. By @reyhdk_
         </div>
       </div>
     </div>
@@ -57,26 +64,44 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import WithEmail from "./tabs/WithEmail.vue";
 import { useSetting } from "@/services";
 
-const { data: setting } = useSetting() || { data: {} };
+// Mengambil data setting
+const { data: setting } = useSetting();
+
+// Computed Property untuk Background
+// Ini mengecek: Apakah ada bg_auth dari database?
+// Jika YA: Pakai itu.
+// Jika TIDAK: Pakai gambar default Unsplash.
+const backgroundStyle = computed(() => {
+  const data = setting.value;
+  
+  if (data && data.bg_auth) {
+    return {
+      backgroundImage: `url('${data.bg_auth}')`
+    };
+  }
+
+  // Fallback Image (Default)
+  return {
+    backgroundImage: "url('https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1470&auto=format&fit=crop')"
+  };
+});
 </script>
 
 <style scoped>
-/* --- ANIMATION KEYFRAMES (BARU) --- */
-
-/* Animasi Fade In (Untuk Gambar Kiri) */
+/* --- ANIMATION KEYFRAMES --- */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-/* Animasi Slide Up (Untuk Form Kanan) */
 @keyframes fadeInUp {
   from { 
     opacity: 0;
-    transform: translateY(30px); /* Mulai dari sedikit ke bawah */
+    transform: translateY(30px);
   }
   to { 
     opacity: 1;
@@ -84,26 +109,24 @@ const { data: setting } = useSetting() || { data: {} };
   }
 }
 
-/* Kelas Animasi */
 .anim-fade-in {
   animation: fadeIn 1.2s ease-out forwards;
 }
 
-/* Elemen form muncul berurutan (Staggered) */
 .anim-up-1 {
-  opacity: 0; /* Mulai hidden */
-  animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s forwards; /* Delay 0.1s */
+  opacity: 0;
+  animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s forwards;
 }
 .anim-up-2 {
   opacity: 0;
-  animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s forwards; /* Delay 0.3s */
+  animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s forwards;
 }
 .anim-up-3 {
   opacity: 0;
-  animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.5s forwards; /* Delay 0.5s */
+  animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.5s forwards;
 }
 
-/* --- STYLE EXISTING (JANGAN DIHAPUS) --- */
+/* --- EXISTING STYLES --- */
 .h-100vh { height: 100vh !important; }
 .overflow-hidden { overflow: hidden !important; }
 .overflow-auto::-webkit-scrollbar { width: 6px; }
@@ -116,6 +139,8 @@ const { data: setting } = useSetting() || { data: {} };
 .btn-light-theme:hover { background-color: #fff5f0; color: #FF6B35; border-color: #FF6B35; }
 .link-theme { color: #FF6B35 !important; text-decoration: none; transition: all 0.2s ease; }
 .link-theme:hover { color: #d14d1d !important; text-decoration: underline; }
+
+/* Menjaga style global button/form agar tetap konsisten */
 :deep(.btn-orange) { background-color: #FF6B35 !important; border-color: #FF6B35 !important; color: white !important; outline: none !important; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important; }
 :deep(.btn-orange:hover) { background-color: #e85d2a !important; border-color: #e85d2a !important; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(255, 107, 53, 0.25) !important; }
 :deep(.btn-orange:active), :deep(.btn-orange:focus) { background-color: #d14d1d !important; border-color: #d14d1d !important; box-shadow: 0 0 0 0.25rem rgba(255, 107, 53, 0.3) !important; }

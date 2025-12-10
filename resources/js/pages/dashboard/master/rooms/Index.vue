@@ -1,330 +1,571 @@
 <template>
-  <div class="card shadow-sm">
-    <div class="card-header border-0 pt-6">
-      <div class="card-title">
-        <div class="d-flex align-items-center position-relative my-1">
-          <i class="ki-duotone ki-magnifier fs-3 position-absolute ms-5">
-            <span class="path1"></span><span class="path2"></span>
-          </i>
-          <input
-            type="text"
-            v-model="searchQuery"
-            class="form-control form-control-solid w-250px ps-13"
-            placeholder="Cari Nomor Kamar"
-          />
+  <div class="d-flex flex-column gap-5">
+    
+    <div class="row g-5 g-xl-8">
+      <div class="col-xl-3 col-6 animate-item" style="--delay: 0s">
+        <div class="card bg-body hover-elevate-up border-0 h-100 card-stat-orange theme-card shadow-sm">
+          <div class="card-body d-flex align-items-center">
+            <div class="symbol symbol-50px me-3">
+              <div class="symbol-label bg-light-orange text-orange rounded-4">
+                <i class="ki-duotone ki-home fs-2x text-orange"><span class="path1"></span><span class="path2"></span></i>
+              </div>
+            </div>
+            <div class="d-flex flex-column">
+              <span class="fw-bolder fs-2 text-gray-900 mb-1">{{ rooms.length }}</span>
+              <span class="text-gray-500 fw-bold fs-8 text-uppercase ls-1">Total Kamar</span>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="card-toolbar">
-        <button v-if="userHasPermission('create rooms')" type="button" class="btn btn-primary" @click="openAddRoomModal">
-          <i class="ki-duotone ki-plus fs-2"></i> Tambah Kamar
-        </button>
+
+      <div class="col-xl-3 col-6 animate-item" style="--delay: 0.1s">
+        <div class="card bg-body hover-elevate-up border-0 h-100 theme-card shadow-sm">
+          <div class="card-body d-flex align-items-center">
+             <div class="symbol symbol-50px me-3">
+              <div class="symbol-label bg-light-success text-success rounded-4">
+                <i class="ki-duotone ki-check-circle fs-2x text-success"><span class="path1"></span><span class="path2"></span></i>
+              </div>
+            </div>
+            <div class="d-flex flex-column">
+              <span class="fw-bolder fs-2 text-gray-900 mb-1">{{ countStatus('available') }}</span>
+              <span class="text-gray-500 fw-bold fs-8 text-uppercase ls-1">Tersedia</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-3 col-6 animate-item" style="--delay: 0.2s">
+         <div class="card bg-body hover-elevate-up border-0 h-100 theme-card shadow-sm">
+          <div class="card-body d-flex align-items-center">
+             <div class="symbol symbol-50px me-3">
+              <div class="symbol-label bg-light-danger text-danger rounded-4">
+                <i class="ki-duotone ki-user fs-2x text-danger"><span class="path1"></span><span class="path2"></span></i>
+              </div>
+            </div>
+            <div class="d-flex flex-column">
+              <span class="fw-bolder fs-2 text-gray-900 mb-1">{{ countStatus('occupied') }}</span>
+              <span class="text-gray-500 fw-bold fs-8 text-uppercase ls-1">Terisi</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-3 col-6 animate-item" style="--delay: 0.3s">
+         <div class="card bg-body hover-elevate-up border-0 h-100 theme-card shadow-sm">
+          <div class="card-body d-flex align-items-center">
+             <div class="symbol symbol-50px me-3">
+              <div class="symbol-label bg-light-warning text-warning rounded-4">
+                <i class="ki-duotone ki-brush fs-2x text-warning"><span class="path1"></span><span class="path2"></span></i>
+              </div>
+            </div>
+            <div class="d-flex flex-column">
+              <span class="fw-bolder fs-2 text-gray-900 mb-1">{{ countDirty }}</span>
+              <span class="text-gray-500 fw-bold fs-8 text-uppercase ls-1">Perawatan</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="card-body pt-0">
-      <div class="table-responsive">
-        <table class="table align-middle table-row-dashed fs-6 gy-5">
-          <thead>
-            <tr class="text-start text-gray-400 fw-bold fs-7 text-uppercase gs-0">
-              <th class="min-w-100px">Gambar</th>
-              <th>No. Kamar</th>
-              <th>Tipe</th>
-              <th>Fasilitas</th>
-              <th>Status</th>
-              <th>Harga / Malam</th>
-              <th>Periode Tersedia</th>
-              <th class="text-end min-w-200px">Aksi</th>
-            </tr>
-          </thead>
-          <tbody class="fw-semibold text-gray-600">
-            <tr v-if="loading"><td colspan="8" class="text-center py-10">Memuat data...</td></tr>
-            <tr v-else-if="filteredRooms.length === 0">
-              <td colspan="8" class="text-center py-10">
-                {{ searchQuery ? 'Kamar tidak ditemukan.' : 'Tidak ada data kamar.' }}
-              </td>
-            </tr>
-            <tr v-for="room in filteredRooms" :key="room.id">
-              <td>
-                <div class="symbol symbol-50px">
-                  <img :src="room.image_url || '/media/svg/files/blank-image.svg'" alt="Gambar Kamar" class="rounded"/>
+
+    <div class="card border-0 shadow-sm theme-card animate-item position-relative" style="--delay: 0.4s; z-index: 99;">
+        <div class="card-body py-4">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4">
+                
+                <div class="d-flex align-items-center position-relative w-100 w-lg-300px">
+                    <i class="ki-duotone ki-magnifier fs-2 position-absolute ms-4 text-gray-500"><span class="path1"></span><span class="path2"></span></i>
+                    <input type="text" v-model="searchQuery" class="form-control form-control-solid ps-12 search-input" placeholder="Cari nomor kamar..." />
                 </div>
-              </td>
-              <td>{{ room.room_number }}</td>
-              <td>{{ room.type }}</td>
-              <td>
-                <div v-if="room.facilities && room.facilities.length > 0" class="d-flex align-items-center gap-2">
-                  <div v-for="facility in room.facilities" :key="facility.id"
-                       class="symbol symbol-25px" v-tooltip :title="facility.name">
-                    <img v-if="facility.icon_url" :src="facility.icon_url" :alt="facility.name" />
-                    <span v-else class="symbol-label bg-light-primary text-primary">{{ facility.name.charAt(0) }}</span>
-                  </div>
+
+                <div class="d-flex flex-wrap gap-3 align-items-center">
+                    
+                    <div class="dropdown-wrapper position-relative w-150px" v-click-outside="() => closeDropdown('type')">
+                        <button 
+                            class="btn btn-custom-select w-100 d-flex align-items-center justify-content-between px-4" 
+                            type="button" 
+                            @click="toggleDropdown('type')"
+                            :class="{ 'active': activeDropdown === 'type' }"
+                        >
+                            <div class="d-flex align-items-center text-truncate">
+                                <i class="ki-duotone ki-category fs-2 me-2 text-gray-500"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
+                                <span class="fw-bold text-gray-700 fs-7">{{ activeTypeLabel }}</span>
+                            </div>
+                            <i class="ki-duotone ki-down fs-5 text-gray-500 ms-2 transition-icon" :class="{ 'rotate-180': activeDropdown === 'type' }"></i>
+                        </button>
+
+                        <transition name="dropdown-anim">
+                            <div v-if="activeDropdown === 'type'" class="custom-dropdown-menu shadow-lg border-0 p-2 rounded-3 theme-dropdown">
+                                <ul class="list-unstyled m-0">
+                                    <li>
+                                        <a href="#" class="dropdown-item-custom rounded px-3 py-2 fw-semibold mb-1" 
+                                           :class="{ 'selected': filterType === 'all' }" 
+                                           @click.prevent="setFilterType('all')">
+                                            Semua Tipe
+                                        </a>
+                                    </li>
+                                    <li v-for="type in uniqueRoomTypes" :key="type">
+                                        <a href="#" class="dropdown-item-custom rounded px-3 py-2 fw-semibold mb-1" 
+                                           :class="{ 'selected': filterType === type }" 
+                                           @click.prevent="setFilterType(type)">
+                                            {{ type }}
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </transition>
+                    </div>
+
+                    <div class="dropdown-wrapper position-relative w-175px" v-click-outside="() => closeDropdown('status')">
+                        <button 
+                            class="btn btn-custom-select w-100 d-flex align-items-center justify-content-between px-4" 
+                            type="button" 
+                            @click="toggleDropdown('status')"
+                            :class="{ 'active': activeDropdown === 'status' }"
+                        >
+                            <div class="d-flex align-items-center text-truncate">
+                                <i class="ki-duotone ki-flag fs-2 me-2 text-gray-500"><span class="path1"></span><span class="path2"></span></i>
+                                <span class="fw-bold text-gray-700 fs-7">{{ activeStatusLabel }}</span>
+                            </div>
+                            <i class="ki-duotone ki-down fs-5 text-gray-500 ms-2 transition-icon" :class="{ 'rotate-180': activeDropdown === 'status' }"></i>
+                        </button>
+
+                        <transition name="dropdown-anim">
+                            <div v-if="activeDropdown === 'status'" class="custom-dropdown-menu shadow-lg border-0 p-2 rounded-3 theme-dropdown">
+                                <ul class="list-unstyled m-0">
+                                    <li><a href="#" class="dropdown-item-custom rounded px-3 py-2 fw-semibold mb-1" :class="{ 'selected': filterStatus === 'all' }" @click.prevent="setFilterStatus('all')">Semua Status</a></li>
+                                    <li><a href="#" class="dropdown-item-custom rounded px-3 py-2 fw-semibold mb-1" :class="{ 'selected': filterStatus === 'available' }" @click.prevent="setFilterStatus('available')">Tersedia</a></li>
+                                    <li><a href="#" class="dropdown-item-custom rounded px-3 py-2 fw-semibold mb-1" :class="{ 'selected': filterStatus === 'occupied' }" @click.prevent="setFilterStatus('occupied')">Terisi</a></li>
+                                    <li><a href="#" class="dropdown-item-custom rounded px-3 py-2 fw-semibold mb-1" :class="{ 'selected': filterStatus === 'dirty' }" @click.prevent="setFilterStatus('dirty')">Perawatan</a></li>
+                                </ul>
+                            </div>
+                        </transition>
+                    </div>
+
+                    <button v-if="userHasPermission('create rooms')" class="btn btn-sm btn-orange fw-bold hover-scale ms-lg-2 box-shadow-orange" @click="openAddRoomModal">
+                        <i class="ki-duotone ki-plus fs-2 text-white"></i> Tambah
+                    </button>
                 </div>
-                <span v-else>-</span>
-              </td>
-              <td><span :class="getStatusBadge(room.status)" class="text-capitalize">{{ getStatusLabel(room.status) }}</span></td>
-              <td>{{ formatCurrency(room.price_per_night) }}</td>
-              <td>
-                <span :class="getAvailabilityPeriod(room) === 'Selamanya' ? 'badge badge-light-success' : 'badge badge-light-info'">
-                  {{ getAvailabilityPeriod(room) }}
-                </span>
-              </td>
-              <td class="text-end">
-                <div class="d-flex justify-content-end flex-shrink-0 align-items-center">
-                  <button v-if="room.status === 'available' && userHasPermission('create pos_orders')"
-                          @click="openCheckInModal(room)" class="btn btn-sm btn-light-success me-2">
-                    Check-in
-                  </button>
-
-                  <button v-if="room.status === 'occupied' && userHasPermission('create pos_orders')"
-                          @click="processCheckout(room)" class="btn btn-sm btn-light-warning me-2">
-                    Check-out
-                  </button>
-
-                  <button v-if="room.status === 'occupied' && (!room.service_requests || room.service_requests.length === 0) && userHasPermission('manage cleaning status')"
-                          @click="requestCleaning(room)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Minta Dibersihkan">
-                    <i class="ki-duotone ki-brush fs-3"></i>
-                  </button>
-
-                  <button v-if="['needs cleaning', 'request cleaning', 'dirty'].includes(room.status.toLowerCase()) && userHasPermission('manage cleaning status')"
-                          @click="markAsClean(room)" class="btn btn-sm btn-light-info me-2">
-                    Tandai Bersih
-                  </button>
-                    <div v-if="room.status === 'request cleaning' && room.service_requests && room.service_requests.length > 0 && room.service_requests[0].cleaning_time"
-                       class="badge badge-light-primary fw-semibold me-2">
-                    {{ room.service_requests[0].cleaning_time.substring(0, 5) }}
-                  </div>
-
-                  <a href="#" v-if="userHasPermission('edit rooms')" @click.prevent="openEditRoomModal(room)" class="btn btn-icon btn-light-primary btn-sm me-2" title="Edit">
-                    <i class="ki-duotone ki-notepad-edit fs-3"></i>
-                  </a>
-                  <a href="#" v-if="userHasPermission('delete rooms')" @click.prevent="deleteRoom(room.id)" class="btn btn-icon btn-light-danger btn-sm" title="Hapus">
-                    <i class="ki-duotone ki-trash-square fs-3"></i>
-                  </a>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+            </div>
+        </div>
     </div>
+
+    <div class="position-relative min-h-300px" style="z-index: 1;">
+        
+        <div v-if="loading" class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center z-index-10 bg-body bg-opacity-75 rounded-3">
+             <div class="d-flex flex-column align-items-center animate-pulse">
+                 <span class="spinner-border text-orange mb-3 w-40px h-40px"></span>
+                 <span class="text-gray-500 fw-bold">Memuat data...</span>
+             </div>
+        </div>
+
+        <div v-else-if="filteredRooms.length === 0" class="d-flex flex-column align-items-center justify-content-center py-15 text-muted animate-fade-in">
+             <div class="symbol symbol-100px mb-5 bg-light-orange rounded-circle d-flex align-items-center justify-content-center">
+                <i class="ki-duotone ki-file-sheet fs-4x text-orange"><span class="path1"></span><span class="path2"></span></i>
+             </div>
+             <span class="fs-4 fw-bold text-gray-800">Tidak ada kamar ditemukan.</span>
+             <span class="fs-7">Coba sesuaikan kata kunci atau filter Anda.</span>
+        </div>
+
+        <div v-if="!loading && filteredRooms.length > 0">
+            <TransitionGroup name="list-shuffle" tag="div" class="row g-6">
+                <div class="col-md-6 col-lg-4 col-xxl-3 room-item" v-for="room in filteredRooms" :key="room.id">
+                    
+                    <div class="card h-100 border-0 shadow-sm theme-card hover-elevate-up transition-300 group-card">
+                        
+                        <div class="position-relative h-200px bg-secondary rounded-top-3 overflow-hidden room-image-container">
+                             <img :src="room.image_url || '/media/svg/files/blank-image.svg'" class="w-100 h-100 object-fit-cover room-img" alt="Room Image" />
+                             
+                             <div class="overlay-layer position-absolute w-100 h-100 transition-300 z-index-1"></div>
+                             
+                             <div class="position-absolute top-0 start-0 w-100 h-4px status-border transition-300" :class="getStatusColor(room.status, 'bg')"></div>
+
+                             <div class="position-absolute bottom-0 end-0 m-3 z-index-2">
+                                <div class="backdrop-blur px-3 py-1 rounded-pill shadow-sm price-badge">
+                                    <span class="fw-bolder fs-7 text-white">Rp {{ formatPriceNumber(room.price_per_night) }}</span>
+                                </div>
+                             </div>
+
+                             <div class="position-absolute top-0 start-0 m-3 z-index-2 status-badge-hover">
+                                <div class="backdrop-blur px-3 py-2 rounded-pill shadow-sm">
+                                    <span class="fw-bold fs-8 text-white text-uppercase">{{ getStatusLabel(room.status) }}</span>
+                                </div>
+                             </div>
+                        </div>
+
+                        <div class="card-body p-5 d-flex flex-column">
+                            
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <div class="text-gray-500 fs-9 fw-bold text-uppercase ls-1 mb-1">{{ room.type }}</div>
+                                    <h3 class="fs-2 fw-bolder text-gray-900 hover-text-orange cursor-pointer transition-200 m-0" @click="openEditRoomModal(room)">
+                                        No. {{ room.room_number }}
+                                    </h3>
+                                </div>
+                                <button class="btn btn-icon btn-sm btn-light-primary w-30px h-30px rounded-circle hover-scale hover-rotate" @click="openEditRoomModal(room)">
+                                    <i class="ki-duotone ki-pencil fs-6"><span class="path1"></span><span class="path2"></span></i>
+                                </button>
+                            </div>
+
+                            <div class="d-flex align-items-center p-3 rounded mb-4 bg-light-subtle border border-dashed border-gray-300 status-info-card">
+                                <span class="bullet bullet-dot h-10px w-10px me-3 pulse-dot" :class="getStatusColor(room.status, 'bg')"></span>
+                                <div class="d-flex flex-column w-100">
+                                    <span class="fs-7 fw-bold" :class="getStatusColor(room.status, 'text')">{{ getStatusLabel(room.status) }}</span>
+                                    
+                                    <div v-if="room.status === 'occupied' && getActiveGuestName(room)" class="d-flex flex-column mt-1">
+                                        <span class="fs-8 fw-bolder text-gray-800 text-truncate">{{ getActiveGuestName(room) }}</span>
+                                        <div class="d-flex align-items-center mt-1">
+                                            <i class="ki-duotone ki-calendar-8 fs-9 me-1 text-gray-400"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span><span class="path6"></span></i>
+                                            <span class="fs-9 fw-semibold text-gray-500">{{ getGuestDates(room) }}</span>
+                                        </div>
+                                    </div>
+
+                                    <span v-else class="fs-9 text-gray-500">
+                                        {{ room.status === 'available' ? 'Siap digunakan' : 'Dalam proses' }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2 mb-4 flex-wrap">
+                                 <template v-if="room.facilities?.length">
+                                    <span v-for="(fac, i) in room.facilities.slice(0, 3)" :key="i" class="badge badge-light-dark fs-9 fw-bold facility-badge">{{ fac.name }}</span>
+                                    <span v-if="room.facilities.length > 3" class="badge badge-light-dark fs-9 fw-bold facility-badge">+{{ room.facilities.length - 3 }}</span>
+                                </template>
+                                <span v-else class="text-gray-400 fs-9 fst-italic">Standard Facility</span>
+                            </div>
+
+                            <div class="mt-auto pt-4 border-top border-gray-200 border-opacity-50 d-flex gap-2">
+                                <div class="flex-grow-1">
+                                    <button v-if="room.status === 'available'" @click="openCheckInModal(room)" class="btn btn-sm btn-success w-100 fw-bold hover-scale action-btn">Check-in</button>
+                                    <button v-if="room.status === 'occupied'" @click="processCheckout(room)" class="btn btn-sm btn-danger w-100 fw-bold hover-scale action-btn">Check-out</button>
+                                    <button v-if="['dirty','needs cleaning'].includes(room.status)" @click="markAsClean(room)" class="btn btn-sm btn-info w-100 fw-bold text-white hover-scale action-btn">Selesai</button>
+                                </div>
+                                
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-icon btn-light h-100 w-35px rounded hover-bg-light-primary dropdown-toggle-custom" 
+                                            type="button" 
+                                            data-bs-toggle="dropdown" 
+                                            aria-expanded="false">
+                                        <i class="ki-duotone ki-dots-square fs-3 text-gray-600 icon-dots">
+                                            <span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span>
+                                        </i>
+                                    </button>
+                                    
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-2 w-200px theme-dropdown z-index-dropdown dropdown-animated">
+                                        <li><div class="dropdown-header text-uppercase fs-9 fw-bold text-muted px-3">Opsi Menu</div></li>
+                                        <li v-if="userHasPermission('edit rooms')" class="dropdown-item-wrapper">
+                                            <a href="#" class="dropdown-item rounded px-3 py-2 fw-semibold text-gray-700 hover-text-primary dropdown-item-animated" @click.prevent="openEditRoomModal(room)">
+                                                <i class="ki-duotone ki-pencil fs-5 me-2"><span class="path1"></span><span class="path2"></span></i> Edit Detail
+                                            </a>
+                                        </li>
+                                        <li v-if="room.status === 'occupied'" class="dropdown-item-wrapper">
+                                            <a href="#" class="dropdown-item rounded px-3 py-2 fw-semibold text-gray-700 hover-text-warning dropdown-item-animated" @click.prevent="requestCleaning(room)">
+                                                <i class="ki-duotone ki-broom fs-5 me-2"><span class="path1"></span><span class="path2"></span></i> Request Cleaning
+                                            </a>
+                                        </li>
+                                        <li v-if="userHasPermission('delete rooms')"><div class="dropdown-divider my-2 border-gray-200"></div></li>
+                                        <li v-if="userHasPermission('delete rooms')" class="dropdown-item-wrapper">
+                                            <a href="#" class="dropdown-item rounded px-3 py-2 fw-semibold text-danger hover-bg-light-danger dropdown-item-animated" @click.prevent="deleteRoom(room.id)">
+                                                <i class="ki-duotone ki-trash fs-5 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i> Hapus Data
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </TransitionGroup>
+        </div>
+
+    </div>
+
+    <RoomModal :room-data="selectedRoom" @room-updated="refreshData" @close-modal="selectedRoom = null" />
+    <CheckInModal :room-data="selectedRoom" @checkin-success="refreshData" @close-modal="selectedRoom = null" />
   </div>
-  <RoomModal :room-data="selectedRoom" @room-updated="refreshData" @close-modal="selectedRoom = null" />
-  <CheckInModal :room-data="selectedRoom" @checkin-success="refreshData" @close-modal="selectedRoom = null" />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useAuthStore } from "@/stores/auth"; // <-- 1. Import auth store
+import { useAuthStore } from "@/stores/auth";
 import ApiService from "@/core/services/ApiService";
 import Swal from "sweetalert2";
 import { Modal } from "bootstrap";
 import RoomModal from "./RoomModal.vue";
 import CheckInModal from "./CheckInModal.vue";
 
-// --- INTERFACES ---
-interface ServiceRequest {
-  id: number;
-  service_name: string;
-  status: string;
-  cleaning_time: string | null;
-}
-interface Facility {
-  id: number;
-  name: string;
-  icon: string | null;
-  icon_url: string | null;
-}
-interface Room {
-  id: number;
-  room_number: string;
-  type: string;
-  status: string;
-  price_per_night: number;
-  description: string | null;
-  image: string | null;
-  image_url: string | null;
-  tersedia_mulai: string | null;
-  tersedia_sampai: string | null;
-  facilities: Facility[];
-  service_requests: ServiceRequest[];
-}
-interface ConfirmActionConfig {
-  text: string;
-  icon: 'warning' | 'info' | 'question';
-  confirmButtonText: string;
+interface Facility { id: number; name: string; }
+interface Room { 
+  id: number; room_number: string; type: string; status: string; price_per_night: number; 
+  description: string | null; image_url: string | null; facilities: Facility[]; check_ins?: any[]; 
 }
 
-
-// --- STATE ---
-const authStore = useAuthStore(); // <-- 2. Inisialisasi store
+const authStore = useAuthStore();
 const rooms = ref<Room[]>([]);
 const loading = ref(true);
-const selectedRoom = ref<Room | null>(null);
+const selectedRoom = ref<any>(null);
 const searchQuery = ref("");
+const filterStatus = ref('all');
+const filterType = ref('all');
 
+// --- Custom Dropdown Logic (Top Filters) ---
+const activeDropdown = ref<string | null>(null);
+const toggleDropdown = (name: string) => { activeDropdown.value = activeDropdown.value === name ? null : name; };
+const closeDropdown = (name: string) => { if (activeDropdown.value === name) activeDropdown.value = null; };
+const setFilterType = (type: string) => { filterType.value = type; activeDropdown.value = null; };
+const setFilterStatus = (status: string) => { filterStatus.value = status; activeDropdown.value = null; };
 
-// --- FUNGSI BANTUAN ---
-
-// [BARU] Fungsi bantuan untuk mengecek izin user
-const userHasPermission = (permission: string): boolean => {
-  return authStore.user?.all_permissions?.includes(permission) ?? false;
+const vClickOutside = {
+    mounted(el: any, binding: any) {
+        el.clickOutsideEvent = function(event: Event) { if (!(el === event.target || el.contains(event.target))) binding.value(event, el); };
+        document.body.addEventListener('click', el.clickOutsideEvent);
+    },
+    unmounted(el: any) { document.body.removeEventListener('click', el.clickOutsideEvent); },
 };
 
-const formatDateSimple = (dateString: string | null): string => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return `${date.getDate()} ${date.toLocaleString('id-ID', { month: 'short' })} ${date.getFullYear()}`;
-};
-const getAvailabilityPeriod = (room: Room): string => {
-    const start = room.tersedia_mulai ? formatDateSimple(room.tersedia_mulai) : null;
-    const end = room.tersedia_sampai ? formatDateSimple(room.tersedia_sampai) : null;
-    if (start && end) return `${start} - ${end}`;
-    if (start) return `Mulai ${start}`;
-    if (end) return `Hingga ${end}`;
-    return 'Selamanya';
-};
-const formatCurrency = (value: number) => {
-  if (isNaN(value)) return "Rp 0";
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
-};
-const getStatusBadge = (status: string) => {
-  const statusMap: { [key: string]: string } = {
-    available: 'badge badge-light-success',
-    occupied: 'badge badge-light-danger',
-    maintenance: 'badge badge-light-warning',
-    'needs cleaning': 'badge badge-light-info',
-    'request cleaning': 'badge badge-light-primary',
-    'dirty': 'badge badge-light-dark', // Tambahkan status dirty jika perlu
-  };
-  return statusMap[status] || 'badge badge-light';
-};
-const getStatusLabel = (status: string) => {
-    const labelMap: { [key: string]: string } = {
-      'needs cleaning': 'Perlu Dibersihkan',
-      'request cleaning': 'Minta Dibersihkan',
-      'dirty': 'Dirty',
-    };
-    return labelMap[status] || status.replace(/-/g, ' ');
-};
-
-
-const filteredRooms = computed(() => {
-  if (!searchQuery.value) return rooms.value;
-  return rooms.value.filter((room) =>
-    room.room_number.toLowerCase().includes(searchQuery.value.toLowerCase())
-  );
+const activeTypeLabel = computed(() => filterType.value === 'all' ? 'Semua Tipe' : filterType.value);
+const activeStatusLabel = computed(() => {
+    const map: any = { 'all': 'Semua Status', 'available': 'Tersedia', 'occupied': 'Terisi', 'dirty': 'Perawatan' };
+    return map[filterStatus.value] || 'Status';
 });
 
-// --- FUNGSI-FUNGSI UTAMA ---
-const getRooms = async () => {
-    try {
-        loading.value = true;
-        const { data } = await ApiService.get("/rooms");
-        rooms.value = data;
-    } catch (error) {
-        rooms.value = [];
-        Swal.fire("Error", "Gagal memuat data kamar.", "error");
-    } finally {
-        loading.value = false;
+const uniqueRoomTypes = computed(() => {
+    const types = rooms.value.map(r => r.type);
+    return [...new Set(types)].filter(Boolean);
+});
+
+// --- Filtering ---
+const filteredRooms = computed(() => {
+  let result = rooms.value;
+  if (searchQuery.value) result = result.filter(room => room.room_number.toLowerCase().includes(searchQuery.value.toLowerCase()));
+  if (filterStatus.value !== 'all') {
+      if (filterStatus.value === 'dirty') result = result.filter(r => ['dirty', 'needs cleaning', 'request cleaning'].includes(r.status));
+      else result = result.filter(r => r.status === filterStatus.value);
+  }
+  if (filterType.value !== 'all') result = result.filter(r => r.type === filterType.value);
+  return result;
+});
+
+const countStatus = (status: string) => rooms.value.filter(r => r.status === status).length;
+const countDirty = computed(() => rooms.value.filter(r => ['dirty', 'needs cleaning', 'request cleaning'].includes(r.status)).length);
+const userHasPermission = (permission: string) => authStore.user?.all_permissions?.includes(permission) ?? false;
+
+const formatPriceNumber = (value: number) => new Intl.NumberFormat("id-ID").format(value);
+const getActiveGuestName = (room: Room) => (room.check_ins && room.check_ins.length > 0) ? room.check_ins[0].guest?.name || 'Tamu' : null;
+
+// --- Helper Baru: Get Date Range ---
+const getGuestDates = (room: Room) => {
+    if (room.status === 'occupied' && room.check_ins && room.check_ins.length > 0) {
+        const checkIn = room.check_ins[0];
+        const start = new Date(checkIn.check_in_time);
+        const end = new Date(checkIn.check_out_time);
+        const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+        // Output: "12 Okt - 14 Okt"
+        return `${start.toLocaleDateString('id-ID', options)} - ${end.toLocaleDateString('id-ID', options)}`;
     }
+    return '';
 };
 
-const refreshData = () => getRooms();
-
-const openModal = (modalId: string, room: Room | null = null) => {
-    selectedRoom.value = room ? { ...room } : null;
-    const modalEl = document.getElementById(modalId);
-    if (modalEl) new Modal(modalEl).show();
+const getStatusLabel = (status: string) => {
+    if (status === 'available') return 'Tersedia';
+    if (status === 'occupied') return 'Terisi';
+    if (['dirty', 'needs cleaning', 'request cleaning'].includes(status)) return 'Perlu Dibersihkan';
+    return status;
 }
 
+const getStatusColor = (status: string, type: 'text' | 'bg') => {
+    const isDirty = ['dirty', 'needs cleaning', 'request cleaning'].includes(status);
+    const map: any = {
+        available: { text: 'text-success', bg: 'bg-success' },
+        occupied: { text: 'text-danger', bg: 'bg-danger' },
+        dirty: { text: 'text-warning', bg: 'bg-warning' }
+    };
+    const key = isDirty ? 'dirty' : (map[status] ? status : 'available');
+    return map[key][type];
+};
+
+const getRooms = async () => {
+    loading.value = true;
+    try { const { data } = await ApiService.get("/rooms"); rooms.value = data; } 
+    catch (e) { rooms.value = []; } finally { loading.value = false; }
+};
+const refreshData = () => getRooms();
+onMounted(getRooms);
+
+const openModal = (id: string, room: any = null) => { selectedRoom.value = room ? { ...room } : null; new Modal(document.getElementById(id)!).show(); };
 const openAddRoomModal = () => openModal('kt_modal_room');
 const openEditRoomModal = (room: Room) => openModal('kt_modal_room', room);
 const openCheckInModal = (room: Room) => openModal('kt_modal_check_in', room);
 
-const confirmAction = async (config: ConfirmActionConfig, callback: () => Promise<void>) => {
-    const result = await Swal.fire({
-        ...config,
-        showCancelButton: true,
-        buttonsStyling: false,
-        cancelButtonText: "Batal",
-        customClass: { confirmButton: "btn fw-bold btn-danger", cancelButton: "btn fw-bold btn-active-light-primary" },
-    });
-
-    if (result.isConfirmed) {
-        try {
-            await callback();
-            await refreshData(); // Tambahkan await agar Swal menunggu data refresh
-        } catch (error: any) {
-            const message = error.response?.data?.message || 'Terjadi kesalahan.';
-            Swal.fire("Error!", message, "error");
-        }
-    }
+const confirmAction = async (opts: any, action: Function) => {
+    const res = await Swal.fire({ ...opts, showCancelButton: true, buttonsStyling: false, customClass: { confirmButton: "btn fw-bold btn-danger", cancelButton: "btn fw-bold btn-light" } });
+    if (res.isConfirmed) { await action(); await refreshData(); }
 };
-
-const deleteRoom = (id: number) => {
-    confirmAction({
-        text: "Apakah Anda yakin ingin menghapus kamar ini?",
-        icon: "warning",
-        confirmButtonText: "Ya, Hapus"
-    }, async () => {
-        await ApiService.delete(`/rooms/${id}`);
-        Swal.fire("Berhasil!", "Data kamar telah dihapus.", "success");
-    });
-};
-
-const processCheckout = (room: Room) => {
-    confirmAction({
-        text: `Apakah Anda yakin ingin melakukan check-out untuk kamar ${room.room_number}?`,
-        icon: "warning",
-        confirmButtonText: "Ya, Check-out"
-    }, async () => {
-        await ApiService.post(`/check-out/${room.id}`, {});
-        Swal.fire("Berhasil!", `Kamar ${room.room_number} telah berhasil check-out.`, "success");
-    });
-};
-
+const deleteRoom = (id: number) => confirmAction({ text: "Hapus kamar ini?", icon: "warning", confirmButtonText: "Ya, Hapus" }, async () => await ApiService.delete(`/rooms/${id}`));
+const processCheckout = (room: Room) => confirmAction({ text: `Check-out ${room.room_number}?`, icon: "warning", confirmButtonText: "Check-out" }, async () => await ApiService.post(`/check-out/${room.id}`, {}));
+const markAsClean = (room: Room) => confirmAction({ text: "Sudah bersih?", icon: "question", confirmButtonText: "Ya" }, async () => await ApiService.post(`/rooms/${room.id}/mark-as-clean`, {}));
 const requestCleaning = (room: Room) => {
-    Swal.fire({
-        title: `Minta Pembersihan untuk Kamar ${room.room_number}`,
-        html: `<p class="fs-6">Masukkan waktu pembersihan yang dijadwalkan.</p><input type="time" id="swal-cleaning-time" class="form-control mt-3" autofocus>`,
-        icon: "info",
-        showCancelButton: true,
-        confirmButtonText: "Ya, Jadwalkan",
-        cancelButtonText: "Batal",
-        buttonsStyling: false,
-        customClass: { confirmButton: "btn fw-bold btn-primary", cancelButton: "btn fw-bold btn-active-light-primary" },
-        preConfirm: () => {
-            const timeInput = document.getElementById('swal-cleaning-time') as HTMLInputElement;
-            if (!timeInput.value) {
-                Swal.showValidationMessage('Waktu tidak boleh kosong');
-                return false;
-            }
-            return timeInput.value;
-        },
-    }).then(async (result) => {
-        if (result.isConfirmed && result.value) {
-            try {
-                await ApiService.post(`/rooms/${room.id}/request-cleaning`, { cleaning_time: result.value });
-                Swal.fire("Berhasil!", `Permintaan pembersihan untuk kamar ${room.room_number} telah dijadwalkan.`, "success");
-                refreshData();
-            } catch (error: any) {
-                const message = error.response?.data?.message || "Gagal mengubah status.";
-                Swal.fire("Error!", message, "error");
-            }
-        }
-    });
+    Swal.fire({ title: 'Jadwal Bersih?', html: '<input type="time" id="swal-time" class="form-control text-center">', showCancelButton: true, confirmButtonText: 'Simpan', confirmButtonColor: '#F68B1E', preConfirm: () => (document.getElementById('swal-time') as HTMLInputElement).value }).then(async (res) => {
+        if(res.isConfirmed && res.value) { await ApiService.post(`/rooms/${room.id}/request-cleaning`, { cleaning_time: res.value }); refreshData(); }
+    })
 };
-
-const markAsClean = (room: Room) => {
-    confirmAction({
-        text: `Apakah Anda yakin ingin menandai kamar ${room.room_number} sudah bersih?`,
-        icon: "question",
-        confirmButtonText: "Ya, Sudah Bersih"
-    }, async () => {
-        await ApiService.post(`/rooms/${room.id}/mark-as-clean`, {});
-        Swal.fire("Berhasil!", `Kamar ${room.room_number} telah ditandai bersih.`, "success");
-    });
-};
-
-// --- LIFECYCLE HOOK ---
-onMounted(getRooms);
 </script>
+
+<style scoped>
+/* ========================
+   THEME COLORS
+   ======================== */
+.text-orange { color: #F68B1E !important; }
+.bg-light-orange { background-color: #FFF8F1 !important; }
+.btn-orange { background-color: #F68B1E; color: white; border: none; }
+.btn-orange:hover { background-color: #d97814; color: white; }
+.hover-text-orange:hover { color: #F68B1E !important; }
+.box-shadow-orange { box-shadow: 0 4px 12px rgba(246, 139, 30, 0.3); }
+
+/* ========================
+   1. CARD & Z-INDEX (CRITICAL)
+   ======================== */
+.group-card { position: relative; z-index: 1; transition: all 0.3s ease; }
+/* Z-Index Tinggi saat hover agar dropdown di dalamnya TIDAK tertutup */
+.group-card:hover { z-index: 20; } 
+
+.hover-elevate-up:hover { 
+    transform: translateY(-8px); 
+    box-shadow: 0 15px 35px rgba(0,0,0,0.12) !important; 
+}
+
+/* ========================
+   2. SMOOTH SHUFFLE ANIMATION
+   ======================== */
+.list-shuffle-move { transition: transform 0.5s cubic-bezier(0.55, 0, 0.1, 1); }
+.list-shuffle-enter-active, .list-shuffle-leave-active { transition: all 0.5s cubic-bezier(0.55, 0, 0.1, 1); }
+.list-shuffle-enter-from, .list-shuffle-leave-to { opacity: 0; transform: scale(0.9); }
+.list-shuffle-leave-active { position: absolute; width: 100%; z-index: -1; visibility: hidden; }
+
+/* ========================
+   3. CUSTOM DROPDOWNS
+   ======================== */
+.dropdown-wrapper { position: relative; z-index: 100; }
+.dropdown-wrapper:has(.custom-dropdown-menu) { z-index: 9999 !important; }
+
+.btn-custom-select {
+    background-color: #F9F9F9;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    height: 42px;
+    transition: all 0.3s ease;
+}
+.btn-custom-select:hover, .btn-custom-select.active {
+    background-color: #ffffff; border-color: #F68B1E; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.transition-icon { transition: transform 0.3s ease; }
+.rotate-180 { transform: rotate(180deg); color: #F68B1E !important; }
+
+.custom-dropdown-menu {
+    position: absolute; top: 110%; left: 0; width: 100%; min-width: 180px;
+    background: white; z-index: 99999 !important; border: 1px solid rgba(0,0,0,0.05);
+}
+
+.dropdown-item-custom {
+    display: block; text-decoration: none; color: #5E6278;
+    transition: all 0.2s ease; cursor: pointer;
+}
+.dropdown-item-custom:hover { background-color: #F5F8FA; color: #F68B1E; transform: translateX(5px); }
+.dropdown-item-custom.selected { background-color: #FFF4E6; color: #F68B1E; font-weight: 700; }
+
+.dropdown-anim-enter-active { animation: dropdown-in 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.dropdown-anim-leave-active { animation: dropdown-out 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes dropdown-in { 0% { opacity: 0; transform: translateY(-10px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes dropdown-out { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-10px) scale(0.95); } }
+
+/* ========================
+   4. CARD ELEMENTS (Room Menu)
+   ======================== */
+.dropdown-toggle-custom { transition: all 0.3s ease; }
+.dropdown-toggle-custom:hover, 
+.dropdown-toggle-custom[aria-expanded="true"] { background-color: rgba(246, 139, 30, 0.1) !important; }
+
+.icon-dots { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.dropdown-toggle-custom:hover .icon-dots,
+.dropdown-toggle-custom[aria-expanded="true"] .icon-dots { color: #F68B1E !important; transform: rotate(90deg); }
+
+.dropdown-animated { animation: dropdownFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform-origin: top right; }
+@keyframes dropdownFadeIn { from { opacity: 0; transform: translateY(-10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+.dropdown-item-animated { position: relative; transition: all 0.3s; transform: translateX(0); }
+.dropdown-item-animated:hover { transform: translateX(5px); padding-left: 1.5rem !important; }
+
+.dropdown-item { transition: all 0.2s; color: #5E6278; }
+.dropdown-item:hover { background-color: #F5F8FA; color: #3F4254; }
+.z-index-dropdown { z-index: 1055; }
+
+/* ========================
+   5. IMAGE & OVERLAY
+   ======================== */
+.room-image-container { position: relative; overflow: hidden; }
+.room-img { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), filter 0.4s ease; }
+.group-card:hover .room-img { transform: scale(1.08); } 
+
+.overlay-layer {
+    background: linear-gradient(to top, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 40%);
+    opacity: 0.6; transition: opacity 0.3s ease;
+}
+.group-card:hover .overlay-layer { opacity: 0.8; }
+
+.status-border { transform: scaleX(0); transform-origin: left; transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+.group-card:hover .status-border { transform: scaleX(1); }
+
+.price-badge { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.group-card:hover .price-badge { transform: translateY(-5px) scale(1.05); }
+
+.status-badge-hover { opacity: 0; transform: translateY(-10px); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+.group-card:hover .status-badge-hover { opacity: 1; transform: translateY(0); }
+
+.backdrop-blur {
+    background: rgba(30, 30, 45, 0.75); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15);
+}
+
+/* ========================
+   6. ACTIONS & GENERAL ANIMATIONS
+   ======================== */
+.action-btn { position: relative; overflow: hidden; transition: all 0.3s ease; }
+.action-btn::before { content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-radius: 50%; background: rgba(255,255,255,0.3); transform: translate(-50%, -50%); transition: width 0.5s, height 0.5s; }
+.action-btn:hover::before { width: 300px; height: 300px; }
+
+.animate-item { opacity: 0; animation: fadeUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; animation-delay: var(--delay, 0s); }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+.animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ========================
+   7. DARK MODE
+   ======================== */
+[data-bs-theme="dark"] .theme-card { background-color: #1e1e2d !important; color: #ffffff; }
+[data-bs-theme="dark"] .theme-dropdown { background-color: #1e1e2d; border-color: #323248; }
+[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
+[data-bs-theme="dark"] .text-gray-800 { color: #e1e3ea !important; }
+[data-bs-theme="dark"] .text-gray-700 { color: #CDCDDE !important; }
+[data-bs-theme="dark"] .bg-body { background-color: #1e1e2d !important; }
+[data-bs-theme="dark"] .bg-light-subtle { background-color: #1b1b29 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .bg-light-orange { background-color: #2b2b40 !important; }
+[data-bs-theme="dark"] .bg-light-success { background-color: rgba(23, 198, 83, 0.15) !important; }
+[data-bs-theme="dark"] .bg-light-danger { background-color: rgba(248, 40, 90, 0.15) !important; }
+[data-bs-theme="dark"] .bg-light-warning { background-color: rgba(255, 199, 0, 0.15) !important; }
+[data-bs-theme="dark"] .border-gray-200, [data-bs-theme="dark"] .border-gray-300 { border-color: #2B2B40 !important; }
+
+[data-bs-theme="dark"] .dropdown-item { color: #9A9CAE; }
+[data-bs-theme="dark"] .dropdown-item:hover { background-color: #2b2b40; color: #ffffff; }
+
+[data-bs-theme="dark"] .form-control-solid { background-color: #1b1b29 !important; border-color: #323248 !important; color: #ffffff; }
+
+[data-bs-theme="dark"] .btn-custom-select { background-color: #1b1b29; border-color: #323248; color: #CDCDDE; }
+[data-bs-theme="dark"] .btn-custom-select:hover, [data-bs-theme="dark"] .btn-custom-select.active { border-color: #F68B1E; color: #ffffff; }
+[data-bs-theme="dark"] .custom-dropdown-menu { background-color: #1e1e2d; border: 1px solid #323248; }
+[data-bs-theme="dark"] .dropdown-item-custom { color: #9A9CAE; }
+[data-bs-theme="dark"] .dropdown-item-custom:hover { background-color: #2b2b40; color: #F68B1E; }
+[data-bs-theme="dark"] .dropdown-item-custom.selected { background-color: rgba(246, 139, 30, 0.15); }
+
+[data-bs-theme="dark"] .overlay-layer { background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 50%); }
+[data-bs-theme="dark"] .backdrop-blur { background: rgba(40, 40, 60, 0.85); }
+</style>

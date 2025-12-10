@@ -1,219 +1,326 @@
 <template>
-  <VForm class="form card mb-10" @submit="submit" :validation-schema="formSchema" id="form-role" ref="formRef">
-    <div class="card-header align-items-center">
-        <h2 class="mb-0">{{ selected ? "Edit Role" : "Tambah Role Baru" }}</h2>
-        <button type="button" class="btn btn-sm btn-light-danger ms-auto" @click="emit('close')">
-            Batal
-        </button>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
-                <div class="fv-row mb-7">
-                    <label class="form-label fw-bold fs-6 required">Nama Role (tanpa spasi)</label>
-                    <Field class="form-control form-control-solid" type="text" name="name" autocomplete="off" v-model="formData.name" placeholder="Contoh: cleaning-service" />
-                    <div class="fv-plugins-message-container">
-                        <div class="fv-help-block"><ErrorMessage name="name" /></div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="fv-row mb-7">
-                    <label class="form-label fw-bold fs-6 required">Nama Tampilan</label>
-                    <Field class="form-control form-control-solid" name="full_name" autocomplete="off" v-model="formData.full_name" placeholder="Contoh: Cleaning Service" />
-                    <div class="fv-plugins-message-container">
-                        <div class="fv-help-block"><ErrorMessage name="full_name" /></div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-12">
-                <h3 class="mt-5 mb-5">Hak Akses (Permissions)</h3>
-                <template v-for="(permission) in permissions" :key="permission.value">
-                    <div class="form-check mb-5">
-                        <input class="form-check-input" type="checkbox" :value="permission.value" :id="permission.value" :checked="formData.permissions.includes(permission.value)" @change="handleCheck(permission, ($event.target as HTMLInputElement).checked)" />
-                        <label class="form-check-label fw-bold" :for="permission.value">{{ permission.text }}</label>
-                    </div>
-
-                    <template v-if="permission.children" v-for="child in permission.children" :key="child.value">
-                        <div class="form-check mb-5" style="margin-left: 2.5rem;">
-                            <input class="form-check-input" type="checkbox" :value="child.value" :id="child.value" :checked="formData.permissions.includes(child.value)" @change="handleCheck(child, ($event.target as HTMLInputElement).checked)" />
-                            <label class="form-check-label" :for="child.value">{{ child.text }}</label>
-                        </div>
-
-                        <template v-if="child.children" v-for="grandChild in child.children" :key="grandChild.value">
-                            <div class="form-check mb-5" style="margin-left: 5rem;">
-                                 <input class="form-check-input" type="checkbox" :value="grandChild.value" :id="grandChild.value" :checked="formData.permissions.includes(grandChild.value)" @change="handleCheck(grandChild, ($event.target as HTMLInputElement).checked)" />
-                                <label class="form-check-label" :for="grandChild.value">{{ grandChild.text }}</label>
-                            </div>
-                        </template>
-                    </template>
-                </template>
+  <div class="modal fade" id="kt_modal_role" ref="modalRef" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-800px">
+      <div class="modal-content rounded-4 shadow-lg border-0 theme-modal">
+        
+        <div class="modal-header border-0 pb-0 justify-content-between align-items-center py-4 px-5">
+            <h2 class="fw-bold m-0 fs-3 text-gray-900">{{ isEditMode ? 'Edit Role' : 'Role Baru' }}</h2>
+            <div class="btn btn-sm btn-icon btn-active-light-primary rounded-circle" data-bs-dismiss="modal">
+                <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
             </div>
         </div>
+
+        <div class="modal-body scroll-y px-5 pb-5 pt-2">
+          <el-form @submit.prevent="submit" :model="formData" :rules="rules" ref="formRef" label-position="top" class="modern-form">
+            
+            <div class="bg-light-subtle rounded-3 p-4 mb-5 border border-dashed border-gray-300">
+                <div class="row g-5">
+                    <div class="col-md-6">
+                        <el-form-item prop="name" class="mb-0">
+                            <template #label><span class="required fw-bold fs-8 text-gray-600 text-uppercase ls-1">Slug Role</span></template>
+                            <el-input v-model="formData.name" placeholder="cth: admin-gudang" class="metronic-input fw-bold" :disabled="isEditMode">
+                                <template #prefix><i class="ki-duotone ki-code fs-3 text-gray-500 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i></template>
+                            </el-input>
+                            <div class="form-text text-muted fs-9 mt-1" v-if="!isEditMode">Gunakan huruf kecil tanpa spasi.</div>
+                        </el-form-item>
+                    </div>
+                    <div class="col-md-6">
+                        <el-form-item prop="full_name" class="mb-0">
+                            <template #label><span class="required fw-bold fs-8 text-gray-600 text-uppercase ls-1">Nama Tampilan</span></template>
+                            <el-input v-model="formData.full_name" placeholder="cth: Admin Gudang" class="metronic-input fw-bold fs-6">
+                                <template #prefix><i class="ki-duotone ki-text-align-left fs-3 text-gray-500 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i></template>
+                            </el-input>
+                        </el-form-item>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-2">
+                <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                    <div class="d-flex align-items-center">
+                        <div class="symbol symbol-30px me-2 bg-light-orange rounded-circle d-flex align-items-center justify-content-center">
+                            <i class="ki-duotone ki-shield-tick fs-3 text-orange"><span class="path1"></span><span class="path2"></span></i>
+                        </div>
+                        <label class="fw-bold fs-7 text-gray-800 mb-0">Hak Akses</label>
+                        <span class="badge badge-light-orange ms-2 fw-bold">{{ formData.permissions.length }} Dipilih</span>
+                    </div>
+                    
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="position-relative w-200px">
+                            <i class="ki-duotone ki-magnifier fs-4 text-gray-500 position-absolute top-50 translate-middle-y ms-3"><span class="path1"></span><span class="path2"></span></i>
+                            <input type="text" v-model="searchPermission" class="form-control form-control-sm form-control-solid ps-10" placeholder="Cari izin..." />
+                        </div>
+                        <div class="form-check form-check-sm form-check-custom form-check-solid">
+                            <input class="form-check-input border-orange" type="checkbox" id="check_all" @change="toggleAllPermissions" :checked="isAllSelected" />
+                            <label class="form-check-label fw-bold fs-8 text-gray-600 cursor-pointer text-nowrap" for="check_all">Semua</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="permission-box rounded-3 border border-gray-300 bg-body p-3 scroll-y">
+                    
+                    <div v-if="loadingPermissions" class="d-flex flex-column align-items-center justify-content-center py-10">
+                        <span class="spinner-border spinner-border-sm text-orange align-middle mb-2"></span> 
+                        <span class="text-gray-500 fs-7">Memuat daftar izin...</span>
+                    </div>
+                    
+                    <div v-else-if="filteredPermissions.length === 0" class="text-center py-10 text-muted">
+                        <i class="ki-duotone ki-search-list fs-1 text-gray-300 mb-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        <div class="fs-7">Tidak ditemukan izin dengan kata kunci "{{ searchPermission }}"</div>
+                    </div>
+
+                    <div v-else class="row g-3">
+                        <div class="col-md-6 col-lg-4" v-for="perm in filteredPermissions" :key="perm.id">
+                            <label class="d-flex align-items-center h-100 p-3 rounded-2 border cursor-pointer transition-200 permission-item" 
+                                   :class="formData.permissions.includes(perm.name) ? 'border-orange bg-light-orange active' : 'border-gray-200 hover-border-gray-400 bg-white'">
+                                
+                                <div class="form-check form-check-custom form-check-solid form-check-sm me-3">
+                                    <input class="form-check-input" type="checkbox" :value="perm.name" v-model="formData.permissions" />
+                                </div>
+                                
+                                <div class="d-flex flex-column overflow-hidden">
+                                    <span class="fw-bold fs-8 text-truncate" :class="formData.permissions.includes(perm.name) ? 'text-orange' : 'text-gray-800'">
+                                        {{ formatPermissionName(perm.name) }}
+                                    </span>
+                                    <span class="fs-9 text-muted font-monospace text-truncate">{{ perm.name }}</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end align-items-center mt-6 pt-3 border-top border-gray-200">
+                 <button type="button" class="btn btn-light me-3 fw-bold text-gray-700 px-5" data-bs-dismiss="modal">Batal</button>
+                 <button :disabled="loading" class="btn btn-orange fw-bold px-6 shadow-sm hover-elevate" type="submit">
+                    <span v-if="!loading" class="d-flex align-items-center">
+                        Simpan <i class="ki-duotone ki-check-circle fs-2 ms-2 text-white"><span class="path1"></span><span class="path2"></span></i>
+                    </span>
+                    <span v-if="loading" class="indicator-progress d-flex align-items-center">
+                        Menyimpan... <span class="spinner-border spinner-border-sm ms-2"></span>
+                    </span>
+                 </button>
+            </div>
+
+          </el-form>
+        </div>
+      </div>
     </div>
-    <div class="card-footer d-flex">
-        <button type="submit" class="btn btn-primary btn-sm ms-auto" :disabled="loading">
-             <span v-if="!loading">Simpan</span>
-             <span v-else>
-                Menyimpan...
-                <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
-             </span>
-        </button>
-    </div>
-  </VForm>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
-import * as Yup from "yup";
-import { toast } from "vue3-toastify";
+import { ref, computed, watch, onMounted } from "vue";
 import ApiService from "@/core/services/ApiService";
-import type { MenuItem } from "@/layouts/default-layout/config/types";
-import MainMenuConfig from "@/layouts/default-layout/config/MainMenuConfig";
-import { Form as VForm, Field, ErrorMessage } from "vee-validate";
-import { block, unblock } from "@/libs/utils";
+import Swal from "sweetalert2";
+import { Modal } from "bootstrap";
+import type { FormInstance, FormRules } from 'element-plus'
 
-// Definisikan tipe Role dan Item secara lokal untuk kejelasan
-interface Role {
-  id: number | null;
-  name: string;
-  full_name: string;
-  permissions: string[];
-}
-interface Item {
-    text: string;
-    value: string;
-    children?: Item[];
-}
+// Interfaces
+interface Permission { id: number; name: string; }
+interface RoleData { id: number; name: string; full_name: string; permissions?: Permission[]; }
+interface FormData { name: string; full_name: string; permissions: string[]; }
 
-const props = defineProps<{
-    selected: number | null;
-}>();
+const props = defineProps<{ roleData: RoleData | null }>();
+const emit = defineEmits(['role-updated']);
 
-const emit = defineEmits(["close", "refresh"]);
-
-// --- STATE MANAGEMENT ---
-const formData = ref<Role>({ id: null, name: '', full_name: '', permissions: [] });
-const formRef = ref<any>(null);
+const formRef = ref<FormInstance>();
+const modalRef = ref<null | HTMLElement>(null);
 const loading = ref(false);
+const loadingPermissions = ref(false);
+const allPermissions = ref<Permission[]>([]);
+const searchPermission = ref(""); // State pencarian
+const isEditMode = computed(() => !!props.roleData);
 
-// --- FUNGSI HELPER (tidak ada perubahan) ---
-const extractNames = (menuConfig: MenuItem[]): Item[] => {
-    const names: Item[] = [];
-    for (const item of menuConfig) {
-        if ("name" in item && item.name) {
-            const nameObject: Item = { text: item.heading || item.sectionTitle!, value: item.name };
-            const children = item.pages || ("sub" in item ? item.sub : undefined);
-            if (children) nameObject.children = extractNames(children);
-            names.push(nameObject);
-        } else {
-            const children = item.pages || ("sub" in item ? item.sub : undefined);
-            if (children) names.push(...extractNames(children));
-        }
+const getInitialFormData = (): FormData => ({ name: "", full_name: "", permissions: [] });
+const formData = ref<FormData>(getInitialFormData());
+
+// --- Fetch Logic ---
+const fetchPermissions = async () => {
+    try {
+        loadingPermissions.value = true;
+        const { data } = await ApiService.get("/master/permissions");
+        allPermissions.value = Array.isArray(data) ? data : (data.data || []);
+    } catch (e) { 
+        console.error("Error permissions", e);
+        Swal.fire("Error", "Gagal memuat permission.", "error");
+    } finally { 
+        loadingPermissions.value = false; 
     }
-    return names;
-};
-const permissions: Item[] = extractNames(MainMenuConfig);
-const findChildren = (menuConfig: Item[]): string[] => {
-    const names: string[] = [];
-    for (const item of menuConfig) {
-        if (item.children?.length) names.push(...findChildren(item.children));
-        names.push(item.value);
-    }
-    return names;
-};
-const findAllParents = (tree: Item[], targetValue: string, parents: string[] = []): string[] => {
-    for (const item of tree) {
-        if (item.value === targetValue) return parents;
-        if (item.children?.length) {
-            const found = findAllParents(item.children, targetValue, [...parents, item.value]);
-            if (found.length > 0 || item.children.some(c => c.value === targetValue)) return found;
-        }
-    }
-    return [];
 };
 
-// --- SKEMA VALIDASI ---
-const formSchema = Yup.object().shape({
-    name: Yup.string().required("Nama harus diisi"),
-    full_name: Yup.string().required("Nama Lengkap harus diisi"),
-    permissions: Yup.array().of(Yup.string()),
+const loadRoleDetails = async (roleId: number) => {
+    loadingPermissions.value = true;
+    try {
+        const { data } = await ApiService.get(`/master/roles/${roleId}`);
+        const role = data.data || data;
+        formData.value.permissions = role.permissions ? role.permissions.map((p: any) => p.name) : [];
+    } catch (e) {
+        console.error("Gagal load detail role", e);
+    } finally {
+        loadingPermissions.value = false;
+    }
+};
+
+// --- Computed & Helpers ---
+const filteredPermissions = computed(() => {
+    if (!searchPermission.value) return allPermissions.value;
+    const q = searchPermission.value.toLowerCase();
+    return allPermissions.value.filter(p => p.name.toLowerCase().includes(q) || formatPermissionName(p.name).toLowerCase().includes(q));
 });
 
-// --- FUNGSI-FUNGSI UTAMA ---
-function handleCheck(item: Item, isChecked: boolean) {
-    let currentPermissions = new Set(formData.value.permissions);
-    const itemAndChildren = [item.value, ...findChildren(item.children || [])];
-    if (isChecked) {
-        itemAndChildren.forEach(p => currentPermissions.add(p));
-        findAllParents(permissions, item.value).forEach(p => currentPermissions.add(p));
+const isAllSelected = computed(() => {
+    return filteredPermissions.value.length > 0 && 
+           filteredPermissions.value.every(p => formData.value.permissions.includes(p.name));
+});
+
+const toggleAllPermissions = (e: Event) => {
+    const checked = (e.target as HTMLInputElement).checked;
+    const visiblePermissions = filteredPermissions.value.map(p => p.name);
+    
+    if (checked) {
+        // Tambahkan yang belum ada
+        const newSet = new Set([...formData.value.permissions, ...visiblePermissions]);
+        formData.value.permissions = Array.from(newSet);
     } else {
-        itemAndChildren.forEach(p => currentPermissions.delete(p));
+        // Hapus yang sedang terlihat
+        formData.value.permissions = formData.value.permissions.filter(p => !visiblePermissions.includes(p));
     }
-    formData.value.permissions = Array.from(currentPermissions);
-}
+};
 
-async function getEditData() {
-    if (!props.selected) return;
-    const formEl = document.getElementById("form-role");
-    loading.value = true;
-    if(formEl) block(formEl);
-    try {
-        const { data } = await ApiService.get(`/master/roles/${props.selected}`);
-        formData.value = {
-            ...data,
-            permissions: data.permissions || [], // Pastikan permissions selalu array
-        };
-    } catch (error: any) {
-        toast.error(error.response?.data?.message || "Gagal memuat data role.");
-        emit('close');
-    } finally {
-        if(formEl) unblock(formEl);
-        loading.value = false;
-    }
-}
+const formatPermissionName = (name: string) => {
+    return name.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
 
-async function submit() {
-    if (!formRef.value) return;
-    const { valid } = await formRef.value.validate();
-    if (!valid) return;
+watch(() => props.roleData, async (newVal) => {
+  if (newVal) {
+    formData.value = { name: newVal.name, full_name: newVal.full_name, permissions: [] };
+    await loadRoleDetails(newVal.id);
+  } else {
+    formRef.value?.resetFields();
+    formData.value = getInitialFormData();
+  }
+});
 
-    loading.value = true;
-    const formEl = document.getElementById("form-role");
-    if(formEl) block(formEl);
-    try {
-        if (props.selected) {
-            await ApiService.put(`/master/roles/${props.selected}`, formData.value);
+const rules = ref<FormRules>({
+  name: [{ required: true, message: "Wajib diisi", trigger: "blur" }],
+  full_name: [{ required: true, message: "Wajib diisi", trigger: "blur" }],
+});
+
+const submit = () => {
+  if (!formRef.value) return;
+  formRef.value.validate(async (valid: boolean) => {
+    if (valid) {
+      loading.value = true;
+      try {
+        if (isEditMode.value && props.roleData?.id) {
+            await ApiService.put(`/master/roles/${props.roleData.id}`, formData.value);
         } else {
             await ApiService.post("/master/roles", formData.value);
         }
-        toast.success("Data berhasil disimpan");
-        emit('refresh');
-        emit('close');
-    } catch (error: any) {
-        if (error.response?.data?.errors) {
-            formRef.value.setErrors(error.response.data.errors);
-        }
-        toast.error(error.response?.data?.message || "Terjadi kesalahan.");
-    } finally {
-        if(formEl) unblock(formEl);
+        Swal.fire({ text: `Berhasil disimpan!`, icon: "success", timer: 1500, showConfirmButton: false }).then(() => {
+            if (modalRef.value) Modal.getInstance(modalRef.value)?.hide();
+            emit('role-updated');
+        });
+      } catch (error: any) {
+        Swal.fire({ text: error.response?.data?.message || "Gagal menyimpan.", icon: "error" });
+      } finally {
         loading.value = false;
+      }
     }
+  });
+};
+
+onMounted(() => { fetchPermissions(); });
+</script>
+
+<style scoped>
+/* ========================
+   THEME COLORS
+   ======================== */
+.text-orange { color: #F68B1E !important; }
+.bg-light-orange { background-color: #FFF8F1 !important; }
+.border-orange { border-color: #F68B1E !important; }
+.btn-orange { background-color: #F68B1E; color: white; border: none; }
+.btn-orange:hover { background-color: #d97814; color: white; }
+
+/* ========================
+   PERMISSION CARD GRID
+   ======================== */
+.permission-box {
+    max-height: 350px;
+    background-color: #ffffff;
 }
 
-// --- LIFECYCLE HOOKS ---
-onMounted(() => {
-    if (props.selected) getEditData();
-});
+.permission-item {
+    transition: all 0.2s ease;
+}
+.permission-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border-color: #F68B1E !important;
+}
+.permission-item.active {
+    background-color: #FFF4E6 !important;
+    border-color: #F68B1E !important;
+}
 
-watch(() => props.selected, (newVal) => {
-    if (newVal) {
-        getEditData();
-    } else {
-        formData.value = { id: null, name: '', full_name: '', permissions: [] };
-        if (formRef.value) {
-            formRef.value.resetForm();
-        }
-    }
-});
-</script>
+/* Custom Checkbox Color */
+.form-check.form-check-solid .form-check-input:checked {
+    background-color: #F68B1E;
+    border-color: #F68B1E;
+}
+
+/* ========================
+   INPUTS STYLE
+   ======================== */
+.required:after { content: "*"; color: #f1416c; margin-left: 3px; }
+
+:deep(.metronic-input .el-input__wrapper) {
+    background-color: #F9F9F9;
+    box-shadow: none !important; 
+    border: 1px solid transparent; 
+    border-radius: 0.6rem; 
+    padding: 8px 12px;
+    height: 40px;
+    transition: all 0.2s;
+}
+
+:deep(.metronic-input .el-input__wrapper.is-focus) {
+    background-color: #ffffff;
+    border-color: #F68B1E !important;
+    box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1) !important;
+}
+
+/* ========================
+   DARK MODE
+   ======================== */
+[data-bs-theme="dark"] .theme-modal { background-color: #1e1e2d; color: #ffffff; }
+[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
+[data-bs-theme="dark"] .text-gray-800 { color: #e1e3ea !important; }
+[data-bs-theme="dark"] .text-gray-600 { color: #CDCDDE !important; }
+[data-bs-theme="dark"] .text-gray-500 { color: #9A9CAE !important; }
+[data-bs-theme="dark"] .bg-light-subtle { background-color: #1b1b29 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .bg-body { background-color: #151521 !important; }
+[data-bs-theme="dark"] .border-gray-300, [data-bs-theme="dark"] .border-gray-200 { border-color: #323248 !important; }
+
+/* Permission Dark */
+[data-bs-theme="dark"] .permission-box { background-color: #1b1b29; border-color: #323248 !important; }
+[data-bs-theme="dark"] .permission-item { background-color: #1e1e2d !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .permission-item:hover { border-color: #F68B1E !important; background-color: #2b2b40 !important; }
+[data-bs-theme="dark"] .permission-item.active { background-color: rgba(246, 139, 30, 0.15) !important; border-color: #F68B1E !important; }
+[data-bs-theme="dark"] .bg-light-orange { background-color: #2b2b40 !important; }
+
+/* Input Dark */
+[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper) {
+    background-color: #1b1b29 !important; 
+    color: #ffffff;
+    border-color: #323248 !important;
+}
+[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper.is-focus) {
+    border-color: #F68B1E !important;
+    background-color: #151521 !important;
+}
+[data-bs-theme="dark"] :deep(.el-input__inner) { color: #ffffff; }
+[data-bs-theme="dark"] .form-control-solid { background-color: #1b1b29 !important; border-color: #323248 !important; color: #ffffff; }
+</style>

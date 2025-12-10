@@ -1,13 +1,31 @@
 <template>
   <div class="landing-page-wrapper">
+    
+    <div class="page-loader" :class="{ 'fade-out': !isLoading }">
+      <div class="loader-content">
+        <div class="spinner-wrapper">
+          <div class="spinner-ring outer"></div>
+          <div class="spinner-ring inner"></div>
+          <div class="brand-icon">
+            <i class="fas fa-crown"></i>
+          </div>
+        </div>
+        <div class="loading-text-wrapper">
+          <h3 class="loading-brand">{{ appName || 'McFlyon' }} <span class="text-theme-main">System</span></h3>
+          <p class="loading-message">Preparing your stay...</p>
+        </div>
+      </div>
+    </div>
     <nav 
       class="navbar navbar-expand-lg fixed-top py-3 transition-all"
       :class="{ 'navbar-scrolled': isScrolled, 'navbar-dark': !isScrolled, 'navbar-light': isScrolled }"
     >
       <div class="container">
         <a class="navbar-brand fw-bolder fs-3 d-flex align-items-center gap-2" href="#">
-          <i class="fas fa-hotel text-theme-main"></i>
-          <span>McFlyon<span class="text-theme-main">Hotel</span></span>
+          <img v-if="logoUrl" :src="logoUrl" alt="Logo" class="navbar-logo">
+          <i v-else class="fas fa-hotel text-theme-main"></i>
+          
+          <span>{{ appName || 'McFlyon' }}<span class="text-theme-main" v-if="!appName">Hotel</span></span>
         </a>
         
         <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -16,45 +34,40 @@
         
         <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
           <ul class="navbar-nav align-items-center gap-3 fw-medium">
-
-            
            <li class="nav-item ms-lg-4 d-flex gap-3 align-items-center">
-  
-  <router-link 
-    to="/auth/sign-in" 
-    class="btn btn-nav-login px-4 py-2 rounded-pill fw-bold transition-all"
-  >
-    Masuk
-  </router-link>
+              <router-link to="/auth/sign-in" class="btn btn-nav-login px-4 py-2 rounded-pill fw-bold transition-all">
+                Masuk
+              </router-link>
 
-  <router-link 
-    to="/auth/sign-up" 
-    class="btn btn-nav-register px-4 py-2 rounded-pill fw-bold shadow-lg transition-all"
-  >
-    Daftar
-  </router-link>
-
-</li>
+              <router-link to="/auth/sign-up" class="btn btn-nav-register px-4 py-2 rounded-pill fw-bold shadow-lg transition-all">
+                Daftar
+              </router-link>
+            </li>
           </ul>
         </div>
       </div>
     </nav>
 
     <header id="home" class="hero-section d-flex align-items-center text-white text-center">
-      <div class="hero-bg"></div>
+      <div 
+        class="hero-bg" 
+        :style="heroBackgroundStyle"
+      ></div>
       <div class="overlay-gradient"></div>
       <div class="container position-relative z-index-1">
-        <div class="row justify-content-center">
+        <div class="row justify-content-center transition-opacity" :class="{ 'opacity-0': isLoading, 'opacity-100': !isLoading }">
           <div class="col-lg-8">
             <div class="badge bg-white bg-opacity-25 text-white px-3 py-2 rounded-pill mb-3 animate-up backdrop-blur border border-white border-opacity-25">
-              <i class="fas fa-crown text-warning me-1"></i> Hotel Bintang 5 Terbaik
+              <i class="fas fa-crown text-warning me-1"></i> {{ appName || 'Hotel Bintang 5 Terbaik' }}
             </div>
             <h1 class="display-2 fw-bolder mb-3 animate-up letter-spacing-tight">
               Golden Sunset <span class="text-gradient">Paradise</span>
             </h1>
+            
             <p class="fs-5 mb-5 text-white-75 animate-up delay-1 px-md-5">
-              Nikmati kehangatan layanan premium dan kenyamanan tanpa batas. Pengalaman menginap yang bersinar seperti emas.
+              {{ appDescription || 'Nikmati kehangatan layanan premium dan kenyamanan tanpa batas. Pengalaman menginap yang bersinar seperti emas.' }}
             </p>
+            
             <div class="d-flex justify-content-center gap-3 animate-up delay-2">
               <router-link to="/auth/sign-in" class="btn btn-theme btn-lg px-5 py-3 rounded-pill fw-bold shadow-lg hover-lift">
                 Booking Sekarang
@@ -80,16 +93,16 @@
           </div>
         </div>
         <div class="col-md-4">
-      <div class="feature-card p-4 rounded-4 bg-white shadow-lg text-center h-100 hover-scale">
-        <div class="icon-circle bg-primary-light text-primary mb-3 mx-auto">
-          <i class="fas fa-tags fs-3"></i>
+          <div class="feature-card p-4 rounded-4 bg-white shadow-lg text-center h-100 hover-scale">
+            <div class="icon-circle bg-primary-light text-primary mb-3 mx-auto">
+              <i class="fas fa-tags fs-3"></i>
+            </div>
+            <h5 class="fw-bold">Harga Terbaik</h5>
+            <p class="text-muted small mb-0">
+              Booking langsung melalui website kami dan dapatkan harga termurah tanpa biaya tersembunyi.
+            </p>
+          </div>
         </div>
-        <h5 class="fw-bold">Harga Terbaik</h5>
-        <p class="text-muted small mb-0">
-          Booking langsung melalui website kami dan dapatkan harga termurah tanpa biaya tersembunyi.
-        </p>
-      </div>
-    </div>
         <div class="col-md-4">
           <div class="feature-card p-4 rounded-4 bg-white shadow-lg text-center h-100 hover-scale">
             <div class="icon-circle bg-danger-light text-danger-orange mb-3 mx-auto">
@@ -203,10 +216,12 @@
         <div class="row g-4 mb-5">
           <div class="col-lg-4 col-md-6">
             <a class="navbar-brand fw-bold fs-3 text-white d-block mb-3" href="#">
-              <i class="fas fa-hotel text-warning me-2"></i>McFlyon Hotel
+              <img v-if="logoUrl" :src="logoUrl" alt="Hotel Logo" class="footer-logo me-2">
+              <i v-else class="fas fa-hotel text-warning me-2"></i>
+              {{ appName || 'McFlyon Hotel' }}
             </a>
             <p class="text-secondary mb-4">
-              Destinasi terbaik untuk kenyamanan dan kemewahan. Kami menghadirkan pengalaman menginap yang bersinar.
+              {{ appDescription ? appDescription.substring(0, 100) + '...' : 'Destinasi terbaik untuk kenyamanan dan kemewahan.' }}
             </p>
             <div class="social-links d-flex gap-3">
               <a href="#" class="social-btn"><i class="fab fa-instagram"></i></a>
@@ -241,7 +256,7 @@
         </div>
         <hr class="border-secondary opacity-25">
         <div class="text-center text-secondary small pt-3">
-          &copy; 2026 McFlyon Hotel System. All rights reserved.
+          &copy; {{ new Date().getFullYear() }} {{ appName || 'McFlyon Hotel System' }}. All rights reserved.
         </div>
       </div>
     </footer>
@@ -249,12 +264,32 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUnmounted } from "vue";
+import { defineComponent, ref, onMounted, onUnmounted, computed } from "vue";
+import axios from "@/libs/axios";
 
 export default defineComponent({
   name: "LandingPage",
   setup() {
     const isScrolled = ref(false);
+    const landingBackground = ref<string>("");
+    const logoUrl = ref<string>("");
+    const appName = ref<string>("");
+    const appDescription = ref<string>("");
+    const isLoading = ref(true);
+
+    const heroBackgroundStyle = computed(() => {
+      if (landingBackground.value) {
+        return {
+          backgroundImage: `url(${landingBackground.value})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
+          opacity: 1,
+          transition: 'opacity 0.8s ease-in-out' // Transisi diperlambat agar lebih elegan
+        };
+      }
+      return { backgroundColor: '#1e1e2d' }; // Warna dasar senada loader
+    });
 
     const handleScroll = () => {
       isScrolled.value = window.scrollY > 50;
@@ -265,11 +300,51 @@ export default defineComponent({
       if (el) el.scrollIntoView({ behavior: "smooth" });
     };
 
+    // Fungsi preload gambar (wajib ada untuk menghindari blink)
+    const preloadImage = (url: string): Promise<void> => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.src = url;
+        img.onload = () => resolve();
+        img.onerror = () => resolve(); // Tetap resolve walau error agar loading kelar
+      });
+    };
+
+    const fetchSettings = async () => {
+      isLoading.value = true;
+      try {
+        const response = await axios.get("/settings");
+        const data = response.data;
+        const timestamp = new Date().getTime();
+        
+        if (data.app) appName.value = data.app;
+        if (data.description) appDescription.value = data.description;
+        if (data.logo) logoUrl.value = `${data.logo}?v=${timestamp}`;
+
+        if (data.bg_landing) {
+          const bgUrl = `${data.bg_landing}?v=${timestamp}`;
+          // Tunggu gambar selesai download baru lanjut
+          await preloadImage(bgUrl);
+          landingBackground.value = bgUrl;
+        }
+
+      } catch (error) {
+        console.error("Error fetching settings:", error);
+      } finally {
+        // Beri sedikit delay agar user sempat melihat animasi branding (premium feel)
+        setTimeout(() => {
+            isLoading.value = false;
+        }, 800);
+      }
+    };
+
     onMounted(() => {
       document.body.classList.remove("page-loading");
       document.body.removeAttribute("data-kt-app-layout");
       document.body.removeAttribute("data-kt-name");
       window.addEventListener("scroll", handleScroll);
+      
+      fetchSettings();
     });
 
     onUnmounted(() => {
@@ -279,6 +354,11 @@ export default defineComponent({
     return {
       isScrolled,
       scrollToRooms,
+      heroBackgroundStyle,
+      logoUrl,
+      isLoading,
+      appName,
+      appDescription
     };
   },
 });
@@ -286,21 +366,151 @@ export default defineComponent({
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
 
+/* --- LUXURY LOADER STYLES --- */
+.page-loader {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-color: #151521; /* Dark Premium Background */
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.8s ease-in-out, visibility 0.8s;
+  opacity: 1;
+  visibility: visible;
+}
+
+.page-loader.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loader-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.spinner-wrapper {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin-bottom: 30px;
+}
+
+/* Cincin Luar (Emas) */
+.spinner-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+
+.spinner-ring.outer {
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-top-color: #FFD700; /* Gold */
+  border-right-color: rgba(255, 215, 0, 0.3);
+  animation: spin 2s linear infinite;
+}
+
+/* Cincin Dalam (Orange) */
+.spinner-ring.inner {
+  top: 15px; left: 15px; right: 15px; bottom: 15px;
+  border-bottom-color: #FF6B35; /* Primary Orange */
+  border-left-color: rgba(255, 107, 53, 0.3);
+  animation: spin-reverse 1.5s linear infinite;
+}
+
+/* Ikon di Tengah */
+.brand-icon {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  color: #FFD700;
+  font-size: 1.5rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.loading-brand {
+  color: white;
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+
+.loading-message {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  font-weight: 300;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  animation: breathe 3s infinite;
+}
+
+/* Keyframes Animasi */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes spin-reverse {
+  0% { transform: rotate(360deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+  50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
+/* Utility tambahan untuk transisi konten */
+.opacity-0 { opacity: 0 !important; }
+.opacity-100 { opacity: 1 !important; }
+.transition-opacity { transition: opacity 1s ease-in-out; }
+
+/* --- END LOADER STYLES --- */
+
+/* Sisa CSS Anda tetap sama di bawah ini */
 .landing-page-wrapper {
   font-family: 'Plus Jakarta Sans', sans-serif;
   overflow-x: hidden;
   color: #2c3e50;
   
-  /* --- PALET WARNA ORANGE/KUNING --- */
-  --color-primary: #FF6B35; /* Orange Cerah */
+  --color-primary: #FF6B35;
   --color-primary-dark: #e85d2a;
-  --color-secondary: #FFD700; /* Emas/Kuning */
+  --color-secondary: #FFD700;
   --color-secondary-soft: #fff9db;
   --color-accent: #ff9f43;
 }
 
-/* --- Utilities Custom Theme --- */
+/* Logo Styling */
+.navbar-logo {
+  height: 45px;
+  width: auto;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.navbar-logo:hover {
+  transform: scale(1.05);
+}
+
+.footer-logo {
+  height: 35px;
+  width: auto;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
 .text-theme-main { color: var(--color-primary) !important; }
 .bg-theme { background-color: var(--color-primary) !important; color: white; }
 .bg-theme-light { background-color: rgba(255, 107, 53, 0.1) !important; }
@@ -328,13 +538,11 @@ export default defineComponent({
   color: white;
 }
 
-/* Custom Icons colors */
 .bg-gold-light { background-color: rgba(255, 215, 0, 0.15); }
 .text-gold-dark { color: #d4af37; }
 .bg-danger-light { background-color: rgba(255, 82, 82, 0.1); }
 .text-danger-orange { color: #ff5252; }
 
-/* --- Navbar Glassmorphism --- */
 .navbar { transition: all 0.4s ease; }
 .navbar-scrolled {
   background: rgba(255, 255, 255, 0.95);
@@ -347,27 +555,28 @@ export default defineComponent({
 .navbar-scrolled .nav-link { color: #555 !important; }
 .navbar-scrolled .nav-link:hover { color: var(--color-primary) !important; }
 
-/* --- Hero Section --- */
 .hero-section {
   position: relative;
   height: 100vh;
   min-height: 700px;
 }
+
 .hero-bg {
   position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
-  /* Ganti gambar dengan nuansa lebih hangat jika perlu */
-  background: url('https://images.unsplash.com/photo-1560624052-449f5ddf0c31?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80') center/cover no-repeat; 
-  background-attachment: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transition: background-image 0.5s ease-in-out;
 }
+
 .overlay-gradient {
   position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
-  /* Gradasi Hitam ke Orange Gelap */
   background: linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(68, 30, 0, 0.7) 100%);
 }
+
 .text-gradient {
-  /* Gradasi Teks Orange ke Kuning */
   background: linear-gradient(to right, #FFD700, #FFA500);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -375,7 +584,6 @@ export default defineComponent({
 }
 .letter-spacing-tight { letter-spacing: -1px; }
 
-/* --- Cards --- */
 .relative-overlap {
   position: relative;
   margin-top: -60px;
@@ -387,7 +595,7 @@ export default defineComponent({
 }
 .feature-card:hover {
   transform: translateY(-10px);
-  border-color: var(--color-primary); /* Border Orange saat hover */
+  border-color: var(--color-primary);
 }
 .icon-circle {
   width: 70px; height: 70px;
@@ -395,7 +603,6 @@ export default defineComponent({
   border-radius: 50%;
 }
 
-/* --- Room Cards --- */
 .room-card { transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
 .room-card:hover { transform: translateY(-5px); }
 .hover-shadow-lg:hover { box-shadow: 0 1rem 3rem rgba(0,0,0,.15)!important; }
@@ -421,7 +628,6 @@ export default defineComponent({
   overflow: hidden;
 }
 
-/* --- CTA Section --- */
 .cta-section { background-color: var(--color-primary); }
 .cta-bg {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -429,7 +635,6 @@ export default defineComponent({
   opacity: 0.15; mix-blend-mode: multiply;
 }
 
-/* --- Footer --- */
 .social-btn {
   width: 40px; height: 40px;
   background: rgba(255,255,255,0.1);
@@ -442,33 +647,27 @@ export default defineComponent({
 .hover-white:hover { color: white !important; }
 .hover-theme:hover { color: var(--color-primary) !important; }
 
-/* --- CUSTOM NAVBAR BUTTONS --- */
-
-/* 1. TOMBOL DAFTAR (Primary) */
 .btn-nav-register {
   background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
   color: white !important;
   border: none;
-  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3); /* Bayangan Orange Halus */
+  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
   position: relative;
   overflow: hidden;
   z-index: 1;
 }
 
-/* Efek Hover untuk Daftar */
 .btn-nav-register:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(255, 107, 53, 0.5);
   background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
 }
 
-/* 2. TOMBOL MASUK (Secondary) */
 .btn-nav-login {
-  /* Kondisi Awal (Di Hero Section - Gelap) */
-  background-color: rgba(255, 255, 255, 0.1); /* Sedikit transparan */
+  background-color: rgba(255, 255, 255, 0.1);
   color: white !important;
   border: 1px solid rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(4px); /* Efek kaca */
+  backdrop-filter: blur(4px);
 }
 
 .btn-nav-login:hover {
@@ -477,12 +676,9 @@ export default defineComponent({
   border-color: white;
 }
 
-/* --- LOGIKA SAAT NAVBAR DI-SCROLL (Background Putih) --- */
-
-/* Saat scroll, tombol Masuk berubah jadi warna tema agar terbaca */
 .navbar-scrolled .btn-nav-login {
   background-color: transparent;
-  color: var(--color-primary) !important; /* Teks jadi Orange */
+  color: var(--color-primary) !important;
   border: 1px solid var(--color-primary);
 }
 
@@ -491,13 +687,10 @@ export default defineComponent({
   color: white !important;
 }
 
-/* Tombol Daftar tetap Solid tapi shadow menyesuaikan */
 .navbar-scrolled .btn-nav-register {
   box-shadow: 0 4px 15px rgba(255, 107, 53, 0.25);
 }
 
-
-/* --- Animations --- */
 .py-section { padding-top: 5rem; padding-bottom: 5rem; }
 .divider { width: 50px; height: 4px; border-radius: 3px; }
 .hover-lift { transition: transform 0.3s; }
@@ -514,6 +707,10 @@ export default defineComponent({
   to { opacity: 1; transform: translateY(0); }
 }
 
+.z-index-1 { z-index: 1; }
+.bg-primary-light { background-color: rgba(13, 110, 253, 0.1); }
+.text-white-75 { color: rgba(255, 255, 255, 0.75); }
+
 @media (max-width: 991px) {
   .relative-overlap { margin-top: 2rem; }
   .navbar-collapse {
@@ -522,5 +719,9 @@ export default defineComponent({
     box-shadow: 0 10px 30px rgba(0,0,0,0.1);
   }
   .navbar-nav .nav-link { color: #333 !important; }
+  
+  .navbar-logo {
+    height: 35px;
+  }
 }
 </style>

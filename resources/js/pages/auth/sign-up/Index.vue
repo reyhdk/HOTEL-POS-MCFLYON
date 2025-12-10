@@ -3,20 +3,25 @@
     
     <div 
       class="d-flex flex-lg-row-fluid w-lg-50 bgi-size-cover bgi-position-center order-1 order-lg-1 position-relative h-100 anim-fade-in"
-      style="background-image: url('https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1470&auto=format&fit=crop');"
+      :style="backgroundStyle"
     >
       <div class="d-flex flex-column flex-center py-7 py-lg-15 px-5 px-md-15 w-100 h-100 bg-gradient-overlay">
+        
         <div class="mb-10 text-center">
-             <img v-if="setting?.logo" :src="setting?.logo" class="h-70px mb-4" alt="Logo"/>
+             <img v-if="setting?.logo" :src="setting.logo" class="h-70px mb-4" alt="Logo"/>
+             <i v-else class="fas fa-hotel fa-4x text-white mb-4"></i>
+
              <h1 class="text-white display-4 fw-bolder text-shadow">
                 Join {{ setting?.app || 'McFlyon Hotel' }}
              </h1>
         </div>
+
         <p class="text-white fs-4 opacity-75 text-center fw-light" style="max-width: 500px;">
           "Create an account to unlock exclusive features and manage your bookings effortlessly."
         </p>
+
         <div class="mt-auto text-white opacity-50 fs-7">
-          &copy; 2026 McFlyon System. By @reyhdk_
+          &copy; {{ new Date().getFullYear() }} {{ setting?.app || 'McFlyon System' }}. By @reyhdk_
         </div>
       </div>
     </div>
@@ -44,6 +49,7 @@
 
           <div class="anim-up-2">
             <VForm class="form w-100" @submit="onSubmitRegister" :validation-schema="registrationSchema">
+                
                 <div class="fv-row mb-7">
                   <label class="form-label fw-bolder text-dark fs-6">Nama Lengkap</label>
                    <div class="position-relative">
@@ -52,6 +58,7 @@
                    </div>
                    <div class="fv-plugins-message-container mt-1"><ErrorMessage name="name" class="text-danger fs-7 fw-semibold" /></div>
                 </div>
+
                 <div class="fv-row mb-7">
                   <label class="form-label fw-bolder text-dark fs-6">Email</label>
                    <div class="position-relative">
@@ -104,8 +111,7 @@
 </template>
 
 <script setup lang="ts">
-// (Script Anda tetap SAMA seperti sebelumnya)
-import { ref } from "vue";
+import { ref, computed } from "vue"; // Tambahkan computed
 import { ErrorMessage, Field, Form as VForm } from "vee-validate";
 import * as Yup from "yup";
 import { useAuthStore } from "@/stores/auth";
@@ -116,7 +122,26 @@ import { useSetting } from "@/services";
 const submitButton = ref<HTMLButtonElement | null>(null);
 const store = useAuthStore();
 const router = useRouter();
-const { data: setting } = useSetting() || { data: {} };
+
+// Menggunakan useSetting yang sama dengan SignIn
+const { data: setting } = useSetting();
+
+// Computed Property untuk Background Dinamis
+const backgroundStyle = computed(() => {
+  const data = setting.value;
+  
+  if (data && data.bg_auth) {
+    return {
+      backgroundImage: `url('${data.bg_auth}')`
+    };
+  }
+
+  // Fallback ke Default Image
+  return {
+    backgroundImage: "url('https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1470&auto=format&fit=crop')"
+  };
+});
+
 const showPassword = ref(false);
 const showConfirmPassword = ref(false);
 
@@ -156,9 +181,6 @@ const onSubmitRegister = async (values: any) => {
 </script>
 
 <style scoped>
-/* Copy paste Style dari Sign-in.vue di atas persis ke sini. 
-   Pastikan bagian KEYFRAMES ikut tercopy */
-
 /* --- ANIMATION KEYFRAMES --- */
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
@@ -182,11 +204,14 @@ const onSubmitRegister = async (values: any) => {
 .link-theme { color: #FF6B35 !important; text-decoration: none; transition: all 0.2s ease; }
 .link-theme:hover { color: #d14d1d !important; text-decoration: underline; }
 .text-gray-500 { color: #a1a5b7 !important; }
+
+/* Style Form & Button Konsisten dengan Login */
 :deep(.btn-orange) { background-color: #FF6B35 !important; border: 1px solid #FF6B35 !important; color: white !important; outline: none !important; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important; }
 :deep(.btn-orange:hover) { background-color: #e85d2a !important; border-color: #e85d2a !important; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(255, 107, 53, 0.25) !important; color: white !important; }
 :deep(.btn-orange:active), :deep(.btn-orange:focus) { background-color: #d14d1d !important; border-color: #d14d1d !important; box-shadow: 0 0 0 0.25rem rgba(255, 107, 53, 0.3) !important; color: white !important; }
 :deep(.form-control-solid) { background-color: #f5f8fa; border-color: #f5f8fa; color: #5e6278; border-radius: 0.75rem; padding-top: 0.8rem; padding-bottom: 0.8rem; transition: all 0.2s ease; }
 :deep(.form-control-solid:focus) { border-color: #FF6B35 !important; background-color: #fff9f5 !important; box-shadow: 0 0 0 0.25rem rgba(255, 107, 53, 0.15) !important; color: #3f4254; }
+
 .ps-12 { padding-left: 3rem !important; }
 .pe-12 { padding-right: 3rem !important; }
 </style>

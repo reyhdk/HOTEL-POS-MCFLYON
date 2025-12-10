@@ -10,42 +10,51 @@ use Illuminate\Support\Facades\Log;
 
 class FolioController extends Controller
 {
-    /**
-     * Mengambil data folio untuk semua kamar yang sedang ditempati.
-     */
-    public function index()
-    {
-        $occupiedRooms = Room::whereHas('checkIns', function ($query) {
-            $query->where('is_active', true);
-        })
-        ->with([
-            'checkIns' => function ($query) {
-                $query->where('is_active', true)->with('guest');
-            },
-            'orders.items.menu',
-        ])
-        ->get();
+public function index()
+{
+    // 1. Ambil data kamar yang aktif (Query dasar)
+    $occupiedRooms = Room::whereHas('checkIns', function ($query) {
+        $query->where('is_active', true);
+    })
+    ->with([
+        'checkIns' => function ($query) {
+            $query->where('is_active', true)->with('guest');
+        },
+        'orders.items.menu',
+    ])
+    ->get();
 
-        $occupiedRooms->each(function ($room) {
-            $activeCheckIn = $room->checkIns->firstWhere('is_active', true);
+    // 2. Format ulang data (Mapping)
+    $formattedRooms = $occupiedRooms->map(function ($room) {
+        $activeCheckIn = $room->checkIns->firstWhere('is_active', true);
+        
+        // A. Ambil Nama Tamu
+        $guestName = $activeCheckIn && $activeCheckIn->guest ? $activeCheckIn->guest->name : 'Tamu';
 
-            if ($activeCheckIn) {
-                // Daftar status yang dianggap sebagai tagihan aktif
-                $billableStatuses = ['pending', 'processing', 'delivering', 'completed'];
+        // B. Ambil Order yang BELUM DIBAYAR saja
+        // Kita asumsikan status 'paid' berarti sudah lunas. Status lain berarti belum.
+        $unpaidOrders = collect();
+        if ($activeCheckIn) {
+            $billableStatuses = ['pending', 'processing', 'delivering', 'completed']; // Status yang belum bayar
+            
+            $unpaidOrders = $room->orders->filter(function ($order) use ($activeCheckIn, $billableStatuses) {
+                return $order->created_at >= $activeCheckIn->created_at
+                        && in_array($order->status, $billableStatuses);
+            })->values(); // Reset index array
+        }
 
-                $relevantOrders = $room->orders->filter(function ($order) use ($activeCheckIn, $billableStatuses) {
-                    return $order->created_at >= $activeCheckIn->created_at
-                           && in_array($order->status, $billableStatuses);
-                });
+        return [
+            'id' => $room->id,
+            'room_number' => $room->room_number,
+            'guest_name' => $guestName,      // <--- Data Nama Tamu
+            'orders' => $unpaidOrders,       // <--- Hanya order yang belum dibayar
+            'total_bill' => $unpaidOrders->sum('total_price'), // Hitung total dari yang belum dibayar
+            'status' => 'occupied'
+        ];
+    });
 
-                $room->setRelation('orders', $relevantOrders->values());
-            } else {
-                $room->setRelation('orders', collect());
-            }
-        });
-
-        return response()->json($occupiedRooms);
-    }
+    return response()->json($formattedRooms);
+}
 
     /**
      * Memproses semua tagihan, lalu melakukan check-out.

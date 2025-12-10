@@ -42,7 +42,10 @@ Route::prefix('public')->group(function () {
     Route::get('/facilities', [FacilityController::class, 'index']);
 });
 
-Route::get('/setting', [SettingController::class, 'index']);
+// ========================================
+// SETTINGS - PUBLIK (untuk Landing Page)
+// ========================================
+Route::get('/settings', [SettingController::class, 'index']);
 
 // Autentikasi
 Route::prefix('auth')->group(function () {
@@ -82,7 +85,10 @@ Route::middleware('auth:api')->group(function () {
 
     // --- RUTE PANEL ADMIN (DILINDUNGI DENGAN PERMISSION) ---
 
-    Route::post('/setting', [SettingController::class, 'update'])->middleware('can:edit settings');
+    // ========================================
+    // SETTINGS UPDATE - ADMIN ONLY
+    // ========================================
+    Route::post('/settings', [SettingController::class, 'update'])->middleware('can:edit settings');
 
     Route::middleware('can:view dashboard')->group(function () {
         Route::get('/dashboard-stats', [DashboardController::class, 'getStats']);
@@ -95,7 +101,7 @@ Route::middleware('auth:api')->group(function () {
     
     // Riwayat Transaksi & Export
     Route::get('/transaction-history', [PaymentController::class, 'getTransactionHistory'])->middleware('can:view transaction_history');
-    Route::get('/transaction-history/export', [PaymentController::class, 'exportReport'])->middleware('can:view transaction_history'); // [UPDATED] Tambah middleware security
+    Route::get('/transaction-history/export', [PaymentController::class, 'exportReport'])->middleware('can:view transaction_history');
 
     Route::post('/orders/{order}/pay', [PaymentController::class, 'processPayment'])->middleware('can:manage payments');
     Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancelOrder'])->middleware('can:manage payments');
@@ -112,15 +118,12 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/online-orders/{order}', [AdminOrderController::class, 'show'])->middleware('can:view online_orders');
     
     // 2. Update Status Dapur (Masak, Antar, Selesai)
-    // Frontend memanggil: PUT /api/admin/orders/{id}/status
     Route::put('/admin/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->middleware('can:view online_orders');
 
     // 3. Pembayaran Manual (POS / Admin)
-    // Frontend memanggil: POST /api/admin/orders/{id}/pay
     Route::post('/admin/orders/{order}/pay', [AdminOrderController::class, 'markAsPaid'])->middleware('can:manage payments');
 
     // =============================================================
-
 
     // Manajemen Permintaan Layanan (Untuk Staf)
     Route::middleware('can:manage service_requests')->group(function () {
@@ -132,7 +135,6 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/check-in', [CheckInController::class, 'store'])->middleware('can:create pos_orders');
     Route::post('/check-out/{room}', [CheckInController::class, 'checkout'])->middleware('can:create pos_orders');
     Route::get('/admin/checkout-history', [CheckoutHistoryController::class, 'index'])->middleware('can:view checkout_history');
-
 
     // Manajemen Master Data
     Route::apiResource('menus', MenuController::class)->middleware('can:view menus');
@@ -149,5 +151,6 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/all-roles', [UserController::class, 'getAllRoles'])->middleware('can:view roles');
         Route::apiResource('users', UserController::class)->scoped(['user' => 'uuid'])->middleware('can:view users');
         Route::apiResource('roles', RoleController::class)->middleware('can:view roles');
+        Route::get('/permissions', [RoleController::class, 'getAllPermissions'])->middleware('can:view roles');
     });
 });

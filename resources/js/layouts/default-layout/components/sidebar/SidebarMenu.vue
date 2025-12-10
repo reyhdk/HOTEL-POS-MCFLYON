@@ -17,6 +17,8 @@
         data-kt-menu="true"
       >
         <template v-for="(item, i) in filteredMenu" :key="i">
+          
+          <!-- Section Heading -->
           <div v-if="item.heading" class="menu-item pt-5">
             <div class="menu-content">
               <span class="menu-heading fw-bold text-uppercase fs-7">
@@ -24,7 +26,11 @@
               </span>
             </div>
           </div>
+
+          <!-- Menu Items -->
           <template v-for="(menuItem, j) in item.pages" :key="j">
+            
+            <!-- Simple Link Menu -->
             <div v-if="menuItem.heading" class="menu-item">
               <router-link
                 v-if="menuItem.route"
@@ -42,11 +48,13 @@
                     icon-class="fs-2"
                   />
                 </span>
-                <span class="menu-title">{{
+                <span class="menu-title fw-semibold">{{
                   translate(menuItem.heading)
                 }}</span>
               </router-link>
             </div>
+
+            <!-- Accordion Menu dengan Sub Items -->
             <div
               v-if="menuItem.sectionTitle && menuItem.route"
               :class="{ show: hasActiveChildren(menuItem.route) }"
@@ -65,7 +73,7 @@
                     icon-class="fs-2"
                   />
                 </span>
-                <span class="menu-title">{{
+                <span class="menu-title fw-semibold">{{
                   translate(menuItem.sectionTitle)
                 }}</span>
                 <span class="menu-arrow"></span>
@@ -124,10 +132,6 @@ const filteredMenu = computed(() => {
 
     if (section.pages) {
       for (const page of section.pages) {
-        // Logika Pengecekan:
-        // 1. Jika menu untuk user biasa, cek rolenya.
-        // 2. Jika menu untuk admin, cek PERMISSION-nya.
-        
         const isUserMenu = page.roles?.includes('user');
         const hasAccess = isUserMenu 
           ? page.roles?.includes(userRole.value) 
@@ -135,26 +139,21 @@ const filteredMenu = computed(() => {
 
         if (hasAccess) {
           const newPage = { ...page };
-
-          // Jika ada sub-menu, filter sub-menunya juga dengan logika yang sama
           if (page.sub) {
             newPage.sub = page.sub.filter(subItem => 
               subItem.name ? authStore.hasPermission(subItem.name) : true
             );
           }
-          
           if (!newPage.sub || newPage.sub.length > 0) {
             newSection.pages?.push(newPage);
           }
         }
       }
     }
-
     if (newSection.pages && newSection.pages.length > 0) {
       result.push(newSection);
     }
   }
-
   return result;
 });
 
@@ -171,3 +170,107 @@ const hasActiveChildren = (match: string) => {
   return route.path.indexOf(match) !== -1;
 };
 </script>
+
+<style scoped>
+/* ========================================
+   SIDEBAR MENU - SMOOTH & MINIMAL
+   ======================================== */
+
+/* Menu Link Base */
+.menu-item .menu-link {
+    transition: all 0.3s ease;
+    border-radius: 10px;
+    margin-bottom: 4px;
+}
+
+/* Hover Effect */
+.menu-item .menu-link:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateX(4px);
+}
+
+.menu-item .menu-link:hover:not(.active) .menu-icon i,
+.menu-item .menu-link:hover:not(.active) .menu-icon .svg-icon {
+    color: #ffffff !important;
+}
+
+/* Active State */
+.menu-link.active {
+    background: linear-gradient(90deg, rgba(246, 139, 30, 0.15) 0%, rgba(246, 139, 30, 0.05) 100%) !important;
+    border-left: 3px solid #F68B1E;
+    padding-left: 1.5rem !important;
+    border-radius: 0 10px 10px 0;
+}
+
+.menu-link.active .menu-title {
+    color: #F68B1E !important;
+    font-weight: 700;
+}
+
+.menu-link.active .menu-icon i,
+.menu-link.active .menu-icon .svg-icon {
+    color: #F68B1E !important;
+}
+
+/* Submenu Styling */
+.menu-sub {
+    margin-left: 1rem;
+    padding-left: 1rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.menu-sub .menu-link.active {
+    background: transparent !important;
+    border-left: none !important;
+    padding-left: 1rem !important;
+}
+
+/* Active Bullet */
+.menu-sub .menu-link .menu-bullet .bullet-dot {
+    width: 6px;
+    height: 6px;
+    background-color: rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+.menu-sub .menu-link.active .menu-bullet .bullet-dot {
+    background-color: #F68B1E !important;
+    transform: scale(1.5);
+    box-shadow: 0 0 10px rgba(246, 139, 30, 0.6);
+}
+
+.menu-sub .menu-link.active .menu-title {
+    color: #ffffff !important;
+    font-weight: 600;
+}
+
+/* Section Heading */
+.menu-heading {
+    color: #6c7293 !important;
+    letter-spacing: 1.5px;
+    opacity: 0.7;
+}
+
+/* Accordion Arrow */
+.menu-arrow {
+    transition: transform 0.3s ease;
+}
+
+.menu-accordion.show .menu-arrow {
+    transform: rotate(90deg);
+}
+
+/* Custom Scrollbar */
+.hover-scroll-overlay-y::-webkit-scrollbar {
+    width: 6px;
+}
+
+.hover-scroll-overlay-y::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.hover-scroll-overlay-y::-webkit-scrollbar-thumb:hover {
+    background: rgba(246, 139, 30, 0.3);
+}
+</style>
