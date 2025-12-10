@@ -13,34 +13,33 @@ use Illuminate\Support\Facades\DB;
 class RoomController extends Controller
 {
 
-      /**
+    /**
      * [TAMBAHKAN INI]
      * Menerapkan otorisasi berbasis permission secara otomatis.
      */
     public function __construct()
     {
-        // 'view'   => 'view rooms' (untuk index dan show)
-        // 'create' => 'create rooms' (untuk store)
-        // 'update' => 'edit rooms' (untuk update)
-        // 'delete' => 'delete rooms' (untuk destroy)
         $this->authorizeResource(Room::class, 'room');
     }
 
 
     /**
-     * Mengambil daftar semua kamar untuk panel admin (POS, Folio, dll).
-     * INI ADALAH FUNGSI KUNCI UNTUK MASALAHMU.
+     * ✅ FIXED: Mengambil daftar semua kamar untuk panel admin (POS, Folio, dll).
+     * MENAMBAHKAN EAGER LOAD 'booking' AGAR is_incognito DARI BOOKING ONLINE TERDETEKSI.
      */
     public function index()
     {
         return Room::with([
             'checkIns' => function ($query) {
-                $query->where('is_active', true)->with('guest');
+                // ✅ PERBAIKAN UTAMA: Tambahkan 'booking' di sini
+                $query->where('is_active', true)
+                      ->with(['guest', 'booking']); // Load booking juga!
             },
             'facilities',
             'serviceRequests' => function ($query) {
-            $query->where('service_name', 'Pembersihan Kamar')->where('status', 'pending');
-        }
+                $query->where('service_name', 'Pembersihan Kamar')
+                      ->where('status', 'pending');
+            }
         ])->latest()->get();
     }
 
@@ -72,18 +71,18 @@ class RoomController extends Controller
         return $query->latest()->get();
     }
 
- /**
+    /**
      * [BARU] Mengambil daftar kamar yang sedang ditempati untuk halaman Point of Sale.
      */
     public function getOccupiedRoomsForPos()
     {
-        // Otorisasi: Pastikan user punya izin untuk membuat pesanan POS
         $this->authorize('create', \App\Models\Order::class);
 
-        // Ambil kamar yang statusnya 'occupied' dan sertakan data check-in aktif beserta nama tamunya
         $occupiedRooms = Room::where('status', 'occupied')
                              ->with(['checkIns' => function ($query) {
-                                 $query->where('is_active', true)->with('guest');
+                                 // ✅ Tambahkan booking di sini juga untuk konsistensi
+                                 $query->where('is_active', true)
+                                       ->with(['guest', 'booking']);
                              }])
                              ->get();
 
@@ -147,23 +146,20 @@ class RoomController extends Controller
      */
     public function update(Request $request, Room $room)
     {
-        // app/Http/Controllers/Api/RoomController.php -> method store()
-
-    $validatedData = $request->validate([
-        'room_number' => 'required|string|unique:rooms,room_number,' . $room->id,
-        'type' => 'required|string',
-        'status' => 'required|string',
-        'price_per_night' => 'required|numeric|min:0',
-        'description' => 'nullable|string',
-        'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        'facility_ids' => 'nullable|array',
-        'facility_ids.*' => 'exists:facilities,id',
-        'tersedia_mulai' => 'nullable|date',
-        'tersedia_sampai' => 'nullable|date|after_or_equal:tersedia_mulai',
-    ]);
+        $validatedData = $request->validate([
+            'room_number' => 'required|string|unique:rooms,room_number,' . $room->id,
+            'type' => 'required|string',
+            'status' => 'required|string',
+            'price_per_night' => 'required|numeric|min:0',
+            'description' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'facility_ids' => 'nullable|array',
+            'facility_ids.*' => 'exists:facilities,id',
+            'tersedia_mulai' => 'nullable|date',
+            'tersedia_sampai' => 'nullable|date|after_or_equal:tersedia_mulai',
+        ]);
 
         Log::info('Data yang divalidasi untuk diupdate:', $validatedData);
-
 
         if ($request->hasFile('image')) {
             if ($room->image) Storage::delete($room->image);
@@ -200,7 +196,7 @@ class RoomController extends Controller
      */
     public function markForCleaning(Room $room)
     {
-        if ($room->status !== 'occupied') { // Logika: Seharusnya dari 'occupied' setelah checkout
+        if ($room->status !== 'occupied') {
             return response()->json(['message' => 'Hanya kamar yang terisi yang bisa ditandai untuk dibersihkan setelah check-out.'], 409);
         }
         $room->update(['status' => 'needs cleaning']);
@@ -210,51 +206,45 @@ class RoomController extends Controller
     /**
      * Tamu meminta kamarnya dibersihkan.
      */
-    public function requestCleaning(Request $request, Room $room) // Tambahkan Request
-{
-    if ($room->status !== 'occupied') {
-        return response()->json(['message' => 'Hanya kamar yang sedang terisi yang bisa meminta pembersihan.'], 409);
+    public function requestCleaning(Request $request, Room $room)
+    {
+        if ($room->status !== 'occupied') {
+            return response()->json(['message' => 'Hanya kamar yang sedang terisi yang bisa meminta pembersihan.'], 409);
+        }
+
+        try {
+            DB::transaction(function () use ($room) {
+                $room->update(['status' => 'request cleaning']);
+
+                \App\Models\ServiceRequest::create([
+                    'room_id' => $room->id,
+                    'user_id' => $room->checkIns()->where('is_active', true)->first()?->booking?->user_id,
+                    'service_name' => 'Pembersihan Kamar',
+                    'status' => 'pending',
+                    'quantity' => 1,
+                ]);
+            });
+
+            return response()->json(['message' => 'Permintaan pembersihan kamar telah dicatat.']);
+        } catch (\Throwable $e) {
+            Log::error('Gagal membuat permintaan pembersihan manual: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal membuat permintaan.'], 500);
+        }
     }
-
-    try {
-        DB::transaction(function () use ($room) {
-            // 1. Ubah status kamar
-            $room->update(['status' => 'request cleaning']);
-
-            // 2. Buat record ServiceRequest agar sinkron
-            \App\Models\ServiceRequest::create([
-                'room_id' => $room->id,
-                'user_id' => $room->checkIns()->where('is_active', true)->first()?->booking?->user_id, // Ambil user_id dari check-in aktif
-                'service_name' => 'Pembersihan Kamar',
-                'status' => 'pending',
-                'quantity' => 1, // Default quantity
-            ]);
-        });
-
-        return response()->json(['message' => 'Permintaan pembersihan kamar telah dicatat.']);
-    } catch (\Throwable $e) {
-        Log::error('Gagal membuat permintaan pembersihan manual: ' . $e->getMessage());
-        return response()->json(['message' => 'Gagal membuat permintaan.'], 500);
-    }
-}
 
     /**
      * Menandai kamar sudah bersih (logika cerdas).
      */
     public function markAsClean(Room $room)
     {
-    if (!in_array($room->status, ['needs cleaning', 'request cleaning', 'dirty'])) {
-        return response()->json(['message' => 'Status kamar tidak valid untuk ditandai bersih.'], 409);
+        if (!in_array($room->status, ['needs cleaning', 'request cleaning', 'dirty'])) {
+            return response()->json(['message' => 'Status kamar tidak valid untuk ditandai bersih.'], 409);
+        }
+
+        $hasActiveCheckIn = $room->checkIns()->where('is_active', true)->exists();
+        $newStatus = $hasActiveCheckIn ? 'occupied' : 'available';
+        $room->update(['status' => $newStatus]);
+
+        return response()->json(['message' => 'Kamar telah ditandai bersih dan status diperbarui menjadi ' . $newStatus . '.']);
     }
-
-    // Cek apakah masih ada sesi check-in aktif untuk kamar ini.
-    $hasActiveCheckIn = $room->checkIns()->where('is_active', true)->exists();
-
-    // Jika ada tamu, status kembali ke 'occupied'. Jika tidak ada (setelah checkout), status kembali ke 'available'.
-    $newStatus = $hasActiveCheckIn ? 'occupied' : 'available';
-
-    $room->update(['status' => $newStatus]);
-
-    return response()->json(['message' => 'Kamar telah ditandai bersih dan status diperbarui menjadi ' . $newStatus . '.']);
-}
 }

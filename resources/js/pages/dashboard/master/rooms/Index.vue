@@ -1,6 +1,7 @@
 <template>
   <div class="d-flex flex-column gap-5">
     
+    <!-- Statistics Cards -->
     <div class="row g-5 g-xl-8">
       <div class="col-xl-3 col-6 animate-item" style="--delay: 0s">
         <div class="card bg-body hover-elevate-up border-0 h-100 card-stat-orange theme-card shadow-sm">
@@ -67,6 +68,7 @@
       </div>
     </div>
 
+    <!-- Filter Card -->
     <div class="card border-0 shadow-sm theme-card animate-item position-relative" style="--delay: 0.4s; z-index: 99;">
         <div class="card-body py-4">
             <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4">
@@ -99,7 +101,7 @@
                                         <a href="#" class="dropdown-item-custom rounded px-3 py-2 fw-semibold mb-1" 
                                            :class="{ 'selected': filterType === 'all' }" 
                                            @click.prevent="setFilterType('all')">
-                                            Semua Tipe
+                                           Semua Tipe
                                         </a>
                                     </li>
                                     <li v-for="type in uniqueRoomTypes" :key="type">
@@ -148,6 +150,7 @@
         </div>
     </div>
 
+    <!-- Room List -->
     <div class="position-relative min-h-300px" style="z-index: 1;">
         
         <div v-if="loading" class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center z-index-10 bg-body bg-opacity-75 rounded-3">
@@ -171,11 +174,10 @@
                     
                     <div class="card h-100 border-0 shadow-sm theme-card hover-elevate-up transition-300 group-card">
                         
+                        <!-- Room Image -->
                         <div class="position-relative h-200px bg-secondary rounded-top-3 overflow-hidden room-image-container">
                              <img :src="room.image_url || '/media/svg/files/blank-image.svg'" class="w-100 h-100 object-fit-cover room-img" alt="Room Image" />
-                             
                              <div class="overlay-layer position-absolute w-100 h-100 transition-300 z-index-1"></div>
-                             
                              <div class="position-absolute top-0 start-0 w-100 h-4px status-border transition-300" :class="getStatusColor(room.status, 'bg')"></div>
 
                              <div class="position-absolute bottom-0 end-0 m-3 z-index-2">
@@ -191,6 +193,7 @@
                              </div>
                         </div>
 
+                        <!-- Room Details -->
                         <div class="card-body p-5 d-flex flex-column">
                             
                             <div class="d-flex justify-content-between align-items-start mb-3">
@@ -205,15 +208,38 @@
                                 </button>
                             </div>
 
+                            <!-- ✅ FIXED: Guest Info with Incognito Badge -->
                             <div class="d-flex align-items-center p-3 rounded mb-4 bg-light-subtle border border-dashed border-gray-300 status-info-card">
                                 <span class="bullet bullet-dot h-10px w-10px me-3 pulse-dot" :class="getStatusColor(room.status, 'bg')"></span>
                                 <div class="d-flex flex-column w-100">
                                     <span class="fs-7 fw-bold" :class="getStatusColor(room.status, 'text')">{{ getStatusLabel(room.status) }}</span>
                                     
                                     <div v-if="room.status === 'occupied' && getActiveGuestName(room)" class="d-flex flex-column mt-1">
-                                        <span class="fs-8 fw-bolder text-gray-800 text-truncate">{{ getActiveGuestName(room) }}</span>
+                                        
+                                        <!-- Incognito Badge -->
+                                        <div v-if="isGuestIncognito(room)" class="d-flex align-items-center mb-1">
+                                            <span class="badge badge-light-danger fw-bold fs-9 d-flex align-items-center px-2 py-1 border border-danger border-dashed">
+                                                <i class="ki-duotone ki-eye-slash fs-8 me-1 text-danger">
+                                                    <span class="path1"></span><span class="path2"></span>
+                                                    <span class="path3"></span><span class="path4"></span>
+                                                </i>
+                                                INCOGNITO
+                                            </span>
+                                        </div>
+                                        
+                                        <!-- Guest Name -->
+                                        <span class="fs-8 fw-bolder text-truncate" 
+                                              :class="isGuestIncognito(room) ? 'text-gray-600 fst-italic' : 'text-gray-800'">
+                                            {{ getActiveGuestName(room) }}
+                                        </span>
+                                        
+                                        <!-- Check-in/out Dates -->
                                         <div class="d-flex align-items-center mt-1">
-                                            <i class="ki-duotone ki-calendar-8 fs-9 me-1 text-gray-400"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span><span class="path6"></span></i>
+                                            <i class="ki-duotone ki-calendar-8 fs-9 me-1 text-gray-400">
+                                                <span class="path1"></span><span class="path2"></span>
+                                                <span class="path3"></span><span class="path4"></span>
+                                                <span class="path5"></span><span class="path6"></span>
+                                            </i>
                                             <span class="fs-9 fw-semibold text-gray-500">{{ getGuestDates(room) }}</span>
                                         </div>
                                     </div>
@@ -224,6 +250,7 @@
                                 </div>
                             </div>
 
+                            <!-- Facilities -->
                             <div class="d-flex gap-2 mb-4 flex-wrap">
                                  <template v-if="room.facilities?.length">
                                     <span v-for="(fac, i) in room.facilities.slice(0, 3)" :key="i" class="badge badge-light-dark fs-9 fw-bold facility-badge">{{ fac.name }}</span>
@@ -232,6 +259,7 @@
                                 <span v-else class="text-gray-400 fs-9 fst-italic">Standard Facility</span>
                             </div>
 
+                            <!-- Action Buttons -->
                             <div class="mt-auto pt-4 border-top border-gray-200 border-opacity-50 d-flex gap-2">
                                 <div class="flex-grow-1">
                                     <button v-if="room.status === 'available'" @click="openCheckInModal(room)" class="btn btn-sm btn-success w-100 fw-bold hover-scale action-btn">Check-in</button>
@@ -239,6 +267,7 @@
                                     <button v-if="['dirty','needs cleaning'].includes(room.status)" @click="markAsClean(room)" class="btn btn-sm btn-info w-100 fw-bold text-white hover-scale action-btn">Selesai</button>
                                 </div>
                                 
+                                <!-- Dropdown Menu -->
                                 <div class="dropdown">
                                     <button class="btn btn-sm btn-icon btn-light h-100 w-35px rounded hover-bg-light-primary dropdown-toggle-custom" 
                                             type="button" 
@@ -279,6 +308,7 @@
 
     </div>
 
+    <!-- Modals -->
     <RoomModal :room-data="selectedRoom" @room-updated="refreshData" @close-modal="selectedRoom = null" />
     <CheckInModal :room-data="selectedRoom" @checkin-success="refreshData" @close-modal="selectedRoom = null" />
   </div>
@@ -293,12 +323,21 @@ import { Modal } from "bootstrap";
 import RoomModal from "./RoomModal.vue";
 import CheckInModal from "./CheckInModal.vue";
 
+// ===== INTERFACES =====
 interface Facility { id: number; name: string; }
 interface Room { 
-  id: number; room_number: string; type: string; status: string; price_per_night: number; 
-  description: string | null; image_url: string | null; facilities: Facility[]; check_ins?: any[]; 
+  id: number; 
+  room_number: string; 
+  type: string; 
+  status: string; 
+  price_per_night: number; 
+  description: string | null; 
+  image_url: string | null; 
+  facilities: Facility[]; 
+  check_ins?: any[]; 
 }
 
+// ===== STATE =====
 const authStore = useAuthStore();
 const rooms = ref<Room[]>([]);
 const loading = ref(true);
@@ -306,25 +345,51 @@ const selectedRoom = ref<any>(null);
 const searchQuery = ref("");
 const filterStatus = ref('all');
 const filterType = ref('all');
-
-// --- Custom Dropdown Logic (Top Filters) ---
 const activeDropdown = ref<string | null>(null);
-const toggleDropdown = (name: string) => { activeDropdown.value = activeDropdown.value === name ? null : name; };
-const closeDropdown = (name: string) => { if (activeDropdown.value === name) activeDropdown.value = null; };
-const setFilterType = (type: string) => { filterType.value = type; activeDropdown.value = null; };
-const setFilterStatus = (status: string) => { filterStatus.value = status; activeDropdown.value = null; };
+
+// ===== DROPDOWN LOGIC =====
+const toggleDropdown = (name: string) => { 
+    activeDropdown.value = activeDropdown.value === name ? null : name; 
+};
+
+const closeDropdown = (name: string) => { 
+    if (activeDropdown.value === name) activeDropdown.value = null; 
+};
+
+const setFilterType = (type: string) => { 
+    filterType.value = type; 
+    activeDropdown.value = null; 
+};
+
+const setFilterStatus = (status: string) => { 
+    filterStatus.value = status; 
+    activeDropdown.value = null; 
+};
 
 const vClickOutside = {
     mounted(el: any, binding: any) {
-        el.clickOutsideEvent = function(event: Event) { if (!(el === event.target || el.contains(event.target))) binding.value(event, el); };
+        el.clickOutsideEvent = function(event: Event) { 
+            if (!(el === event.target || el.contains(event.target))) binding.value(event, el); 
+        };
         document.body.addEventListener('click', el.clickOutsideEvent);
     },
-    unmounted(el: any) { document.body.removeEventListener('click', el.clickOutsideEvent); },
+    unmounted(el: any) { 
+        document.body.removeEventListener('click', el.clickOutsideEvent); 
+    },
 };
 
-const activeTypeLabel = computed(() => filterType.value === 'all' ? 'Semua Tipe' : filterType.value);
+// ===== COMPUTED PROPERTIES =====
+const activeTypeLabel = computed(() => 
+    filterType.value === 'all' ? 'Semua Tipe' : filterType.value
+);
+
 const activeStatusLabel = computed(() => {
-    const map: any = { 'all': 'Semua Status', 'available': 'Tersedia', 'occupied': 'Terisi', 'dirty': 'Perawatan' };
+    const map: any = { 
+        'all': 'Semua Status', 
+        'available': 'Tersedia', 
+        'occupied': 'Terisi', 
+        'dirty': 'Perawatan' 
+    };
     return map[filterStatus.value] || 'Status';
 });
 
@@ -333,45 +398,114 @@ const uniqueRoomTypes = computed(() => {
     return [...new Set(types)].filter(Boolean);
 });
 
-// --- Filtering ---
 const filteredRooms = computed(() => {
-  let result = rooms.value;
-  if (searchQuery.value) result = result.filter(room => room.room_number.toLowerCase().includes(searchQuery.value.toLowerCase()));
-  if (filterStatus.value !== 'all') {
-      if (filterStatus.value === 'dirty') result = result.filter(r => ['dirty', 'needs cleaning', 'request cleaning'].includes(r.status));
-      else result = result.filter(r => r.status === filterStatus.value);
-  }
-  if (filterType.value !== 'all') result = result.filter(r => r.type === filterType.value);
-  return result;
+    let result = rooms.value;
+    
+    if (searchQuery.value) {
+        result = result.filter(room => 
+            room.room_number.toLowerCase().includes(searchQuery.value.toLowerCase())
+        );
+    }
+    
+    if (filterStatus.value !== 'all') {
+        if (filterStatus.value === 'dirty') {
+            result = result.filter(r => 
+                ['dirty', 'needs cleaning', 'request cleaning'].includes(r.status)
+            );
+        } else {
+            result = result.filter(r => r.status === filterStatus.value);
+        }
+    }
+    
+    if (filterType.value !== 'all') {
+        result = result.filter(r => r.type === filterType.value);
+    }
+    
+    return result;
 });
 
-const countStatus = (status: string) => rooms.value.filter(r => r.status === status).length;
-const countDirty = computed(() => rooms.value.filter(r => ['dirty', 'needs cleaning', 'request cleaning'].includes(r.status)).length);
-const userHasPermission = (permission: string) => authStore.user?.all_permissions?.includes(permission) ?? false;
+const countStatus = (status: string) => 
+    rooms.value.filter(r => r.status === status).length;
 
-const formatPriceNumber = (value: number) => new Intl.NumberFormat("id-ID").format(value);
-const getActiveGuestName = (room: Room) => (room.check_ins && room.check_ins.length > 0) ? room.check_ins[0].guest?.name || 'Tamu' : null;
+const countDirty = computed(() => 
+    rooms.value.filter(r => 
+        ['dirty', 'needs cleaning', 'request cleaning'].includes(r.status)
+    ).length
+);
 
-// --- Helper Baru: Get Date Range ---
+// ===== HELPER FUNCTIONS =====
+const userHasPermission = (permission: string) => 
+    authStore.user?.all_permissions?.includes(permission) ?? false;
+
+const formatPriceNumber = (value: number) => 
+    new Intl.NumberFormat("id-ID").format(value);
+
+/**
+ * ✅ Get Active Guest Name
+ */
+const getActiveGuestName = (room: Room) => {
+    if (room.check_ins && room.check_ins.length > 0) {
+        return room.check_ins[0].guest?.name || 'Tamu';
+    }
+    return null;
+};
+
+/**
+ * ✅ Check if Guest is Incognito
+ * Priority: check_ins.is_incognito > booking.is_incognito
+ */
+const isGuestIncognito = (room: Room): boolean => {
+    if (room.status !== 'occupied') return false;
+    if (!room.check_ins || room.check_ins.length === 0) return false;
+    
+    const checkIn = room.check_ins[0];
+    
+    // Priority 1: Check from check_ins.is_incognito
+    if (checkIn.is_incognito === true || 
+        checkIn.is_incognito === 1 || 
+        checkIn.is_incognito === "1") {
+        return true;
+    }
+    
+    // Priority 2: Fallback to booking.is_incognito
+    if (checkIn.booking && (
+        checkIn.booking.is_incognito === true || 
+        checkIn.booking.is_incognito === 1 || 
+        checkIn.booking.is_incognito === "1"
+    )) {
+        return true;
+    }
+    
+    return false;
+};
+
+/**
+ * ✅ Get Guest Check-in/out Dates
+ */
 const getGuestDates = (room: Room) => {
     if (room.status === 'occupied' && room.check_ins && room.check_ins.length > 0) {
         const checkIn = room.check_ins[0];
         const start = new Date(checkIn.check_in_time);
         const end = new Date(checkIn.check_out_time);
         const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
-        // Output: "12 Okt - 14 Okt"
         return `${start.toLocaleDateString('id-ID', options)} - ${end.toLocaleDateString('id-ID', options)}`;
     }
     return '';
 };
 
+/**
+ * ✅ Get Status Label
+ */
 const getStatusLabel = (status: string) => {
     if (status === 'available') return 'Tersedia';
     if (status === 'occupied') return 'Terisi';
     if (['dirty', 'needs cleaning', 'request cleaning'].includes(status)) return 'Perlu Dibersihkan';
     return status;
-}
+};
 
+/**
+ * ✅ Get Status Color
+ */
 const getStatusColor = (status: string, type: 'text' | 'bg') => {
     const isDirty = ['dirty', 'needs cleaning', 'request cleaning'].includes(status);
     const map: any = {
@@ -383,31 +517,82 @@ const getStatusColor = (status: string, type: 'text' | 'bg') => {
     return map[key][type];
 };
 
+// ===== API CALLS =====
 const getRooms = async () => {
     loading.value = true;
-    try { const { data } = await ApiService.get("/rooms"); rooms.value = data; } 
-    catch (e) { rooms.value = []; } finally { loading.value = false; }
+    try { 
+        const { data } = await ApiService.get("/rooms"); 
+        rooms.value = data; 
+    } catch (e) { 
+        console.error('Error fetching rooms:', e);
+        rooms.value = []; 
+    } finally { 
+        loading.value = false; 
+    }
 };
-const refreshData = () => getRooms();
-onMounted(getRooms);
 
-const openModal = (id: string, room: any = null) => { selectedRoom.value = room ? { ...room } : null; new Modal(document.getElementById(id)!).show(); };
+const refreshData = () => getRooms();
+
+// ===== MODAL HANDLERS =====
+const openModal = (id: string, room: any = null) => { 
+    selectedRoom.value = room ? { ...room } : null; 
+    new Modal(document.getElementById(id)!).show(); 
+};
+
 const openAddRoomModal = () => openModal('kt_modal_room');
 const openEditRoomModal = (room: Room) => openModal('kt_modal_room', room);
 const openCheckInModal = (room: Room) => openModal('kt_modal_check_in', room);
 
+// ===== ACTION HANDLERS =====
 const confirmAction = async (opts: any, action: Function) => {
-    const res = await Swal.fire({ ...opts, showCancelButton: true, buttonsStyling: false, customClass: { confirmButton: "btn fw-bold btn-danger", cancelButton: "btn fw-bold btn-light" } });
-    if (res.isConfirmed) { await action(); await refreshData(); }
+    const res = await Swal.fire({ 
+        ...opts, 
+        showCancelButton: true, 
+        buttonsStyling: false, 
+        customClass: { 
+            confirmButton: "btn fw-bold btn-danger", 
+            cancelButton: "btn fw-bold btn-light" 
+        } 
+    });
+    if (res.isConfirmed) { 
+        await action(); 
+        await refreshData(); 
+    }
 };
-const deleteRoom = (id: number) => confirmAction({ text: "Hapus kamar ini?", icon: "warning", confirmButtonText: "Ya, Hapus" }, async () => await ApiService.delete(`/rooms/${id}`));
-const processCheckout = (room: Room) => confirmAction({ text: `Check-out ${room.room_number}?`, icon: "warning", confirmButtonText: "Check-out" }, async () => await ApiService.post(`/check-out/${room.id}`, {}));
-const markAsClean = (room: Room) => confirmAction({ text: "Sudah bersih?", icon: "question", confirmButtonText: "Ya" }, async () => await ApiService.post(`/rooms/${room.id}/mark-as-clean`, {}));
+
+const deleteRoom = (id: number) => confirmAction(
+    { text: "Hapus kamar ini?", icon: "warning", confirmButtonText: "Ya, Hapus" }, 
+    async () => await ApiService.delete(`/rooms/${id}`)
+);
+
+const processCheckout = (room: Room) => confirmAction(
+    { text: `Check-out ${room.room_number}?`, icon: "warning", confirmButtonText: "Check-out" }, 
+    async () => await ApiService.post(`/check-out/${room.id}`, {})
+);
+
+const markAsClean = (room: Room) => confirmAction(
+    { text: "Sudah bersih?", icon: "question", confirmButtonText: "Ya" }, 
+    async () => await ApiService.post(`/rooms/${room.id}/mark-as-clean`, {})
+);
+
 const requestCleaning = (room: Room) => {
-    Swal.fire({ title: 'Jadwal Bersih?', html: '<input type="time" id="swal-time" class="form-control text-center">', showCancelButton: true, confirmButtonText: 'Simpan', confirmButtonColor: '#F68B1E', preConfirm: () => (document.getElementById('swal-time') as HTMLInputElement).value }).then(async (res) => {
-        if(res.isConfirmed && res.value) { await ApiService.post(`/rooms/${room.id}/request-cleaning`, { cleaning_time: res.value }); refreshData(); }
-    })
+    Swal.fire({ 
+        title: 'Jadwal Bersih?', 
+        html: '<input type="time" id="swal-time" class="form-control text-center">', 
+        showCancelButton: true, 
+        confirmButtonText: 'Simpan', 
+        confirmButtonColor: '#F68B1E', 
+        preConfirm: () => (document.getElementById('swal-time') as HTMLInputElement).value 
+    }).then(async (res) => {
+        if(res.isConfirmed && res.value) { 
+            await ApiService.post(`/rooms/${room.id}/request-cleaning`, { cleaning_time: res.value }); 
+            refreshData(); 
+        }
+    });
 };
+
+// ===== LIFECYCLE =====
+onMounted(getRooms);
 </script>
 
 <style scoped>

@@ -17,6 +17,7 @@ class CheckIn extends Model
         'check_in_time',
         'check_out_time',
         'is_active',
+        'is_incognito',
     ];
 
     /**

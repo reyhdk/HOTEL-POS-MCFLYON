@@ -53,6 +53,31 @@
                 </div>
             </div>
 
+            <div class="mb-4">
+                <div class="d-flex flex-stack bg-light-primary rounded border border-dashed border-primary border-active p-4">
+                    <div class="d-flex align-items-center me-2">
+                        <i class="ki-duotone ki-eye-slash fs-2x me-4 text-primary">
+                            <span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span>
+                        </i>
+                        <div class="flex-grow-1">
+                            <span class="fw-bold text-gray-800 fs-6 d-block">Mode Incognito</span>
+                            <span class="text-gray-500 fw-semibold fs-7">Sembunyikan identitas tamu di layar publik/POS</span>
+                        </div>
+                    </div>
+                    <div class="form-check form-check-custom form-check-solid form-switch">
+                        <input 
+                            class="form-check-input" 
+                            type="checkbox" 
+                            id="is_incognito" 
+                            v-model="formData.is_incognito" 
+                            :true-value="true" 
+                            :false-value="false" 
+                        />
+                        <label class="form-check-label fw-bold text-gray-700" for="is_incognito"></label>
+                    </div>
+                </div>
+            </div>
+
             <div class="mb-5">
                 <label class="fw-bold fs-8 text-gray-600 text-uppercase ls-1 mb-3 d-block">Metode Pembayaran</label>
                 <div class="row g-3">
@@ -116,42 +141,80 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, defineProps, defineEmits, watch, computed } from "vue";
+import { ref, onMounted, watch, computed } from "vue";
 import ApiService from "@/core/services/ApiService";
 import Swal from "sweetalert2";
 import { Modal } from "bootstrap";
 import type { FormInstance, FormRules } from 'element-plus';
 
+// ===== INTERFACES & TYPES =====
+interface Guest {
+    id: number;
+    name: string;
+    phone_number: string;
+}
+
+interface PaymentMethod {
+    label: string;
+    value: string;
+    icon: string;
+    desc: string;
+}
+
+interface FormData {
+    room_id: number | null;
+    guest_id: number | null;
+    check_in_date: string;
+    check_out_date: string;
+    payment_method: string;
+    is_incognito: boolean;
+}
+
+// Declare Midtrans Snap
 declare const snap: any;
 
-const props = defineProps<{ roomData: any }>();
-const emit = defineEmits(['checkin-success', 'close-modal']);
+// ===== PROPS & EMITS =====
+const props = defineProps<{ 
+    roomData: any 
+}>();
 
+const emit = defineEmits<{
+    'checkin-success': [];
+    'close-modal': [];
+}>();
+
+// ===== REFS =====
 const formRef = ref<FormInstance>();
-const modalRef = ref<null | HTMLElement>(null);
+const modalRef = ref<HTMLElement | null>(null);
 const loading = ref(false);
 const loadingGuests = ref(false);
+const guests = ref<Guest[]>([]);
 
-const guests = ref<{ id: number; name: string; phone_number: string }[]>([]);
-const paymentMethods = ref([
+const paymentMethods = ref<PaymentMethod[]>([
     { label: 'Tunai', value: 'cash', icon: 'ki-duotone ki-wallet', desc: 'Bayar di kasir' },
     { label: 'QRIS / TF', value: 'midtrans', icon: 'ki-duotone ki-scan-barcode', desc: 'Auto Payment' }
 ]);
 
-const formData = ref({
-  room_id: null as number | null,
-  guest_id: null as number | null,
-  check_in_date: '',
-  check_out_date: '',
-  payment_method: 'cash',
+// ===== FORM DATA =====
+const getInitialFormData = (): FormData => ({
+    room_id: null,
+    guest_id: null,
+    check_in_date: '',
+    check_out_date: '',
+    payment_method: 'cash',
+    is_incognito: false, // ✅ PENTING: Default value harus ada
 });
 
+const formData = ref<FormData>(getInitialFormData());
+
+// ===== VALIDATION RULES =====
 const rules = ref<FormRules>({
-  guest_id: [{ required: true, message: "Pilih tamu", trigger: "change" }],
-  check_in_date: [{ required: true, message: "Wajib", trigger: "change" }],
-  check_out_date: [{ required: true, message: "Wajib", trigger: "change" }],
+    guest_id: [{ required: true, message: "Pilih tamu", trigger: "change" }],
+    check_in_date: [{ required: true, message: "Wajib", trigger: "change" }],
+    check_out_date: [{ required: true, message: "Wajib", trigger: "change" }],
 });
 
+// ===== COMPUTED PROPERTIES =====
 const durationInNights = computed(() => {
     if (!formData.value.check_in_date || !formData.value.check_out_date) return 0;
     const diffTime = new Date(formData.value.check_out_date).getTime() - new Date(formData.value.check_in_date).getTime();
@@ -164,6 +227,17 @@ const totalCost = computed(() => {
     return props.roomData.price_per_night * durationInNights.value;
 });
 
+// ===== HELPER FUNCTIONS =====
+const formatCurrency = (value: number) => {
+    if (!value || isNaN(value)) return "Rp 0";
+    return new Intl.NumberFormat("id-ID", { 
+        style: "currency", 
+        currency: "IDR", 
+        minimumFractionDigits: 0 
+    }).format(value);
+};
+
+// ===== API CALLS =====
 const getGuests = async () => {
     try {
         loadingGuests.value = true;
@@ -176,75 +250,99 @@ const getGuests = async () => {
     }
 };
 
-const formatCurrency = (value: number) => {
-    if (!value || isNaN(value)) return "Rp 0";
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
-};
-
-onMounted(getGuests);
-
+// ===== WATCHERS =====
 watch(() => props.roomData, (newVal) => {
     if (newVal) {
         const today = new Date();
         const tomorrow = new Date();
         tomorrow.setDate(today.getDate() + 1);
 
+        // ✅ FIX: Gunakan spread operator untuk memastikan semua property ter-set
         formData.value = {
+            ...getInitialFormData(), // Start dengan default values
             room_id: newVal.id,
-            guest_id: null,
             check_in_date: today.toISOString().split('T')[0],
             check_out_date: tomorrow.toISOString().split('T')[0],
-            payment_method: 'cash',
         };
     }
 });
 
+// ===== SUBMIT HANDLER =====
 const submit = () => {
-  if (!formRef.value) return;
-  formRef.value.validate(async (valid: boolean) => {
-    if (valid) {
-      if (durationInNights.value <= 0) {
-        Swal.fire({ text: "Durasi minimal 1 malam.", icon: "warning", confirmButtonText: "Ok" });
-        return;
-      }
-      loading.value = true;
-      let response: any = null;
-      try {
-        response = await ApiService.post('/check-in', formData.value);
-
-        const handleSuccess = () => {
-             Swal.fire({ text: "Check-in Berhasil!", icon: "success", timer: 1500, showConfirmButton: false });
-             emit('checkin-success');
-             if (modalRef.value) Modal.getInstance(modalRef.value)?.hide();
-        };
-
-        if (response.data.snap_token) {
-            loading.value = false; // Stop loading UI to show snap
-            snap.pay(response.data.snap_token, {
-                onSuccess: handleSuccess,
-                onPending: () => {
-                    Swal.fire("Pending", "Menunggu pembayaran selesai.", "info");
-                    emit('checkin-success');
-                    if (modalRef.value) Modal.getInstance(modalRef.value)?.hide();
-                },
-                onClose: () => {
-                    Swal.fire("Dibatalkan", "Pembayaran belum diselesaikan.", "warning");
-                }
+    if (!formRef.value) return;
+    
+    formRef.value.validate(async (valid: boolean) => {
+        if (!valid) return;
+        
+        if (durationInNights.value <= 0) {
+            Swal.fire({ 
+                text: "Durasi minimal 1 malam.", 
+                icon: "warning", 
+                confirmButtonText: "Ok" 
             });
-        } else {
-            handleSuccess();
+            return;
         }
-      } catch (error: any) {
-        const errorMsg = error.response?.data?.message || "Gagal memproses check-in.";
-        Swal.fire({ text: errorMsg, icon: "error" });
-      } finally {
-        if (!response?.data?.snap_token) {
-            loading.value = false;
+        
+        loading.value = true;
+        let response: any = null;
+        
+        try {
+            response = await ApiService.post('/check-in', formData.value);
+
+            const handleSuccess = () => {
+                Swal.fire({ 
+                    text: "Check-in Berhasil!", 
+                    icon: "success", 
+                    timer: 1500, 
+                    showConfirmButton: false 
+                });
+                emit('checkin-success');
+                if (modalRef.value) {
+                    Modal.getInstance(modalRef.value)?.hide();
+                }
+            };
+
+            // Handle Midtrans Payment
+            if (response.data.snap_token) {
+                loading.value = false; // Stop loading to show Snap popup
+                
+                snap.pay(response.data.snap_token, {
+                    onSuccess: handleSuccess,
+                    onPending: () => {
+                        Swal.fire("Pending", "Menunggu pembayaran selesai.", "info");
+                        emit('checkin-success');
+                        if (modalRef.value) {
+                            Modal.getInstance(modalRef.value)?.hide();
+                        }
+                    },
+                    onClose: () => {
+                        Swal.fire("Dibatalkan", "Pembayaran belum diselesaikan.", "warning");
+                    }
+                });
+            } else {
+                // Cash payment - direct success
+                handleSuccess();
+            }
+            
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || "Gagal memproses check-in.";
+            Swal.fire({ 
+                text: errorMsg, 
+                icon: "error" 
+            });
+        } finally {
+            // Only set loading to false if not showing Midtrans
+            if (!response?.data?.snap_token) {
+                loading.value = false;
+            }
         }
-      }
-    }
-  });
+    });
 };
+
+// ===== LIFECYCLE =====
+onMounted(() => {
+    getGuests();
+});
 </script>
 
 <style scoped>
@@ -271,7 +369,7 @@ const submit = () => {
 
 :deep(.metronic-input .el-input__wrapper), 
 :deep(.metronic-date .el-input__wrapper) {
-    background-color: #F9F9F9; /* Light Gray */
+    background-color: #F9F9F9;
     box-shadow: none !important; 
     border: 1px solid transparent; 
     border-radius: 0.6rem; 
@@ -280,7 +378,6 @@ const submit = () => {
     height: 42px;
 }
 
-/* Focus State */
 :deep(.metronic-input .el-input__wrapper.is-focus),
 :deep(.metronic-date .el-input__wrapper.is-focus) {
     background-color: #ffffff;
@@ -288,10 +385,7 @@ const submit = () => {
     box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1) !important;
 }
 
-/* Link Style */
 .hover-underline:hover { text-decoration: underline !important; }
-
-/* Utils */
 .hover-elevate:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
 
 /* ========================
@@ -307,7 +401,6 @@ const submit = () => {
 [data-bs-theme="dark"] .bg-light-orange { background-color: rgba(246, 139, 30, 0.15) !important; border-color: #F68B1E !important; }
 [data-bs-theme="dark"] .border-gray-300 { border-color: #323248 !important; }
 
-/* Payment Card Dark */
 [data-bs-theme="dark"] .payment-card { 
     background-color: #1b1b29; border-color: #323248; 
 }
@@ -319,7 +412,6 @@ const submit = () => {
     border-color: #565674;
 }
 
-/* Inputs Dark */
 [data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper),
 [data-bs-theme="dark"] :deep(.metronic-date .el-input__wrapper) {
     background-color: #1b1b29 !important; 
@@ -333,8 +425,7 @@ const submit = () => {
 }
 [data-bs-theme="dark"] :deep(.el-input__inner) { color: #ffffff; }
 
-/* Dropdowns Dark */
 [data-bs-theme="dark"] :deep(.el-select-dropdown__item.hover) { background-color: #2b2b40 !important; color: #F68B1E; }
 [data-bs-theme="dark"] :deep(.el-select-dropdown__item) { color: #CDCDDE; }
 [data-bs-theme="dark"] :deep(.el-select-dropdown) { background-color: #1e1e2d; border-color: #323248; }
-</style>
+</style>    

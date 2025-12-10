@@ -70,6 +70,27 @@
                 <label class="form-label required fs-6 fw-semibold">Nomor Telepon</label>
                 <input v-model="formData.guest_phone" type="tel" class="form-control" required placeholder="Contoh: 08123456789"/>
               </div>
+              <div class="d-flex align-items-center mb-8 bg-light-warning rounded p-4 border border-warning border-dashed">
+    <i class="ki-duotone ki-shield-tick fs-2x me-4 text-warning">
+        <span class="path1"></span><span class="path2"></span>
+    </i>
+    
+                  <div class="flex-grow-1">
+                      <span class="fw-bold text-gray-800 fs-6 d-block">Booking Incognito (Privasi)</span>
+                      <span class="text-gray-600 fw-semibold fs-7">
+                          Nama Anda akan disamarkan di layar resepsionis & sistem publik hotel.
+                      </span>
+                  </div>
+
+                  <div class="form-check form-check-custom form-check-solid form-switch">
+                      <input 
+                          class="form-check-input w-45px h-30px" 
+                          type="checkbox" 
+                          id="is_incognito_online"
+                          v-model="formData.is_incognito" 
+                      />
+                  </div>
+              </div>
             </form>
           </div>
 
@@ -117,6 +138,7 @@ const formData = ref({
   guest_name: '',
   guest_email: '',
   guest_phone: '',
+  is_incognito: false
 });
 
 const durationInNights = computed(() => {
@@ -163,6 +185,7 @@ const submitBooking = async () => {
       guest_phone: formData.value.guest_phone,
       check_in_date: props.bookingDates.check_in_date,
       check_out_date: props.bookingDates.check_out_date,
+      is_incognito: formData.value.is_incognito, 
     };
 
     const response = await axios.post('/public/bookings', payload);

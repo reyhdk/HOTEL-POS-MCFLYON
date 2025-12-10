@@ -27,6 +27,7 @@ class BookingController extends Controller
             'guest_phone' => 'required|string|max:20',
             'check_in_date' => 'required|date|after_or_equal:today',
             'check_out_date' => 'required|date|after:check_in_date',
+            'is_incognito'   => 'nullable|boolean',
         ]);
 
         // Kalkulasi harga tetap dilakukan di awal
@@ -39,7 +40,7 @@ class BookingController extends Controller
         $booking = null;
 
         try {
-            DB::transaction(function () use ($validated, $checkInDate, $checkOutDate, $totalPrice, &$booking) {
+            DB::transaction(function () use ($validated, $checkInDate, $checkOutDate, $totalPrice, &$booking, $request) {
                 // Kunci baris data kamar untuk mencegah double booking saat proses ini berjalan
                 $lockedRoom = Room::where('id', $validated['room_id'])->lockForUpdate()->first();
 
@@ -62,6 +63,7 @@ class BookingController extends Controller
                     'check_out_date' => $checkOutDate,
                     'total_price' => $totalPrice,
                     'status' => 'pending',
+                    'is_incognito' => $request->boolean('is_incognito'),
                 ]);
             });
 

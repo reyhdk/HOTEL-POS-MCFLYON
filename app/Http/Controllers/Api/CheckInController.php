@@ -15,71 +15,101 @@ use Throwable;
 
 class CheckInController extends Controller
 {
-    public function store(Request $request)
-{
-    $validated = $request->validate([
-        'room_id' => 'required|exists:rooms,id',
-        'guest_id' => 'required|exists:guests,id',
-        'check_in_date' => 'required|date|after_or_equal:today',
-        'check_out_date' => 'required|date|after:check_in_date',
-        'payment_method' => 'required|string|in:cash,midtrans',
-    ]);
+public function store(Request $request)
+    {
+        // 1. Validasi Input
+        $validated = $request->validate([
+            'room_id' => 'required|exists:rooms,id',
+            'guest_id' => 'required|exists:guests,id',
+            'check_in_date' => 'required|date',
+            'check_out_date' => 'required|date|after:check_in_date',
+            'payment_method' => 'required|string|in:cash,midtrans',
+            'is_incognito'   => 'nullable|boolean', // Input manual dari resepsionis
+        ]);
 
-    $room = Room::findOrFail($validated['room_id']);
-    if ($room->status !== 'available') {
-        return response()->json(['message' => 'Kamar ini tidak tersedia untuk check-in.'], 409);
-    }
+        $room = Room::findOrFail($validated['room_id']);
 
-    try {
-        $checkInDate = Carbon::parse($validated['check_in_date']);
-        $checkOutDate = Carbon::parse($validated['check_out_date']);
-        $durationInNights = $checkOutDate->diffInDays($checkInDate);
-        $totalPrice = $room->price_per_night * $durationInNights;
+        // Logika: Kamar boleh 'occupied' jika kita check-in kan booking yang sudah confirmed (bukan tamu nyelonong)
+        // Jadi kita hapus pengecekan $room->status !== 'available' yang kaku di sini, 
+        // kita ganti dengan pengecekan di bawah.
 
-        if ($validated['payment_method'] === 'cash') {
-            DB::transaction(function () use ($validated, $checkInDate, $checkOutDate, $totalPrice, $room) {
-                $booking = Booking::create([
-                    'room_id' => $room->id, 'guest_id' => $validated['guest_id'], 'user_id' => auth()->id(),
-                    'check_in_date' => $checkInDate, 'check_out_date' => $checkOutDate,
-                    'total_price' => $totalPrice,
-                    // [PERBAIKAN DI SINI] Ubah status menjadi 'completed' agar langsung masuk dasbor
-                    'status' => 'completed',
-                ]);
+        try {
+            DB::transaction(function () use ($validated, $room, $request) {
+                
+                $checkInDate = Carbon::parse($validated['check_in_date']);
+                $checkOutDate = Carbon::parse($validated['check_out_date']);
+                $durationInNights = $checkOutDate->diffInDays($checkInDate);
+                $totalPrice = $room->price_per_night * $durationInNights;
+
+                // [LOGIKA BARU - PENTING]
+                // Cek apakah ada Booking Online yang sudah 'confirmed' untuk kamar ini hari ini?
+                $existingBooking = Booking::where('room_id', $room->id)
+                    ->where('guest_id', $validated['guest_id']) // Pastikan tamunya sama
+                    ->whereIn('status', ['confirmed', 'paid'])  // Status sudah bayar/konfirmasi
+                    ->whereDate('check_in_date', $checkInDate->format('Y-m-d'))
+                    ->first();
+
+                // Tentukan Status Incognito
+                // Prioritas: 1. Input Resepsionis (jika ada), 2. Data Booking Online, 3. False
+                $isIncognito = $request->boolean('is_incognito');
+                
+                if ($existingBooking && $existingBooking->is_incognito) {
+                    $isIncognito = true; // Warisi status incognito dari online booking
+                }
+
+                if ($existingBooking) {
+                    // SKENARIO A: CHECK-IN DARI BOOKING ONLINE
+                    $booking = $existingBooking;
+                    
+                    // Update status booking biar rapi
+                    $booking->update([
+                        'status' => 'checked_in', // Atau biarkan 'confirmed' tergantung flow Anda
+                        // Jika resepsionis mengubah tanggal checkout saat kedatangan, update juga:
+                        'check_out_date' => $checkOutDate, 
+                        'total_price' => $totalPrice
+                    ]);
+
+                } else {
+                    // SKENARIO B: WALK-IN (Tamu Datang Langsung)
+                    // Cek ketersediaan fisik kamar
+                    if ($room->status !== 'available') {
+                        throw new \Exception('Kamar ini sedang terisi dan tidak memiliki jadwal booking untuk tamu ini.');
+                    }
+
+                    $booking = Booking::create([
+                        'room_id' => $room->id,
+                        'user_id' => $request->user() ? $request->user()->id : null,
+                        'guest_id' => $validated['guest_id'],
+                        'check_in_date' => $checkInDate,
+                        'check_out_date' => $checkOutDate,
+                        'total_price' => $totalPrice,
+                        'status' => 'checked_in', // Langsung masuk
+                        'is_incognito' => $isIncognito, // Simpan status
+                    ]);
+                }
+
+                // 3. Create CheckIn Record (Sesi Masuk Kamar)
                 CheckIn::create([
-                    'booking_id' => $booking->id, 'room_id' => $room->id, 'guest_id' => $validated['guest_id'],
-                    'check_in_time' => now(), 'is_active' => true,
+                    'booking_id' => $booking->id,
+                    'room_id' => $room->id,
+                    'guest_id' => $validated['guest_id'],
+                    'check_in_time' => now(),
+                    'is_active' => true,
+                    'is_incognito' => $isIncognito, // <--- INI KUNCINYA
                 ]);
+
+                // 4. Update Status Kamar Fisik
                 $room->update(['status' => 'occupied']);
             });
-            return response()->json(['message' => 'Check-in berhasil dicatat dengan pembayaran tunai.'], 201);
+
+            return response()->json(['message' => 'Check-in berhasil diproses.']);
+
+        } catch (\Throwable $e) {
+            Log::error('Gagal check-in: ' . $e->getMessage());
+            // Kembalikan pesan error yang ramah user
+            return response()->json(['message' => $e->getMessage()], 409); 
         }
-
-        if ($validated['payment_method'] === 'midtrans') {
-            $booking = Booking::create([
-                'room_id' => $room->id, 'guest_id' => $validated['guest_id'], 'user_id' => auth()->id(),
-                'check_in_date' => $checkInDate, 'check_out_date' => $checkOutDate,
-                'total_price' => $totalPrice, 'status' => 'pending',
-            ]);
-
-            $midtransOrderId = 'BOOK-' . $booking->id . '-' . time();
-            $booking->midtrans_order_id = $midtransOrderId;
-            $booking->save();
-
-            $guest = $booking->guest;
-            $params = [
-                'transaction_details' => [ 'order_id' => $midtransOrderId, 'gross_amount' => (int) $totalPrice, ],
-                'customer_details' => [ 'first_name' => $guest->name, 'email' => $guest->email, 'phone' => $guest->phone_number, ],
-            ];
-
-            $snapToken = Snap::getSnapToken($params);
-            return response()->json(['snap_token' => $snapToken]);
-        }
-
-    } catch (Throwable $e) {
-        Log::error('Gagal melakukan check-in manual: ' . $e->getMessage());
-        return response()->json(['message' => 'Terjadi kesalahan saat proses check-in.'], 500);
     }
-}
 
     /**
      * Proses Check-out Tamu & Pelunasan Folio Otomatis

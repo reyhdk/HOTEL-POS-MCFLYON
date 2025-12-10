@@ -24,6 +24,7 @@ class Booking extends Model
         'total_price',
         'status',
         'midtrans_order_id',
+        'is_incognito',
     ];
 
     /**
