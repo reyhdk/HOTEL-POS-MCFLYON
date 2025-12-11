@@ -30,6 +30,11 @@ class CheckInController extends Controller
 
         $room = Room::findOrFail($validated['room_id']);
         $guest = Guest::findOrFail($validated['guest_id']); // Ambil data tamu untuk Midtrans
+        if ($guest->is_blacklisted) {
+            return response()->json([
+                'message' => 'Tamu ini masuk daftar BLACKLIST dan tidak dapat melakukan Check-in. Alasan: ' . ($guest->blacklist_reason ?? 'Tidak disebutkan')
+            ], 403);
+        }   
 
         // Hitung Harga
         $checkInDate = Carbon::parse($validated['check_in_date']);
@@ -98,7 +103,6 @@ class CheckInController extends Controller
                     'snap_token' => $snapToken,
                     'booking_id' => $booking->id
                 ]);
-
             } catch (\Exception $e) {
                 Log::error('Gagal generate Midtrans Token: ' . $e->getMessage());
                 return response()->json(['message' => 'Gagal memproses pembayaran online: ' . $e->getMessage()], 500);
@@ -110,7 +114,7 @@ class CheckInController extends Controller
         // ============================================================
         try {
             DB::transaction(function () use ($validated, $room, $request, $checkInDate, $checkOutDate, $totalPrice) {
-                
+
                 // Cek Booking Online Existing (Logika Lama Anda)
                 $existingBooking = Booking::where('room_id', $room->id)
                     ->where('guest_id', $validated['guest_id'])
@@ -119,7 +123,7 @@ class CheckInController extends Controller
                     ->first();
 
                 $isIncognito = $request->boolean('is_incognito');
-                
+
                 if ($existingBooking && $existingBooking->is_incognito) {
                     $isIncognito = true;
                 }
@@ -129,10 +133,9 @@ class CheckInController extends Controller
                     $booking = $existingBooking;
                     $booking->update([
                         'status' => 'checked_in',
-                        'check_out_date' => $checkOutDate, 
+                        'check_out_date' => $checkOutDate,
                         'total_price' => $totalPrice
                     ]);
-
                 } else {
                     // B. WALK-IN CASH
                     if ($room->status !== 'available') {
@@ -167,10 +170,9 @@ class CheckInController extends Controller
             });
 
             return response()->json(['message' => 'Check-in berhasil diproses (Cash).']);
-
         } catch (\Throwable $e) {
             Log::error('Gagal check-in cash: ' . $e->getMessage());
-            return response()->json(['message' => $e->getMessage()], 409); 
+            return response()->json(['message' => $e->getMessage()], 409);
         }
     }
 
@@ -189,14 +191,14 @@ class CheckInController extends Controller
         try {
             DB::transaction(function () use ($room, $paymentMethod) {
                 $activeCheckIn = CheckIn::where('room_id', $room->id)
-                                        ->where('is_active', true)
-                                        ->first();
+                    ->where('is_active', true)
+                    ->first();
 
                 if ($activeCheckIn) {
                     // Lunasi semua Order
                     \App\Models\Order::where('room_id', $room->id)
                         ->where('guest_id', $activeCheckIn->guest_id)
-                        ->whereNotIn('status', ['paid', 'cancelled']) 
+                        ->whereNotIn('status', ['paid', 'cancelled'])
                         ->update([
                             'status' => 'paid',
                             'payment_method' => $paymentMethod,
@@ -208,7 +210,7 @@ class CheckInController extends Controller
                         'is_active' => false,
                         'check_out_time' => now(),
                     ]);
-                    
+
                     // Update status Booking jadi completed (history)
                     if ($activeCheckIn->booking) {
                         $activeCheckIn->booking->update(['status' => 'completed']);
@@ -219,7 +221,6 @@ class CheckInController extends Controller
             });
 
             return response()->json(['message' => 'Check-out berhasil.']);
-
         } catch (Throwable $e) {
             Log::error('Gagal checkout: ' . $e->getMessage());
             return response()->json(['message' => 'Terjadi kesalahan saat checkout.'], 500);

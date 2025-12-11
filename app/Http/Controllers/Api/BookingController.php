@@ -20,6 +20,7 @@ class BookingController extends Controller
      */
     public function store(Request $request)
     {
+        // 1. Validasi Input
         $validated = $request->validate([
             'room_id' => 'required|exists:rooms,id',
             'guest_name' => 'required|string|max:255',
@@ -30,35 +31,66 @@ class BookingController extends Controller
             'is_incognito'   => 'nullable|boolean',
         ]);
 
-        // Kalkulasi harga tetap dilakukan di awal
+        // =========================================================================
+        // [BARU] LOGIKA CEK BLACKLIST
+        // =========================================================================
+        // Mengecek apakah email ATAU no hp tamu ini ada di daftar blacklist
+        $blacklistedGuest = Guest::where('is_blacklisted', true)
+            ->where(function ($query) use ($validated) {
+                $query->where('email', $validated['guest_email'])
+                    ->orWhere('phone_number', $validated['guest_phone']);
+            })
+            ->first();
+
+        // Jika ditemukan tamu blacklist, tolak dengan kode 403
+        if ($blacklistedGuest) {
+            $reason = $blacklistedGuest->blacklist_reason ? " (Alasan: {$blacklistedGuest->blacklist_reason})" : "";
+            return response()->json([
+                'message' => 'Maaf, permintaan booking Anda ditolak karena identitas Anda masuk dalam daftar Blacklist hotel kami.' . $reason
+            ], 403);
+        }
+        // =========================================================================
+
+        // 2. Kalkulasi Harga
         $room = Room::findOrFail($validated['room_id']);
         $checkInDate = Carbon::parse($validated['check_in_date']);
         $checkOutDate = Carbon::parse($validated['check_out_date']);
-        $durationInNights = $checkOutDate->diffInDays($checkInDate);
-        $totalPrice = $room->price_per_night * $durationInNights;
 
+        // Pastikan durasi minimal 1 malam (jika user pilih tanggal yang sama/jam beda tipis)
+        $durationInNights = $checkOutDate->diffInDays($checkInDate);
+        if ($durationInNights < 1) {
+            $durationInNights = 1;
+        }
+
+        $totalPrice = $room->price_per_night * $durationInNights;
         $booking = null;
 
         try {
             DB::transaction(function () use ($validated, $checkInDate, $checkOutDate, $totalPrice, &$booking, $request) {
-                // Kunci baris data kamar untuk mencegah double booking saat proses ini berjalan
+                // 3. Kunci baris data kamar (Pessimistic Locking)
                 $lockedRoom = Room::where('id', $validated['room_id'])->lockForUpdate()->first();
 
-                // Pastikan kamar masih tersedia tepat sebelum membuat booking
+                // Pastikan kamar masih tersedia (Available)
                 if ($lockedRoom->status !== 'available') {
-                    throw new \Exception('Maaf, kamar ini baru saja dipesan, Silakan pilih kamar lain.');
+                    throw new \Exception('Maaf, kamar ini baru saja dipesan orang lain. Silakan pilih kamar lain.');
                 }
 
+                // 4. Cari atau Buat Data Tamu (Guest)
                 $guest = Guest::firstOrCreate(
                     ['email' => $validated['guest_email']],
                     ['name' => $validated['guest_name'], 'phone_number' => $validated['guest_phone']]
                 );
 
-                // Membuat record booking baru dengan status 'pending'. Ini sudah benar.
+                // Pastikan tamu yang baru di-fetch/create tidak di-blacklist (Double check)
+                if ($guest->is_blacklisted) {
+                    throw new \Exception('Identitas tamu terdeteksi sebagai Blacklist.');
+                }
+
+                // 5. Buat Record Booking
                 $booking = Booking::create([
                     'room_id' => $lockedRoom->id,
                     'guest_id' => $guest->id,
-                    'user_id' => auth()->id(),
+                    'user_id' => auth()->id(), // null jika guest booking tanpa login
                     'check_in_date' => $checkInDate,
                     'check_out_date' => $checkOutDate,
                     'total_price' => $totalPrice,
@@ -67,11 +99,11 @@ class BookingController extends Controller
                 ]);
             });
 
-            // Logika setelah transaksi database berhasil
             if (!$booking) {
                 throw new \Exception('Gagal membuat record booking di database.');
             }
 
+            // 6. Generate Midtrans Snap Token
             $midtransOrderId = 'BOOK-' . $booking->id . '-' . time();
             $booking->midtrans_order_id = $midtransOrderId;
             $booking->save();
@@ -91,12 +123,12 @@ class BookingController extends Controller
             $snapToken = Snap::getSnapToken($params);
 
             return response()->json(['snap_token' => $snapToken]);
-
         } catch (Throwable $e) {
-            // Karena kita tidak mengubah status kamar, blok catch ini menjadi lebih sederhana.
-            // Tidak perlu mengembalikan status kamar lagi.
             Log::error('Booking Store Error: ' . $e->getMessage());
-            return response()->json(['message' => 'Gagal memproses booking: ' . $e->getMessage()], 500);
+
+            // Mengembalikan pesan error yang ramah pengguna
+            // Jika error blacklist dari dalam transaction, akan tertangkap di sini juga
+            return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 }

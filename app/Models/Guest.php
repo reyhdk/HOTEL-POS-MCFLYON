@@ -17,6 +17,8 @@ class Guest extends Model
         'email',
         'phone_number', 
         'address',
+        'is_blacklisted',   
+        'blacklist_reason'  
     ];
 
     public function checkIns(): HasMany

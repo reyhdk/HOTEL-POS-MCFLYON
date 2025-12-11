@@ -10,7 +10,10 @@ class GuestController extends Controller
 {
     public function index()
     {
-        return Guest::latest()->get();
+        // Mengambil data tamu beserta status check-in aktif (jika ada) dan data kamarnya
+        return Guest::with(['checkIns' => function($query) {
+            $query->where('is_active', true)->with('room');
+        }])->latest()->get();
     }
 
     public function store(Request $request)
@@ -20,6 +23,8 @@ class GuestController extends Controller
             'email' => 'nullable|email|unique:guests,email',
             'phone_number' => 'nullable|string',
             'address' => 'nullable|string',
+            'is_blacklisted' => 'boolean', 
+            'blacklist_reason' => 'nullable|string'
         ]);
 
         $guest = Guest::create($request->all());

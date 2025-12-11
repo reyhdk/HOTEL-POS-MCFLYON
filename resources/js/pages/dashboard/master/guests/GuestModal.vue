@@ -13,52 +13,71 @@
         <div class="modal-body scroll-y px-5 pb-5 pt-2">
           <el-form @submit.prevent="submit" :model="formData" :rules="rules" ref="formRef" label-position="top" class="compact-form">
             
-            <div class="mb-3 mt-2 text-center">
+            <div class="mb-4 mt-2 text-center">
                 <div class="symbol symbol-60px symbol-circle bg-light-orange mb-3">
                     <div class="symbol-label text-orange fs-2 fw-bold">
                         {{ getInitials(formData.name) }}
                     </div>
                 </div>
-                <div class="fs-7 text-muted" v-if="!formData.name">Nama tamu akan muncul di sini</div>
             </div>
 
-            <el-form-item prop="name" class="mb-4">
-                <template #label><span class="required fw-bold fs-8 text-gray-600 text-uppercase ls-1">Nama Lengkap</span></template>
-                <el-input v-model="formData.name" placeholder="Nama sesuai KTP..." class="metronic-input fw-bold fs-6">
-                    <template #prefix><i class="ki-duotone ki-user fs-3 text-gray-500 me-1"><span class="path1"></span><span class="path2"></span></i></template>
-                </el-input>
-            </el-form-item>
-
-            <div class="row g-4 mb-1">
-                <div class="col-6">
-                    <el-form-item prop="email" class="mb-3">
-                        <template #label><span class="fw-bold fs-8 text-gray-600 text-uppercase">Email</span></template>
-                        <el-input v-model="formData.email" placeholder="contoh@email.com" class="metronic-input" />
+            <div class="row g-3">
+                <div class="col-12">
+                    <el-form-item label="Nama Lengkap" prop="name">
+                        <el-input v-model="formData.name" placeholder="Nama sesuai KTP" class="metronic-input" />
                     </el-form-item>
                 </div>
                 <div class="col-6">
-                    <el-form-item prop="phone_number" class="mb-3">
-                        <template #label><span class="fw-bold fs-8 text-gray-600 text-uppercase">No. Telepon</span></template>
-                        <el-input v-model="formData.phone_number" placeholder="0812..." class="metronic-input" />
+                    <el-form-item label="No. HP / WhatsApp" prop="phone_number">
+                        <el-input v-model="formData.phone_number" placeholder="08..." class="metronic-input" />
+                    </el-form-item>
+                </div>
+                <div class="col-6">
+                    <el-form-item label="Email (Opsional)" prop="email">
+                        <el-input v-model="formData.email" placeholder="nama@email.com" class="metronic-input" />
+                    </el-form-item>
+                </div>
+                <div class="col-12">
+                    <el-form-item label="Alamat" prop="address">
+                        <el-input v-model="formData.address" type="textarea" rows="2" placeholder="Alamat domisili..." class="metronic-input" />
                     </el-form-item>
                 </div>
             </div>
 
-            <el-form-item prop="address" class="mb-0">
-                 <template #label><span class="fw-bold fs-8 text-gray-600 text-uppercase">Alamat</span></template>
-                 <el-input v-model="formData.address" type="textarea" :rows="3" resize="none" placeholder="Alamat lengkap..." class="metronic-input"/>
-            </el-form-item>
+            <div class="separator separator-dashed my-4"></div>
 
-            <div class="d-flex justify-content-end align-items-center mt-8 pt-4 border-top border-gray-200">
-                 <button type="button" class="btn btn-light me-3 fw-bold text-gray-700 px-5" data-bs-dismiss="modal">Batal</button>
-                 <button :disabled="loading" class="btn btn-orange fw-bold px-6 shadow-sm hover-elevate" type="submit">
-                    <span v-if="!loading" class="d-flex align-items-center">
-                        Simpan <i class="ki-duotone ki-check-circle fs-2 ms-2 text-white"><span class="path1"></span><span class="path2"></span></i>
-                    </span>
-                    <span v-if="loading" class="indicator-progress d-flex align-items-center">
-                        Menyimpan... <span class="spinner-border spinner-border-sm ms-2"></span>
-                    </span>
-                 </button>
+            <div class="bg-light-danger rounded border border-danger border-dashed p-4 mb-4">
+                <div class="d-flex flex-stack">
+                    <div class="d-flex align-items-center me-2">
+                        <i class="ki-duotone ki-shield-cross fs-2x text-danger me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        <div>
+                            <span class="fw-bold text-gray-800 fs-6 d-block">Blacklist Tamu Ini?</span>
+                            <span class="text-gray-500 fs-8">Tamu tidak akan bisa Check-in jika diaktifkan.</span>
+                        </div>
+                    </div>
+                    <div class="form-check form-switch form-check-custom form-check-solid form-check-danger">
+                        <input class="form-check-input h-25px w-45px" type="checkbox" v-model="formData.is_blacklisted" :true-value="true" :false-value="false" />
+                    </div>
+                </div>
+
+                <div v-if="formData.is_blacklisted" class="mt-3 animate__animated animate__fadeIn">
+                    <label class="required fs-8 fw-bold text-danger mb-1">Alasan Blacklist</label>
+                    <el-input 
+                        v-model="formData.blacklist_reason" 
+                        type="textarea" 
+                        rows="2" 
+                        placeholder="Contoh: Merusak TV kamar 101, Kabur tanpa bayar..." 
+                        class="metronic-input border-danger"
+                    />
+                </div>
+            </div>
+
+            <div class="d-flex gap-3 pt-3 border-top border-gray-100">
+                <button type="button" class="btn btn-light w-100" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" class="btn btn-orange w-100" :disabled="loading">
+                    <span v-if="!loading">{{ isEditMode ? 'Simpan Perubahan' : 'Registrasi' }}</span>
+                    <span v-else>Menyimpan...</span>
+                </button>
             </div>
 
           </el-form>
@@ -69,96 +88,157 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
-import axios from "@/libs/axios";
-import Swal from "sweetalert2";
-import { Modal } from "bootstrap";
-import type { FormInstance, FormRules } from 'element-plus'
+import { ref, reactive, watch, nextTick } from 'vue';
+import { Modal } from 'bootstrap';
+import ApiService from '@/core/services/ApiService';
+import Swal from 'sweetalert2';
+import type { FormInstance, FormRules } from 'element-plus';
 
-const props = defineProps<{ guestData: any }>();
-const emit = defineEmits(['guest-updated']);
+const props = defineProps<{
+    isEditMode: boolean,
+    guestData: any
+}>();
 
+const emit = defineEmits(['saved']);
+
+// Refs
+const modalRef = ref<HTMLElement | null>(null);
 const formRef = ref<FormInstance>();
-const modalRef = ref<null | HTMLElement>(null);
+const modalInstance = ref<Modal | null>(null);
 const loading = ref(false);
-const isEditMode = computed(() => !!props.guestData);
 
-const getInitialFormData = () => ({ id: null, name: "", email: "", phone_number: "", address: "" });
-const formData = ref(getInitialFormData());
+// Form Data dengan tambahan Blacklist
+const formData = reactive({
+    id: null,
+    name: '',
+    email: '',
+    phone_number: '',
+    address: '',
+    is_blacklisted: false,
+    blacklist_reason: ''
+});
 
+// Rules
+const rules = reactive<FormRules>({
+    name: [{ required: true, message: 'Nama wajib diisi', trigger: 'blur' }],
+    phone_number: [{ required: true, message: 'No HP wajib diisi', trigger: 'blur' }],
+    // Validasi conditional untuk blacklist reason
+    blacklist_reason: [
+        { 
+            validator: (rule, value, callback) => {
+                if (formData.is_blacklisted && !value) {
+                    callback(new Error('Alasan blacklist wajib diisi'));
+                } else {
+                    callback();
+                }
+            }, 
+            trigger: 'blur' 
+        }
+    ]
+});
+
+// Helper Initials
 const getInitials = (name: string) => {
-    if (!name) return "?";
-    const parts = name.split(" ");
-    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-    return (parts[0][0] + parts[1][0]).toUpperCase();
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 };
 
-watch(() => props.guestData, (newVal) => {
-  if (newVal) {
-    formData.value = { ...newVal };
-  } else {
-    formRef.value?.resetFields();
-    formData.value = getInitialFormData();
-  }
-});
-
-const rules = ref<FormRules>({
-  name: [{ required: true, message: "Nama wajib diisi", trigger: "blur" }],
-  email: [{ type: 'email', message: 'Format email tidak valid', trigger: ['blur', 'change'] }]
-});
-
-const submit = () => {
-  if (!formRef.value) return;
-  formRef.value.validate(async (valid: boolean) => {
-    if (valid) {
-      loading.value = true;
-      try {
-        if (isEditMode.value) {
-          await axios.put(`/guests/${formData.value.id}`, formData.value);
-        } else {
-          await axios.post("/guests", formData.value);
-        }
-        
-        Swal.fire({ text: `Data tamu berhasil ${isEditMode.value ? 'diperbarui' : 'ditambahkan'}!`, icon: "success", timer: 1500, showConfirmButton: false })
-            .then(() => {
-                if (modalRef.value) Modal.getInstance(modalRef.value)?.hide();
-                emit('guest-updated');
-            });
-
-      } catch (error: any) {
-        let msg = "Terjadi kesalahan.";
-        if (error.response?.data?.errors) msg = Object.values(error.response.data.errors).flat().join('<br>');
-        Swal.fire({ html: msg, icon: "error" });
-      } finally {
-        loading.value = false;
-      }
+// === FUNGSI UTAMA YANG MEMPERBAIKI MASALAH TOMBOL ===
+const open = () => {
+    if (modalRef.value) {
+        modalInstance.value = new Modal(modalRef.value);
+        modalInstance.value.show();
     }
-  });
+};
+
+const hide = () => {
+    if (modalInstance.value) {
+        modalInstance.value.hide();
+    }
+};
+
+// PENTING: Expose fungsi open dan hide agar bisa dipanggil dari Index.vue
+defineExpose({
+    open,
+    hide
+});
+// ====================================================
+
+// Watcher untuk mengisi data saat Edit Mode
+watch(() => props.guestData, (newVal) => {
+    if (props.isEditMode && newVal) {
+        Object.assign(formData, {
+            id: newVal.id,
+            name: newVal.name,
+            email: newVal.email,
+            phone_number: newVal.phone_number,
+            address: newVal.address,
+            // Mapping data blacklist (pastikan backend mengirim field ini)
+            is_blacklisted: Boolean(newVal.is_blacklisted),
+            blacklist_reason: newVal.blacklist_reason || ''
+        });
+    } else {
+        // Reset form untuk mode tambah baru
+        Object.assign(formData, {
+            id: null, name: '', email: '', phone_number: '', address: '', 
+            is_blacklisted: false, blacklist_reason: ''
+        });
+        if(formRef.value) formRef.value.resetFields();
+    }
+});
+
+const submit = async () => {
+    if (!formRef.value) return;
+    await formRef.value.validate(async (valid) => {
+        if (valid) {
+            loading.value = true;
+            try {
+                if (props.isEditMode && formData.id) {
+                    await ApiService.put(`/guests/${formData.id}`, formData);
+                } else {
+                    await ApiService.post('/guests', formData);
+                }
+                
+                Swal.fire({
+                    text: "Data berhasil disimpan!",
+                    icon: "success",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok, Siap!",
+                    customClass: { confirmButton: "btn btn-primary" }
+                });
+                
+                emit('saved');
+                hide();
+            } catch (error: any) {
+                Swal.fire({
+                    text: error.response?.data?.message || "Terjadi kesalahan.",
+                    icon: "error",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: { confirmButton: "btn btn-danger" }
+                });
+            } finally {
+                loading.value = false;
+            }
+        }
+    });
 };
 </script>
 
 <style scoped>
-/* ========================
-   THEME COLORS
-   ======================== */
 .text-orange { color: #F68B1E !important; }
 .bg-light-orange { background-color: #FFF8F1 !important; }
 .btn-orange { background-color: #F68B1E; color: white; border: none; }
-.btn-orange:hover { background-color: #d97814; color: white; }
+.btn-orange:hover { background-color: #d97814; }
 
-/* ========================
-   INPUTS STYLE (MATCHING)
-   ======================== */
-.required:after { content: "*"; color: #f1416c; margin-left: 3px; }
-
-:deep(.metronic-input .el-input__wrapper), 
+/* Input Styles */
+:deep(.metronic-input .el-input__wrapper),
 :deep(.metronic-input .el-textarea__inner) {
     background-color: #F9F9F9;
-    box-shadow: none !important; 
-    border: 1px solid transparent; 
-    border-radius: 0.6rem; 
+    box-shadow: none !important;
+    border: 1px solid transparent;
+    border-radius: 0.6rem;
     padding: 8px 12px;
-    transition: all 0.2s;
 }
 
 :deep(.metronic-input .el-input__wrapper.is-focus),
@@ -168,30 +248,19 @@ const submit = () => {
     box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1) !important;
 }
 
-/* Utils */
-.hover-elevate:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+/* Red Border untuk alasan blacklist */
+:deep(.metronic-input.border-danger .el-textarea__inner) {
+    border-color: #f1416c !important;
+    background-color: #fff5f8 !important;
+}
+:deep(.metronic-input.border-danger .el-textarea__inner:focus) {
+    box-shadow: 0 0 0 3px rgba(241, 65, 108, 0.1) !important;
+}
 
-/* ========================
-   DARK MODE
-   ======================== */
-[data-bs-theme="dark"] .theme-modal { background-color: #1e1e2d; color: #ffffff; }
-[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
-[data-bs-theme="dark"] .text-gray-600 { color: #CDCDDE !important; }
-[data-bs-theme="dark"] .bg-light-orange { background-color: #2b2b40 !important; }
-[data-bs-theme="dark"] .border-gray-200 { border-color: #323248 !important; }
-
-/* Input Dark */
+/* Dark Mode */
+[data-bs-theme="dark"] .theme-modal { background-color: #1e1e2d; color: white; }
 [data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper),
 [data-bs-theme="dark"] :deep(.metronic-input .el-textarea__inner) {
-    background-color: #1b1b29 !important; 
-    color: #ffffff;
-    border-color: #323248 !important;
+    background-color: #1b1b29; color: white; border-color: #323248;
 }
-
-[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper.is-focus),
-[data-bs-theme="dark"] :deep(.metronic-input .el-textarea__inner:focus) {
-    border-color: #F68B1E !important;
-    background-color: #151521 !important;
-}
-[data-bs-theme="dark"] :deep(.el-input__inner) { color: #ffffff; }
 </style>
