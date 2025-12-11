@@ -16,28 +16,82 @@
         </div>
 
         <div class="modal-body scroll-y px-5 pb-5 pt-2">
-          <el-form @submit.prevent="submit" :model="formData" :rules="rules" ref="formRef" label-position="top" class="modern-form">
+          <el-form @submit.prevent="submit" :model="formData" :rules="currentRules" ref="formRef" label-position="top" class="modern-form">
             
-            <div class="mb-4">
-                <el-form-item prop="guest_id" class="mb-0">
-                    <template #label><span class="required fw-bold fs-8 text-gray-600 text-uppercase ls-1">Pilih Tamu</span></template>
-                    <el-select v-model="formData.guest_id" filterable placeholder="Cari nama tamu..." class="w-100 metronic-input" :loading="loadingGuests">
-                        <template #prefix><i class="ki-duotone ki-user fs-4 text-gray-500 me-2"><span class="path1"></span><span class="path2"></span></i></template>
-                        <el-option v-for="guest in guests" :key="guest.id" :label="guest.name" :value="guest.id">
-                            <div class="d-flex justify-content-between align-items-center w-100">
-                                <span class="fw-bold text-gray-800">{{ guest.name }}</span>
-                                <span class="fs-9 text-gray-400">{{ guest.phone_number }}</span>
+            <div class="mb-5">
+                
+                <div v-if="!isNewGuest" class="animate__animated animate__fadeIn">
+                    
+                    <el-form-item prop="guest_id" class="mb-0">
+                        <template #label><span class="required fw-bold fs-8 text-gray-600 text-uppercase ls-1">Pilih Tamu</span></template>
+                        
+                        <el-select 
+                            v-model="formData.guest_id" 
+                            filterable 
+                            placeholder="Cari Tamu " 
+                            class="w-100 metronic-input" 
+                            :loading="loadingGuests"
+                            no-data-text="Data tidak ditemukan"
+                            no-match-text="Nama tidak ditemukan"
+                        >
+                            <template #prefix><i class="ki-duotone ki-user fs-4 text-gray-500 me-2"><span class="path1"></span><span class="path2"></span></i></template>
+                            <el-option v-for="guest in guests" :key="guest.id" :label="guest.name" :value="guest.id">
+                                <div class="d-flex justify-content-between align-items-center w-100">
+                                    <span class="fw-bold text-gray-800">{{ guest.name }}</span>
+                                    <span class="fs-9 text-gray-400">{{ guest.phone_number }}</span>
+                                </div>
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
+                    
+                    <div class="d-flex align-items-center bg-light-info rounded p-2 mt-4 mb-2">
+                        <i class="ki-duotone ki-information-2 fs-5 text-info me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        <span class="text-gray-600 fs-9">Cari nama tamu yang sudah terdaftar di atas.</span>
+                    </div>
+                </div>
+
+                <div v-else class="bg-light-orange rounded p-4 border border-orange border-dashed animate__animated animate__fadeIn">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="symbol symbol-30px me-3">
+                            <div class="symbol-label bg-orange text-white">
+                                <i class="ki-duotone ki-user-tick fs-3 text-white"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
                             </div>
-                        </el-option>
-                    </el-select>
-                </el-form-item>
-                <div class="d-flex justify-content-end mt-1">
-                    <a href="#" class="text-orange fs-9 fw-bold hover-underline">Tamu Baru?</a>
+                        </div>
+                        <span class="fw-bold text-gray-800 fs-7">Registrasi Tamu Cepat</span>
+                    </div>
+
+                    <el-form-item prop="new_guest_name" class="mb-3">
+                        <label class="required fw-bold fs-9 text-gray-600 text-uppercase mb-1">Nama Lengkap</label>
+                        <el-input v-model="formData.new_guest_name" placeholder="Contoh: Budi Santoso" class="metronic-input" />
+                    </el-form-item>
+
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <el-form-item prop="new_guest_phone" class="mb-0">
+                                <label class="required fw-bold fs-9 text-gray-600 text-uppercase mb-1">No. HP </label>
+                                <el-input v-model="formData.new_guest_phone" placeholder="No Handphone" class="metronic-input" />
+                            </el-form-item>
+                        </div>
+                        <div class="col-6">
+                            <el-form-item prop="new_guest_email" class="mb-0">
+                                <label class="required fw-bold fs-9 text-gray-600 text-uppercase mb-1">Email</label>
+                                <el-input v-model="formData.new_guest_email" placeholder="Email" class="metronic-input" />
+                            </el-form-item>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-3">
+                    <button type="button" @click="toggleGuestMode" class="btn btn-sm btn-link btn-color-orange btn-active-color-primary fw-bold fs-8 px-0">
+                        {{ isNewGuest ? '← Kembali ke Pencarian Database' : 'Tamu Baru ?' }}
+                    </button>
                 </div>
             </div>
 
+            <div class="separator separator-dashed my-4"></div>
+
             <div class="bg-light-subtle rounded-3 p-4 mb-5 border border-dashed border-gray-300">
-                <div class="row g-3">
+                <div class="row g-4">
                     <div class="col-6">
                         <el-form-item prop="check_in_date" class="mb-0">
                             <template #label><span class="required fw-bold fs-9 text-gray-500 text-uppercase">Check-in</span></template>
@@ -53,27 +107,19 @@
                 </div>
             </div>
 
-            <div class="mb-4">
-                <div class="d-flex flex-stack bg-light-primary rounded border border-dashed border-primary border-active p-4">
+            <div class="mb-5">
+                <div class="d-flex flex-stack bg-light-primary rounded border border-dashed border-primary border-active p-3">
                     <div class="d-flex align-items-center me-2">
-                        <i class="ki-duotone ki-eye-slash fs-2x me-4 text-primary">
+                        <i class="ki-duotone ki-eye-slash fs-2 me-3 text-primary">
                             <span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span>
                         </i>
                         <div class="flex-grow-1">
-                            <span class="fw-bold text-gray-800 fs-6 d-block">Mode Incognito</span>
-                            <span class="text-gray-500 fw-semibold fs-7">Sembunyikan identitas tamu di layar publik/POS</span>
+                            <span class="fw-bold text-gray-800 fs-7 d-block">Mode Incognito</span>
+                            <span class="text-gray-500 fw-semibold fs-9">Privasi tamu di layar publik</span>
                         </div>
                     </div>
-                    <div class="form-check form-check-custom form-check-solid form-switch">
-                        <input 
-                            class="form-check-input" 
-                            type="checkbox" 
-                            id="is_incognito" 
-                            v-model="formData.is_incognito" 
-                            :true-value="true" 
-                            :false-value="false" 
-                        />
-                        <label class="form-check-label fw-bold text-gray-700" for="is_incognito"></label>
+                    <div class="form-check form-check-custom form-check-solid form-switch form-check-sm">
+                        <input class="form-check-input" type="checkbox" v-model="formData.is_incognito" :true-value="true" :false-value="false" />
                     </div>
                 </div>
             </div>
@@ -96,8 +142,8 @@
                                  <span class="fw-bold fs-7" :class="formData.payment_method === method.value ? 'text-orange' : 'text-gray-700'">{{ method.label }}</span>
                                  <span class="fs-9 text-muted">{{ method.desc }}</span>
                              </div>
-
-                             <i v-if="formData.payment_method === method.value" class="ki-duotone ki-check-circle fs-4 text-orange position-absolute top-0 end-0 m-2"></i>
+                             
+                             <i v-if="formData.payment_method === method.value" class="ki-duotone ki-check-circle fs-4 text-orange position-absolute top-0 end-0 m-2"><span class="path1"></span><span class="path2"></span></i>
                         </div>
                     </div>
                 </div>
@@ -124,11 +170,11 @@
                 <button type="button" class="btn btn-light w-100 fw-bold text-gray-600" data-bs-dismiss="modal">Batal</button>
                 <button class="btn btn-orange w-100 fw-bold shadow-sm hover-elevate" type="submit" :disabled="loading">
                     <span v-if="!loading">
-                        {{ formData.payment_method === 'cash' ? 'Konfirmasi' : 'Bayar Sekarang' }} 
+                        {{ formData.payment_method === 'cash' ? 'Check-in & Bayar' : 'Lanjut Pembayaran' }} 
                         <i class="ki-duotone ki-arrow-right fs-4 ms-2 text-white"><span class="path1"></span><span class="path2"></span></i>
                     </span>
                     <span v-else class="indicator-progress">
-                        Memproses... <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                        {{ loadingText }} <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
                     </span>
                 </button>
             </div>
@@ -147,7 +193,7 @@ import Swal from "sweetalert2";
 import { Modal } from "bootstrap";
 import type { FormInstance, FormRules } from 'element-plus';
 
-// ===== INTERFACES & TYPES =====
+// ===== INTERFACES =====
 interface Guest {
     id: number;
     name: string;
@@ -168,20 +214,15 @@ interface FormData {
     check_out_date: string;
     payment_method: string;
     is_incognito: boolean;
+    new_guest_name: string;
+    new_guest_phone: string;
+    new_guest_email: string;
 }
 
-// Declare Midtrans Snap
 declare const snap: any;
 
-// ===== PROPS & EMITS =====
-const props = defineProps<{ 
-    roomData: any 
-}>();
-
-const emit = defineEmits<{
-    'checkin-success': [];
-    'close-modal': [];
-}>();
+const props = defineProps<{ roomData: any }>();
+const emit = defineEmits(['checkin-success', 'close-modal']);
 
 // ===== REFS =====
 const formRef = ref<FormInstance>();
@@ -189,6 +230,8 @@ const modalRef = ref<HTMLElement | null>(null);
 const loading = ref(false);
 const loadingGuests = ref(false);
 const guests = ref<Guest[]>([]);
+const isNewGuest = ref(false);
+const loadingText = ref('Memproses...');
 
 const paymentMethods = ref<PaymentMethod[]>([
     { label: 'Tunai', value: 'cash', icon: 'ki-duotone ki-wallet', desc: 'Bayar di Receptionist' },
@@ -203,18 +246,35 @@ const getInitialFormData = (): FormData => ({
     check_out_date: '',
     payment_method: 'cash',
     is_incognito: false,
+    new_guest_name: '',
+    new_guest_phone: '',
+    new_guest_email: '',
 });
 
 const formData = ref<FormData>(getInitialFormData());
 
-// ===== VALIDATION RULES =====
-const rules = ref<FormRules>({
-    guest_id: [{ required: true, message: "Pilih tamu", trigger: "change" }],
-    check_in_date: [{ required: true, message: "Wajib", trigger: "change" }],
-    check_out_date: [{ required: true, message: "Wajib", trigger: "change" }],
+// ===== RULES =====
+const currentRules = computed<FormRules>(() => {
+    const commonRules = {
+        check_in_date: [{ required: true, message: "Wajib diisi", trigger: "change" }],
+        check_out_date: [{ required: true, message: "Wajib diisi", trigger: "change" }],
+    };
+
+    if (isNewGuest.value) {
+        return {
+            ...commonRules,
+            new_guest_name: [{ required: true, message: "Nama wajib diisi", trigger: "blur" }],
+            new_guest_phone: [{ required: true, message: "No HP wajib diisi", trigger: "blur" }],
+        };
+    } else {
+        return {
+            ...commonRules,
+            guest_id: [{ required: true, message: "Silakan pilih tamu dari daftar", trigger: "change" }],
+        };
+    }
 });
 
-// ===== COMPUTED PROPERTIES =====
+// ===== COMPUTED =====
 const durationInNights = computed(() => {
     if (!formData.value.check_in_date || !formData.value.check_out_date) return 0;
     const diffTime = new Date(formData.value.check_out_date).getTime() - new Date(formData.value.check_in_date).getTime();
@@ -227,47 +287,39 @@ const totalCost = computed(() => {
     return props.roomData.price_per_night * durationInNights.value;
 });
 
-// ===== HELPER FUNCTIONS =====
+// ===== METHODS =====
 const formatCurrency = (value: number) => {
     if (!value || isNaN(value)) return "Rp 0";
-    return new Intl.NumberFormat("id-ID", { 
-        style: "currency", 
-        currency: "IDR", 
-        minimumFractionDigits: 0 
-    }).format(value);
+    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
 };
 
-// ===== API CALLS =====
+const toggleGuestMode = () => {
+    isNewGuest.value = !isNewGuest.value;
+    if (formRef.value) formRef.value.clearValidate();
+};
+
 const getGuests = async () => {
     try {
         loadingGuests.value = true;
         const { data } = await ApiService.get("/guests");
         guests.value = data;
     } catch (error) {
-        console.error("Gagal mengambil data tamu:", error);
+        console.error("Gagal load tamu:", error);
     } finally {
         loadingGuests.value = false;
     }
 };
 
-// ===== WATCHERS =====
-watch(() => props.roomData, (newVal) => {
-    if (newVal) {
-        const today = new Date();
-        const tomorrow = new Date();
-        tomorrow.setDate(today.getDate() + 1);
+const createNewGuest = async () => {
+    const payload = {
+        name: formData.value.new_guest_name,
+        phone_number: formData.value.new_guest_phone,
+        email: formData.value.new_guest_email
+    };
+    const { data } = await ApiService.post("/guests", payload);
+    return data; 
+};
 
-        // ✅ FIX: Gunakan spread operator untuk memastikan semua property ter-set
-        formData.value = {
-            ...getInitialFormData(), // Start dengan default values
-            room_id: newVal.id,
-            check_in_date: today.toISOString().split('T')[0],
-            check_out_date: tomorrow.toISOString().split('T')[0],
-        };
-    }
-});
-
-// ===== SUBMIT HANDLER =====
 const submit = () => {
     if (!formRef.value) return;
     
@@ -275,96 +327,96 @@ const submit = () => {
         if (!valid) return;
         
         if (durationInNights.value <= 0) {
-            Swal.fire({ 
-                text: "Durasi minimal 1 malam.", 
-                icon: "warning", 
-                confirmButtonText: "Ok" 
-            });
+            Swal.fire({ text: "Durasi minimal 1 malam.", icon: "warning", confirmButtonText: "Ok" });
             return;
         }
         
         loading.value = true;
-        let response: any = null;
-        
+        loadingText.value = 'Memproses...';
+
         try {
-            response = await ApiService.post('/check-in', formData.value);
+            if (isNewGuest.value) {
+                loadingText.value = 'Menyimpan Tamu...';
+                try {
+                    const newGuest = await createNewGuest();
+                    formData.value.guest_id = newGuest.id; 
+                    guests.value.unshift(newGuest); 
+                } catch (err: any) {
+                    throw new Error(err.response?.data?.message || "Gagal menyimpan data tamu baru.");
+                }
+            }
+
+            loadingText.value = 'Check-in...';
+            const response = await ApiService.post('/check-in', {
+                room_id: formData.value.room_id,
+                guest_id: formData.value.guest_id,
+                check_in_date: formData.value.check_in_date,
+                check_out_date: formData.value.check_out_date,
+                payment_method: formData.value.payment_method,
+                is_incognito: formData.value.is_incognito
+            });
 
             const handleSuccess = () => {
-                Swal.fire({ 
-                    text: "Check-in Berhasil!", 
-                    icon: "success", 
-                    timer: 1500, 
-                    showConfirmButton: false 
-                });
+                Swal.fire({ text: "Check-in Berhasil!", icon: "success", timer: 1500, showConfirmButton: false });
                 emit('checkin-success');
-                if (modalRef.value) {
-                    Modal.getInstance(modalRef.value)?.hide();
-                }
+                if (modalRef.value) Modal.getInstance(modalRef.value)?.hide();
             };
 
-            // Handle Midtrans Payment
             if (response.data.snap_token) {
-                loading.value = false; // Stop loading to show Snap popup
-                
+                loading.value = false; 
                 snap.pay(response.data.snap_token, {
                     onSuccess: handleSuccess,
                     onPending: () => {
                         Swal.fire("Pending", "Menunggu pembayaran selesai.", "info");
                         emit('checkin-success');
-                        if (modalRef.value) {
-                            Modal.getInstance(modalRef.value)?.hide();
-                        }
+                        if (modalRef.value) Modal.getInstance(modalRef.value)?.hide();
                     },
-                    onClose: () => {
-                        Swal.fire("Dibatalkan", "Pembayaran belum diselesaikan.", "warning");
-                    }
+                    onClose: () => Swal.fire("Dibatalkan", "Pembayaran belum diselesaikan.", "warning")
                 });
             } else {
-                // Cash payment - direct success
-                handleSuccess();
+                handleSuccess(); 
             }
             
         } catch (error: any) {
-            const errorMsg = error.response?.data?.message || "Gagal memproses check-in.";
-            Swal.fire({ 
-                text: errorMsg, 
-                icon: "error" 
-            });
+            Swal.fire({ text: error.message || "Terjadi kesalahan.", icon: "error" });
         } finally {
-            // Only set loading to false if not showing Midtrans
-            if (!response?.data?.snap_token) {
+            if (!formData.value.payment_method || formData.value.payment_method === 'cash') {
                 loading.value = false;
             }
         }
     });
 };
 
-// ===== LIFECYCLE =====
+watch(() => props.roomData, (newVal) => {
+    if (newVal) {
+        const today = new Date();
+        const tomorrow = new Date();
+        tomorrow.setDate(today.getDate() + 1);
+
+        formData.value = {
+            ...getInitialFormData(),
+            room_id: newVal.id,
+            check_in_date: today.toISOString().split('T')[0],
+            check_out_date: tomorrow.toISOString().split('T')[0],
+        };
+        isNewGuest.value = false; 
+        if (formRef.value) formRef.value.clearValidate();
+    }
+});
+
 onMounted(() => {
     getGuests();
 });
 </script>
 
 <style scoped>
-/* ========================
-   THEME COLORS
-   ======================== */
 .text-orange { color: #F68B1E !important; }
 .bg-light-orange { background-color: #FFF8F1 !important; }
 .border-orange { border-color: #F68B1E !important; }
 .btn-orange { background-color: #F68B1E; color: white; border: none; }
 .btn-orange:hover { background-color: #d97814; }
+.btn-color-orange { color: #F68B1E; }
 
-/* ========================
-   PAYMENT CARD UI
-   ======================== */
-.payment-card { transition: all 0.2s ease; }
-.payment-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-.payment-card.active { box-shadow: 0 4px 12px rgba(246, 139, 30, 0.15); }
-
-/* ========================
-   INPUT STYLING (MATCHING OTHERS)
-   ======================== */
 .required:after { content: "*"; color: #f1416c; margin-left: 3px; }
 
 :deep(.metronic-input .el-input__wrapper), 
@@ -374,7 +426,6 @@ onMounted(() => {
     border: 1px solid transparent; 
     border-radius: 0.6rem; 
     padding: 8px 12px;
-    transition: all 0.2s;
     height: 42px;
 }
 
@@ -385,47 +436,19 @@ onMounted(() => {
     box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1) !important;
 }
 
-.hover-underline:hover { text-decoration: underline !important; }
-.hover-elevate:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.payment-card { transition: all 0.2s ease; }
+.payment-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+.payment-card.active { box-shadow: 0 4px 12px rgba(246, 139, 30, 0.15); }
 
-/* ========================
-   DARK MODE
-   ======================== */
 [data-bs-theme="dark"] .theme-modal { background-color: #1e1e2d; color: #ffffff; }
 [data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
 [data-bs-theme="dark"] .text-gray-800 { color: #e1e3ea !important; }
-[data-bs-theme="dark"] .text-gray-700,
 [data-bs-theme="dark"] .text-gray-600 { color: #CDCDDE !important; }
 [data-bs-theme="dark"] .bg-light-subtle { background-color: #1b1b29 !important; border-color: #323248 !important; }
-[data-bs-theme="dark"] .bg-light-success { background-color: rgba(23, 198, 83, 0.15) !important; border-color: rgba(23, 198, 83, 0.3) !important; }
 [data-bs-theme="dark"] .bg-light-orange { background-color: rgba(246, 139, 30, 0.15) !important; border-color: #F68B1E !important; }
 [data-bs-theme="dark"] .border-gray-300 { border-color: #323248 !important; }
-
-[data-bs-theme="dark"] .payment-card { 
-    background-color: #1b1b29; border-color: #323248; 
+[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper) {
+    background-color: #1b1b29 !important; border-color: #323248 !important; color: white;
 }
-[data-bs-theme="dark"] .payment-card.active { 
-    background-color: rgba(246, 139, 30, 0.1) !important; 
-    border-color: #F68B1E !important; 
-}
-[data-bs-theme="dark"] .payment-card:not(.active):hover {
-    border-color: #565674;
-}
-
-[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper),
-[data-bs-theme="dark"] :deep(.metronic-date .el-input__wrapper) {
-    background-color: #1b1b29 !important; 
-    color: #ffffff;
-    border-color: #323248 !important;
-}
-[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper.is-focus),
-[data-bs-theme="dark"] :deep(.metronic-date .el-input__wrapper.is-focus) {
-    border-color: #F68B1E !important;
-    background-color: #151521 !important;
-}
-[data-bs-theme="dark"] :deep(.el-input__inner) { color: #ffffff; }
-
 [data-bs-theme="dark"] :deep(.el-select-dropdown__item.hover) { background-color: #2b2b40 !important; color: #F68B1E; }
-[data-bs-theme="dark"] :deep(.el-select-dropdown__item) { color: #CDCDDE; }
-[data-bs-theme="dark"] :deep(.el-select-dropdown) { background-color: #1e1e2d; border-color: #323248; }
-</style>    
+</style>
