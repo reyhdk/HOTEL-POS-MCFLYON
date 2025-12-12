@@ -63,6 +63,7 @@ Route::middleware('auth:api')->group(function () {
     // Auth & User Profile
     Route::prefix('auth')->group(function () {
         Route::delete('logout', [AuthController::class, 'logout']);
+        Route::post('update-profile', [AuthController::class, 'updateProfile']);
         Route::get('me', [AuthController::class, 'me']);
     });
 

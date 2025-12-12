@@ -34,6 +34,16 @@ const routes: Array<RouteRecordRaw> = [
                 meta: { pageTitle: "Dasbor" },
             },
             {
+                path: "profile",
+                name: "user-profile", // Nama route beda dengan admin
+                // Kita pakai file yang SAMA dengan admin agar tidak kerja 2x
+                component: () => import("@/pages/dashboard/profile/Index.vue"),
+                meta: {
+                    pageTitle: "Profil Saya",
+                    breadcrumbs: ["Dashboard", "Profil"],
+                },
+            },
+            {
                 path: "booking",
                 name: "user-booking",
                 component: () =>
@@ -115,6 +125,15 @@ const routes: Array<RouteRecordRaw> = [
             role: ["admin", "receptionist", "chef", "cleaning-service"],
         },
         children: [
+            {
+                path: "profile",
+                name: "admin-profile",
+                component: () => import("@/pages/dashboard/profile/Index.vue"),
+                meta: {
+                    pageTitle: "Pengaturan Akun",
+                    breadcrumbs: ["Admin", "Profile"],
+                },
+            },
             {
                 path: "dashboard",
                 name: "admin-dashboard",

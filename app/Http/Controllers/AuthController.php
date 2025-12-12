@@ -19,7 +19,7 @@ class AuthController extends Controller
             'status' => true,
             'data' => [
                 // Load relasi 'roles' agar data role selalu ada
-                'user' => $user->load('roles'), 
+                'user' => $user->load('roles'),
                 // Ambil semua nama permission yang dimiliki user
                 'permissions' => $user->getAllPermissions()->pluck('name'),
             ]
@@ -31,7 +31,7 @@ class AuthController extends Controller
 
         return response()->json($response);
     }
-    
+
     /**
      * Mengambil data user yang sedang login.
      */
@@ -60,7 +60,6 @@ class AuthController extends Controller
         return $this->createAuthResponse(auth()->user(), $token);
     }
 
-
     /**
      * Proses registrasi user baru.
      */
@@ -77,7 +76,7 @@ class AuthController extends Controller
 
             $user = User::create($validatedData);
 
-            // Berikan role 'user' (atau 'tamu' jika Anda punya) secara default
+            // Berikan role 'user' secara default
             $user->assignRole('user');
 
             $token = auth()->login($user);
@@ -89,14 +88,72 @@ class AuthController extends Controller
                     'user' => $user,
                     'token' => $token
                 ]
-            ], 201); // Kode 201 menandakan "Created"
-
+            ], 201);
         } catch (\Exception $e) {
             Log::error('Registrasi Gagal: ' . $e->getMessage());
 
             return response()->json([
                 'status' => false,
                 'message' => 'Terjadi kesalahan pada server, silakan coba lagi.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Update Profile (Nama, Password, Foto)
+     * Endpoint: /api/auth/update-profile
+     */
+    public function updateProfile(Request $request)
+    {
+        /** @var \App\Models\User $user */ // <-- INI SOLUSI GARIS MERAHNYA
+        $user = auth()->user();
+
+        // 1. Validasi Input
+        $request->validate([
+            'name'     => 'required|string|max:255',
+            'password' => 'nullable|string|min:6',
+            'photo'    => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        try {
+            // 2. Update Nama
+            $user->name = $request->name;
+
+            // 3. Update Password (Hanya jika diisi)
+            if ($request->filled('password')) {
+                $user->password = Hash::make($request->password);
+            }
+
+            // 4. Update Foto
+            if ($request->hasFile('photo')) {
+                // Hapus foto lama jika ada (opsional, pastikan path benar)
+                if ($user->photo && file_exists(public_path($user->photo))) {
+                    // unlink(public_path($user->photo)); 
+                }
+
+                // Simpan file baru ke public/storage/avatars
+                $path = $request->file('photo')->store('avatars', 'public');
+
+                // Simpan path lengkap agar bisa diakses frontend
+                $user->photo = '/storage/' . $path;
+            }
+
+            // Sekarang editor tahu $user adalah User Model, jadi save() tidak akan merah
+            $user->save();
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Profil berhasil diperbarui.',
+                'data'    => [
+                    'user' => $user->fresh(), // Ini juga tidak akan merah lagi
+                    'photo_url' => $user->photo
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Update Profile Gagal: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Gagal memperbarui profil: ' . $e->getMessage()
             ], 500);
         }
     }

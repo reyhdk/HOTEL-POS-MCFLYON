@@ -1,87 +1,229 @@
 <template>
   <div class="modal fade" id="kt_modal_user" ref="modalRef" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-550px">
-      <div class="modal-content rounded-3 shadow-lg border-0 theme-modal">
+      <div class="modal-content rounded shadow-lg border-0">
         
-        <div class="modal-header border-0 pb-0 justify-content-between align-items-center py-4 px-5">
-            <h2 class="fw-bold m-0 fs-3 text-gray-900">{{ isEditMode ? 'Edit User' : 'Tambah User' }}</h2>
-            <div class="btn btn-sm btn-icon btn-active-light-primary rounded-circle" data-bs-dismiss="modal">
-                <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
-            </div>
+        <!-- Modal Header -->
+        <div class="modal-header border-0 pb-0 pt-5 px-7">
+          <h2 class="fw-bolder m-0 text-gray-900">
+            <i class="ki-duotone ki-user-edit fs-2 text-orange me-2">
+              <span class="path1"></span>
+              <span class="path2"></span>
+              <span class="path3"></span>
+            </i>
+            {{ isEditMode ? 'Edit User' : 'Tambah User Baru' }}
+          </h2>
+          <div class="btn btn-sm btn-icon btn-active-color-primary" data-bs-dismiss="modal">
+            <i class="ki-duotone ki-cross fs-1">
+              <span class="path1"></span>
+              <span class="path2"></span>
+            </i>
+          </div>
         </div>
 
-        <div class="modal-body scroll-y px-5 pb-5 pt-2">
-          <el-form @submit.prevent="submit" :model="formData" :rules="rules" ref="formRef" label-position="top" class="compact-form">
+        <!-- Modal Body -->
+        <div class="modal-body scroll-y px-7 py-5">
+          <el-form 
+            @submit.prevent="submit" 
+            :model="formData" 
+            :rules="rules" 
+            ref="formRef" 
+            label-position="top"
+            size="default"
+          >
             
-            <div class="mb-5 text-center mt-2">
-                <div class="symbol symbol-60px symbol-circle bg-light-orange mb-3">
-                    <div class="symbol-label text-orange fs-2 fw-bold">
-                        {{ getInitials(formData.name) }}
-                    </div>
-                </div>
-                <div class="fs-7 text-muted" v-if="!formData.name">Profil Pengguna</div>
+            <!-- Photo Upload - Compact -->
+            <div class="text-center mb-6">
+              <div class="image-input image-input-outline image-input-circle" data-kt-image-input="true">
+                <div 
+                  class="image-input-wrapper w-80px h-80px shadow-sm border border-2 border-gray-300"
+                  :style="`background-image: url(${photoPreview})`"
+                ></div>
+
+                <label 
+                  class="btn btn-icon btn-circle btn-color-muted btn-active-color-primary w-20px h-20px bg-body shadow-sm"
+                  data-kt-image-input-action="change"
+                  data-bs-toggle="tooltip"
+                  title="Ubah foto"
+                >
+                  <i class="ki-duotone ki-pencil fs-6">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                  </i>
+                  <input type="file" accept=".png, .jpg, .jpeg" @change="onFileChange" />
+                </label>
+
+                <span 
+                  v-if="photoPreview && !photoPreview.includes('blank')"
+                  class="btn btn-icon btn-circle btn-color-muted btn-active-color-danger w-20px h-20px bg-body shadow-sm"
+                  data-kt-image-input-action="remove"
+                  data-bs-toggle="tooltip"
+                  title="Hapus foto"
+                  @click="removePhoto"
+                >
+                  <i class="ki-duotone ki-cross fs-7">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                  </i>
+                </span>
+              </div>
+              <div class="form-text fs-8 text-muted mt-2">Format: PNG, JPG, JPEG (Max 2MB)</div>
             </div>
 
-            <el-form-item prop="name" class="mb-4">
-                <template #label><span class="required fw-bold fs-8 text-gray-600 text-uppercase ls-1">Nama Lengkap</span></template>
-                <el-input v-model="formData.name" placeholder="Nama User" class="metronic-input fw-bold fs-6">
-                    <template #prefix><i class="ki-duotone ki-user fs-3 text-gray-500 me-1"><span class="path1"></span><span class="path2"></span></i></template>
-                </el-input>
+            <!-- Form Fields -->
+            <el-form-item prop="name" label="Nama Lengkap" class="mb-4">
+              <el-input 
+                v-model="formData.name" 
+                placeholder="Contoh: John Doe" 
+                class="metronic-input-orange"
+                clearable
+              >
+                <template #prefix>
+                  <i class="ki-duotone ki-profile-circle fs-3 text-gray-500">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                  </i>
+                </template>
+              </el-input>
             </el-form-item>
 
-            <div class="row g-4 mb-1">
-                <div class="col-6">
-                    <el-form-item prop="email" class="mb-3">
-                        <template #label><span class="required fw-bold fs-8 text-gray-600 text-uppercase">Email</span></template>
-                        <el-input v-model="formData.email" placeholder="email@contoh.com" class="metronic-input" />
-                    </el-form-item>
-                </div>
-                <div class="col-6">
-                    <el-form-item prop="phone" class="mb-3">
-                        <template #label><span class="required fw-bold fs-8 text-gray-600 text-uppercase">No. Telepon</span></template>
-                        <el-input v-model="formData.phone" placeholder="08..." class="metronic-input" />
-                    </el-form-item>
-                </div>
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <el-form-item prop="email" label="Email" class="mb-0">
+                  <el-input 
+                    v-model="formData.email" 
+                    placeholder="email@example.com" 
+                    class="metronic-input-orange"
+                    clearable
+                  >
+                    <template #prefix>
+                      <i class="ki-duotone ki-sms fs-3 text-gray-500">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                      </i>
+                    </template>
+                  </el-input>
+                </el-form-item>
+              </div>
+              <div class="col-md-6">
+                <el-form-item prop="phone" label="No. Telepon" class="mb-0">
+                  <el-input 
+                    v-model="formData.phone" 
+                    placeholder="08123456789" 
+                    class="metronic-input-orange"
+                    clearable
+                  >
+                    <template #prefix>
+                      <i class="ki-duotone ki-phone fs-3 text-gray-500">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                      </i>
+                    </template>
+                  </el-input>
+                </el-form-item>
+              </div>
             </div>
 
-            <el-form-item prop="role_name" class="mb-4">
-                <template #label><span class="required fw-bold fs-8 text-gray-600 text-uppercase">Role / Hak Akses</span></template>
-                <el-select v-model="formData.role_name" placeholder="Pilih Role..." class="w-100 metronic-input">
-                    <el-option v-for="role in allRoles" :key="role.id" :label="role.full_name || role.name" :value="role.name">
-                        <div class="d-flex align-items-center">
-                            <span class="badge badge-light-primary fw-bold fs-9 me-2">{{ role.name }}</span>
-                            <span class="text-gray-600 fs-9">{{ role.full_name }}</span>
-                        </div>
-                    </el-option>
-                </el-select>
+            <el-form-item prop="role_name" label="Role / Jabatan" class="mb-4">
+              <el-select 
+                v-model="formData.role_name" 
+                placeholder="Pilih role pengguna" 
+                class="w-100 metronic-select-orange"
+                clearable
+              >
+                <template #prefix>
+                  <i class="ki-duotone ki-security-user fs-3 text-gray-500">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                  </i>
+                </template>
+                <el-option 
+                  v-for="role in roles" 
+                  :key="role.id" 
+                  :label="role.name.toUpperCase()" 
+                  :value="role.name"
+                >
+                  <span class="badge badge-light-orange fw-bold">{{ role.name.toUpperCase() }}</span>
+                </el-option>
+              </el-select>
             </el-form-item>
 
-            <div class="row g-4 mb-1">
-                <div class="col-6">
-                    <el-form-item prop="password" class="mb-0">
-                        <template #label><span class="fw-bold fs-8 text-gray-600 text-uppercase" :class="{ 'required': !isEditMode }">Password</span></template>
-                        <el-input v-model="formData.password" type="password" placeholder="******" class="metronic-input" show-password />
-                    </el-form-item>
-                </div>
-                <div class="col-6">
-                    <el-form-item prop="password_confirmation" class="mb-0">
-                        <template #label><span class="fw-bold fs-8 text-gray-600 text-uppercase" :class="{ 'required': !isEditMode }">Konfirmasi</span></template>
-                        <el-input v-model="formData.password_confirmation" type="password" placeholder="******" class="metronic-input" show-password />
-                    </el-form-item>
-                </div>
+            <!-- Password Section -->
+            <div class="separator separator-dashed my-5"></div>
+            
+            <div class="d-flex align-items-center mb-3">
+              <i class="ki-duotone ki-lock fs-2 text-orange me-2">
+                <span class="path1"></span>
+                <span class="path2"></span>
+              </i>
+              <h5 class="fw-bold text-gray-800 mb-0">Keamanan Akun</h5>
             </div>
-            <div class="form-text text-muted fs-9 mt-2" v-if="isEditMode">Kosongkan password jika tidak ingin mengubahnya.</div>
 
-            <div class="d-flex justify-content-end align-items-center mt-8 pt-4 border-top border-gray-200">
-                 <button type="button" class="btn btn-light me-3 fw-bold text-gray-700 px-5" data-bs-dismiss="modal">Batal</button>
-                 <button :disabled="loading" class="btn btn-orange fw-bold px-6 shadow-sm hover-elevate" type="submit">
-                    <span v-if="!loading" class="d-flex align-items-center">
-                        Simpan <i class="ki-duotone ki-check-circle fs-2 ms-2 text-white"><span class="path1"></span><span class="path2"></span></i>
-                    </span>
-                    <span v-if="loading" class="indicator-progress d-flex align-items-center">
-                        Menyimpan... <span class="spinner-border spinner-border-sm ms-2"></span>
-                    </span>
-                 </button>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <el-form-item prop="password" label="Password" class="mb-0">
+                  <el-input 
+                    v-model="formData.password" 
+                    type="password" 
+                    placeholder="Minimal 8 karakter" 
+                    show-password 
+                    class="metronic-input-orange"
+                    clearable
+                  >
+                    <template #prefix>
+                      <i class="ki-duotone ki-lock-2 fs-3 text-gray-500">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                        <span class="path5"></span>
+                      </i>
+                    </template>
+                  </el-input>
+                  <div v-if="isEditMode" class="form-text fs-8 text-muted mt-1">
+                    <i class="bi bi-info-circle me-1"></i>Kosongkan jika tidak ingin mengubah
+                  </div>
+                </el-form-item>
+              </div>
+              <div class="col-md-6">
+                <el-form-item prop="password_confirmation" label="Konfirmasi Password" class="mb-0">
+                  <el-input 
+                    v-model="formData.password_confirmation" 
+                    type="password" 
+                    placeholder="Ulangi password" 
+                    show-password 
+                    class="metronic-input-orange"
+                    clearable
+                  >
+                    <template #prefix>
+                      <i class="ki-duotone ki-shield-tick fs-3 text-gray-500">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                      </i>
+                    </template>
+                  </el-input>
+                </el-form-item>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-end gap-2 mt-6 pt-3 border-top">
+              <button type="button" class="btn btn-light btn-sm fw-bold" data-bs-dismiss="modal">
+                <i class="ki-duotone ki-cross fs-3 me-1">
+                  <span class="path1"></span>
+                  <span class="path2"></span>
+                </i>
+                Batal
+              </button>
+              <button type="button" class="btn btn-orange btn-sm fw-bold" @click="submit" :disabled="loading">
+                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+                <i v-else class="ki-duotone ki-check fs-3 me-1">
+                  <span class="path1"></span>
+                  <span class="path2"></span>
+                </i>
+                {{ isEditMode ? 'Simpan Perubahan' : 'Tambah User' }}
+              </button>
             </div>
 
           </el-form>
@@ -92,169 +234,400 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted } from "vue";
+import { ref, reactive, onMounted } from 'vue';
+import { Modal } from 'bootstrap';
 import ApiService from "@/core/services/ApiService";
-import Swal from "sweetalert2";
-import { Modal } from "bootstrap";
-import type { FormInstance, FormRules } from 'element-plus'
+import Swal from 'sweetalert2';
+import { getAssetPath } from "@/core/helpers/assets";
 
-// Interfaces
-interface Role { id: number; name: string; full_name: string; }
-interface UserData { uuid: string; name: string; email: string; phone: string; roles: Role[]; }
-interface FormData { name: string; email: string; phone: string; role_name: string; password: string; password_confirmation: string; }
+// Types
+interface Role {
+  id: number;
+  name: string;
+}
 
-const props = defineProps<{ userData: UserData | null }>();
-const emit = defineEmits(['user-updated']);
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  photo?: string;
+  roles: Role[];
+}
 
-const formRef = ref<FormInstance>();
-const modalRef = ref<null | HTMLElement>(null);
+// Emits
+const emit = defineEmits(['saved']);
+
+// Refs
+const modalRef = ref<HTMLElement | null>(null);
+const formRef = ref<any>(null);
+const modalInstance = ref<any>(null);
 const loading = ref(false);
-const allRoles = ref<Role[]>([]);
-const isEditMode = computed(() => !!props.userData);
+const isEditMode = ref(false);
+const editId = ref<number | null>(null);
+const roles = ref<Role[]>([]);
 
-const getInitialFormData = (): FormData => ({ name: "", email: "", phone: "", role_name: "", password: "", password_confirmation: "" });
-const formData = ref<FormData>(getInitialFormData());
+// Photo Setup
+const defaultPhoto = getAssetPath("media/avatars/blank.png");
+const photoPreview = ref(defaultPhoto);
+const photoFile = ref<File | null>(null);
 
-const getInitials = (name: string) => {
-    if (!name) return "?";
-    const parts = name.split(" ");
-    return parts.length > 1 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
-};
-
-// Fetch Roles
-const getRoles = async () => {
-    try {
-        const { data } = await ApiService.get("/master/roles");
-        allRoles.value = data.data || data;
-    } catch (e) { console.error(e); }
-};
-onMounted(getRoles);
-
-// Watcher untuk Edit Mode
-watch(() => props.userData, (newVal) => {
-  if (newVal) {
-    formData.value = {
-        name: newVal.name,
-        email: newVal.email,
-        phone: newVal.phone,
-        role_name: newVal.roles?.[0]?.name || "",
-        password: "",
-        password_confirmation: ""
-    };
-  } else {
-    formRef.value?.resetFields();
-    formData.value = getInitialFormData();
-  }
+// Form Data
+const formData = reactive({
+  name: '',
+  email: '',
+  phone: '',
+  role_name: '',
+  password: '',
+  password_confirmation: ''
 });
 
-// Validasi Element Plus
-const rules = computed<FormRules>(() => ({
-  name: [{ required: true, message: "Wajib diisi", trigger: "blur" }],
-  email: [{ required: true, message: "Wajib diisi", trigger: "blur" }, { type: 'email', message: 'Email tidak valid', trigger: ['blur', 'change'] }],
-  phone: [{ required: true, message: "Wajib diisi", trigger: "blur" }],
-  role_name: [{ required: true, message: "Pilih role", trigger: "change" }],
-  // Password wajib hanya jika mode tambah
-  password: !isEditMode.value ? [{ required: true, message: "Password wajib", trigger: "blur" }, { min: 8, message: "Min 8 karakter", trigger: "blur" }] : [],
-  password_confirmation: !isEditMode.value ? [
-      { required: true, message: "Konfirmasi password", trigger: "blur" },
-      { validator: (rule: any, value: string, callback: any) => {
-          if (value !== formData.value.password) callback(new Error("Password tidak sama"));
-          else callback();
-        }, trigger: "blur" 
+// Validation Rules
+const rules = reactive({
+  name: [{ required: true, message: 'Nama wajib diisi', trigger: 'blur' }],
+  email: [
+    { required: true, message: 'Email wajib diisi', trigger: 'blur' },
+    { type: 'email', message: 'Format email tidak valid', trigger: 'blur' }
+  ],
+  role_name: [{ required: true, message: 'Role wajib dipilih', trigger: 'change' }],
+  password: [{ 
+    required: false, 
+    validator: (rule: any, value: any, callback: any) => {
+      if (!isEditMode.value && !value) {
+        callback(new Error('Password wajib diisi untuk user baru'));
+      } else if (value && value.length < 8) {
+        callback(new Error('Password minimal 8 karakter'));
+      } else {
+        callback();
       }
-  ] : []
-}));
+    }, 
+    trigger: 'blur' 
+  }],
+  password_confirmation: [{
+    required: false,
+    validator: (rule: any, value: any, callback: any) => {
+      if (formData.password && value !== formData.password) {
+        callback(new Error('Konfirmasi password tidak cocok'));
+      } else {
+        callback();
+      }
+    },
+    trigger: 'blur'
+  }]
+});
+
+onMounted(() => {
+  if (modalRef.value) {
+    modalInstance.value = new Modal(modalRef.value);
+  }
+  fetchRoles();
+});
+
+const fetchRoles = async () => {
+  try {
+    const response = await ApiService.get("master/all-roles");
+    roles.value = response.data;
+  } catch (error) {
+    console.error("Gagal memuat roles", error);
+  }
+};
+
+// Photo Handlers
+const onFileChange = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  if (target.files && target.files.length > 0) {
+    const file = target.files[0];
+    
+    // Validasi ukuran file (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      Swal.fire({
+        text: "Ukuran file maksimal 2MB",
+        icon: "warning",
+        buttonsStyling: false,
+        confirmButtonText: "Ok",
+        customClass: { confirmButton: "btn btn-orange" }
+      });
+      return;
+    }
+    
+    photoFile.value = file;
+    photoPreview.value = URL.createObjectURL(file);
+  }
+};
+
+const removePhoto = () => {
+  photoFile.value = null;
+  photoPreview.value = defaultPhoto;
+};
+
+// Open Modal
+const open = (user: User | null = null) => {
+  resetForm();
+  
+  if (user) {
+    isEditMode.value = true;
+    editId.value = user.id;
+    
+    formData.name = user.name;
+    formData.email = user.email;
+    formData.phone = user.phone || '';
+    formData.role_name = user.roles && user.roles.length > 0 ? user.roles[0].name : '';
+    
+    photoPreview.value = user.photo || defaultPhoto;
+  } else {
+    isEditMode.value = false;
+    editId.value = null;
+    photoPreview.value = defaultPhoto;
+  }
+  
+  if (modalInstance.value) {
+    modalInstance.value.show();
+  }
+};
+
+const resetForm = () => {
+  if (formRef.value) {
+    formRef.value.resetFields();
+  }
+  Object.assign(formData, {
+    name: '',
+    email: '',
+    phone: '',
+    role_name: '',
+    password: '',
+    password_confirmation: ''
+  });
+  photoFile.value = null;
+  photoPreview.value = defaultPhoto;
+};
 
 const submit = () => {
   if (!formRef.value) return;
+
   formRef.value.validate(async (valid: boolean) => {
     if (valid) {
       loading.value = true;
       try {
-        if (isEditMode.value && props.userData?.uuid) {
-            await ApiService.put(`/master/users/${props.userData.uuid}`, formData.value);
-        } else {
-            await ApiService.post("/master/users", formData.value);
+        const data = new FormData();
+        data.append('name', formData.name);
+        data.append('email', formData.email);
+        if (formData.phone) data.append('phone', formData.phone);
+        data.append('role_name', formData.role_name);
+
+        if (formData.password) {
+          data.append('password', formData.password);
+          data.append('password_confirmation', formData.password_confirmation);
+        }
+
+        if (photoFile.value) {
+          data.append('photo', photoFile.value);
         }
         
-        Swal.fire({ text: `User berhasil ${isEditMode.value ? 'diupdate' : 'ditambahkan'}!`, icon: "success", timer: 1500, showConfirmButton: false })
-            .then(() => {
-                if (modalRef.value) Modal.getInstance(modalRef.value)?.hide();
-                emit('user-updated');
-            });
+        if (isEditMode.value) {
+          data.append('_method', 'PUT');
+          await ApiService.post(`master/users/${editId.value}`, data);
+        } else {
+          await ApiService.post("master/users", data);
+        }
 
+        Swal.fire({
+          text: `User berhasil ${isEditMode.value ? 'diperbarui' : 'ditambahkan'}!`,
+          icon: "success",
+          buttonsStyling: false,
+          confirmButtonText: "Ok",
+          customClass: { confirmButton: "btn btn-orange" }
+        });
+
+        if (modalInstance.value) {
+          modalInstance.value.hide();
+        }
+        emit('saved');
       } catch (error: any) {
-        let msg = "Gagal menyimpan data.";
-        if (error.response?.data?.message) msg = error.response.data.message;
-        Swal.fire({ text: msg, icon: "error" });
+        Swal.fire({
+          text: error.response?.data?.message || "Terjadi kesalahan sistem.",
+          icon: "error",
+          buttonsStyling: false,
+          confirmButtonText: "Ok",
+          customClass: { confirmButton: "btn btn-danger" }
+        });
       } finally {
         loading.value = false;
       }
     }
   });
 };
+
+defineExpose({ open });
 </script>
 
 <style scoped>
 /* ========================
-   THEME COLORS
+   ORANGE THEME
    ======================== */
-.text-orange { color: #F68B1E !important; }
-.bg-light-orange { background-color: #FFF8F1 !important; }
-.btn-orange { background-color: #F68B1E; color: white; border: none; }
-.btn-orange:hover { background-color: #d97814; color: white; }
+.text-orange { 
+  color: #F68B1E !important; 
+}
+
+.bg-orange { 
+  background-color: #F68B1E !important; 
+}
+
+.bg-light-orange { 
+  background-color: rgba(246, 139, 30, 0.1) !important; 
+}
+
+.btn-orange {
+  background-color: #F68B1E;
+  border-color: #F68B1E;
+  color: #fff;
+}
+
+.btn-orange:hover:not(:disabled) {
+  background-color: #e57b0e;
+  border-color: #e57b0e;
+  color: #fff;
+}
+
+.btn-orange:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.badge-light-orange {
+  background-color: rgba(246, 139, 30, 0.1);
+  color: #F68B1E;
+}
 
 /* ========================
-   INPUTS STYLE
+   INPUT STYLING - ORANGE
    ======================== */
-.required:after { content: "*"; color: #f1416c; margin-left: 3px; }
-
-:deep(.metronic-input .el-input__wrapper), 
-:deep(.metronic-input .el-textarea__inner) {
-    background-color: #F9F9F9;
-    box-shadow: none !important; 
-    border: 1px solid transparent; 
-    border-radius: 0.6rem; 
-    padding: 8px 12px;
-    height: 40px;
-    transition: all 0.2s;
+.metronic-input-orange :deep(.el-input__wrapper) {
+  background-color: var(--bs-body-bg);
+  border: 1px solid #e4e6ef;
+  box-shadow: none;
+  transition: all 0.3s;
 }
 
-:deep(.metronic-input .el-input__wrapper.is-focus),
-:deep(.metronic-input .el-textarea__inner:focus) {
-    background-color: #ffffff;
-    border-color: #F68B1E !important;
-    box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1) !important;
+.metronic-input-orange :deep(.el-input__wrapper:hover) {
+  border-color: #F68B1E;
 }
 
-/* Utils */
-.hover-elevate:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.metronic-input-orange :deep(.el-input__wrapper.is-focus) {
+  border-color: #F68B1E;
+  box-shadow: 0 0 0 0.15rem rgba(246, 139, 30, 0.15);
+}
+
+.metronic-select-orange :deep(.el-input__wrapper) {
+  background-color: var(--bs-body-bg);
+  border: 1px solid #e4e6ef;
+  box-shadow: none;
+  transition: all 0.3s;
+}
+
+.metronic-select-orange :deep(.el-input__wrapper:hover) {
+  border-color: #F68B1E;
+}
+
+.metronic-select-orange :deep(.el-input__wrapper.is-focus) {
+  border-color: #F68B1E;
+  box-shadow: 0 0 0 0.15rem rgba(246, 139, 30, 0.15);
+}
+
+/* Dark Mode */
+[data-bs-theme="dark"] .metronic-input-orange :deep(.el-input__wrapper),
+[data-bs-theme="dark"] .metronic-select-orange :deep(.el-input__wrapper) {
+  background-color: #1b1b29;
+  border-color: #323248;
+}
+
+[data-bs-theme="dark"] .metronic-input-orange :deep(.el-input__inner),
+[data-bs-theme="dark"] .metronic-select-orange :deep(.el-input__inner) {
+  color: #ffffff;
+}
 
 /* ========================
-   DARK MODE
+   IMAGE INPUT
    ======================== */
-[data-bs-theme="dark"] .theme-modal { background-color: #1e1e2d; color: #ffffff; }
-[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
-[data-bs-theme="dark"] .text-gray-600 { color: #CDCDDE !important; }
-[data-bs-theme="dark"] .bg-light-orange { background-color: #2b2b40 !important; }
-[data-bs-theme="dark"] .border-gray-200 { border-color: #323248 !important; }
-
-/* Input Dark */
-[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper),
-[data-bs-theme="dark"] :deep(.metronic-input .el-textarea__inner) {
-    background-color: #1b1b29 !important; 
-    color: #ffffff;
-    border-color: #323248 !important;
+.image-input {
+  position: relative;
+  display: inline-block;
 }
 
-[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper.is-focus),
-[data-bs-theme="dark"] :deep(.metronic-input .el-textarea__inner:focus) {
-    border-color: #F68B1E !important;
-    background-color: #151521 !important;
+.image-input-wrapper {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
 }
-[data-bs-theme="dark"] :deep(.el-input__inner) { color: #ffffff; }
 
-/* Popups Dark */
-[data-bs-theme="dark"] :deep(.el-select-dropdown__item.hover) { background-color: #2b2b40 !important; color: #F68B1E; }
-[data-bs-theme="dark"] :deep(.el-select-dropdown) { background-color: #1e1e2d; border-color: #323248; }
+.image-input .btn-icon {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  z-index: 1;
+}
+
+.image-input [data-kt-image-input-action="change"] {
+  right: 0;
+}
+
+.image-input [data-kt-image-input-action="remove"] {
+  right: -5px;
+  bottom: 25px;
+}
+
+.image-input input[type="file"] {
+  display: none;
+}
+
+/* ========================
+   FORM LABEL
+   ======================== */
+:deep(.el-form-item__label) {
+  font-weight: 600;
+  color: var(--bs-gray-700);
+  font-size: 0.925rem;
+  margin-bottom: 0.5rem;
+}
+
+[data-bs-theme="dark"] :deep(.el-form-item__label) {
+  color: var(--bs-gray-400);
+}
+
+/* ========================
+   MODAL ENHANCEMENTS
+   ======================== */
+.modal-content {
+  border-radius: 0.75rem;
+}
+
+.scroll-y {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+/* Custom Scrollbar */
+.scroll-y::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-y::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.scroll-y::-webkit-scrollbar-thumb {
+  background: #F68B1E;
+  border-radius: 10px;
+}
+
+.scroll-y::-webkit-scrollbar-thumb:hover {
+  background: #e57b0e;
+}
+
+[data-bs-theme="dark"] .scroll-y::-webkit-scrollbar-track {
+  background: #1b1b29;
+}
 </style>

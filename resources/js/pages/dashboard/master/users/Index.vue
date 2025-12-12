@@ -1,360 +1,557 @@
 <template>
   <div class="d-flex flex-column gap-5">
     
-    <div class="row g-5 g-xl-8">
-      <div class="col-xl-4 col-md-6 animate-item" style="--delay: 0s">
-        <div class="card bg-body hover-elevate-up border-0 h-100 card-stat-orange theme-card shadow-sm">
-          <div class="card-body d-flex align-items-center">
-            <div class="symbol symbol-50px me-3">
-              <div class="symbol-label bg-light-orange text-orange rounded-4">
-                <i class="ki-duotone ki-people fs-2x text-orange"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+    <!-- HEADER CARD - Premium Orange Design -->
+    <div class="row g-5 g-xl-8 mb-5 animate__animated animate__fadeInDown">
+      <div class="col-12">
+        <div class="card card-flush h-xl-100 shadow-sm border-0">
+          <div class="card-body d-flex align-items-center justify-content-between py-7">
+            <div class="d-flex align-items-center">
+              <div class="symbol symbol-60px me-5">
+                <span class="symbol-label bg-light-orange">
+                  <i class="ki-duotone ki-profile-user fs-2x text-orange">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                    <span class="path4"></span>
+                  </i>
+                </span>
+              </div>
+              <div class="d-flex flex-column">
+                <span class="fs-2hx fw-bold text-gray-900 lh-1 ls-n2">{{ pagination.total }}</span>
+                <span class="text-gray-500 pt-1 fw-semibold fs-5">Total Pengguna Terdaftar</span>
               </div>
             </div>
-            <div class="d-flex flex-column">
-              <span class="fw-bolder fs-2 text-gray-900 mb-1">{{ users.length }}</span>
-              <span class="text-gray-500 fw-bold fs-8 text-uppercase ls-1">Total Pengguna</span>
+
+            <div>
+              <button @click="handleAdd" class="btn btn-orange">
+                <i class="ki-duotone ki-plus fs-2"></i>
+                Tambah User
+              </button>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="card border-0 shadow-sm theme-card animate-item position-relative" style="--delay: 0.1s; z-index: 99;">
-        <div class="card-body py-4">
-            <div class="d-flex flex-column flex-sm-row align-items-center justify-content-between gap-4">
-                
-                <div class="d-flex align-items-center position-relative w-100 w-sm-300px">
-                    <i class="ki-duotone ki-magnifier fs-2 position-absolute ms-4 text-gray-500"><span class="path1"></span><span class="path2"></span></i>
-                    <input type="text" v-model="searchQuery" class="form-control form-control-solid ps-12 search-input" placeholder="Cari user..." />
-                </div>
-
-                <div class="d-flex flex-wrap gap-3 align-items-center w-100 w-sm-auto justify-content-end">
-                    
-                    <div class="dropdown-wrapper position-relative w-150px" v-click-outside="() => closeDropdown()">
-                        <button 
-                            class="btn btn-custom-select w-100 d-flex align-items-center justify-content-between px-4" 
-                            type="button" 
-                            @click="toggleDropdown()"
-                            :class="{ 'active': isDropdownOpen }"
-                        >
-                            <div class="d-flex align-items-center text-truncate">
-                                <i class="ki-duotone ki-shield-tick fs-2 me-2 text-gray-500"><span class="path1"></span><span class="path2"></span></i>
-                                <span class="fw-bold text-gray-700 fs-7">{{ activeRoleLabel }}</span>
-                            </div>
-                            <i class="ki-duotone ki-down fs-5 text-gray-500 ms-2 transition-icon" :class="{ 'rotate-180': isDropdownOpen }"></i>
-                        </button>
-
-                        <transition name="dropdown-anim">
-                            <div v-if="isDropdownOpen" class="custom-dropdown-menu shadow-lg border-0 p-2 rounded-3 theme-dropdown">
-                                <ul class="list-unstyled m-0">
-                                    <li>
-                                        <a href="#" class="dropdown-item-custom rounded px-3 py-2 fw-semibold mb-1" 
-                                           :class="{ 'selected': filterRole === 'all' }" 
-                                           @click.prevent="setFilterRole('all')">
-                                            Semua Role
-                                        </a>
-                                    </li>
-                                    <li v-for="role in uniqueRoles" :key="role">
-                                        <a href="#" class="dropdown-item-custom rounded px-3 py-2 fw-semibold mb-1" 
-                                           :class="{ 'selected': filterRole === role }" 
-                                           @click.prevent="setFilterRole(role)">
-                                            {{ role }}
-                                        </a>
-                                    </li>
-                                </ul>
-                            </div>
-                        </transition>
-                    </div>
-
-                    <button v-if="userHasPermission('create users')" class="btn btn-sm btn-orange fw-bold hover-scale box-shadow-orange" @click="openAddModal">
-                        <i class="ki-duotone ki-plus fs-2 text-white"></i> Tambah User
-                    </button>
-                </div>
-            </div>
+    <!-- MAIN TABLE CARD -->
+    <div class="card card-flush animate__animated animate__fadeInUp" style="animation-delay: 0.1s;">
+      
+      <!-- Card Header with Filters -->
+      <div class="card-header align-items-center py-5 gap-2 gap-md-5 border-0">
+        <div class="card-title">
+          <div class="d-flex align-items-center position-relative my-1">
+            <i class="ki-duotone ki-magnifier fs-3 position-absolute ms-4">
+              <span class="path1"></span>
+              <span class="path2"></span>
+            </i>
+            <input 
+              type="text" 
+              v-model="search" 
+              @input="handleSearch"
+              class="form-control form-control-solid w-250px ps-12" 
+              placeholder="Cari nama, email..." 
+            />
+          </div>
         </div>
-    </div>
 
-    <div class="position-relative min-h-300px" style="z-index: 1;">
+        <div class="card-toolbar flex-row-fluid justify-content-end gap-2">
+          <!-- Filter Role -->
+          <el-select 
+            v-model="filterRole" 
+            placeholder="Filter Role" 
+            class="w-150px metronic-select-orange"
+            size="large"
+            @change="handleFilterChange"
+            clearable
+          >
+            <template #prefix>
+              <i class="ki-duotone ki-filter fs-3 text-gray-500">
+                <span class="path1"></span>
+                <span class="path2"></span>
+              </i>
+            </template>
+            <el-option label="Semua Role" value="" />
+            <el-option 
+              v-for="role in rolesList" 
+              :key="role.id" 
+              :label="role.name.toUpperCase()" 
+              :value="role.name" 
+            />
+          </el-select>
+
+          <!-- Reset Button -->
+          <button 
+            v-if="search || filterRole"
+            @click="resetFilters"
+            class="btn btn-icon btn-light btn-active-light-danger"
+            data-bs-toggle="tooltip"
+            title="Reset Filter"
+          >
+            <i class="ki-duotone ki-cross fs-2">
+              <span class="path1"></span>
+              <span class="path2"></span>
+            </i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Card Body -->
+      <div class="card-body pt-0">
         
-        <div v-if="loading" class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center z-index-10 bg-body bg-opacity-75 rounded-3">
-             <div class="d-flex flex-column align-items-center animate-pulse">
-                 <span class="spinner-border text-orange mb-3 w-40px h-40px"></span>
-                 <span class="text-gray-500 fw-bold">Memuat data...</span>
-             </div>
-        </div>
-
-        <div v-else-if="filteredUsers.length === 0" class="d-flex flex-column align-items-center justify-content-center py-15 text-muted animate-fade-in">
-             <div class="symbol symbol-100px mb-5 bg-light-orange rounded-circle d-flex align-items-center justify-content-center">
-                <i class="ki-duotone ki-profile-user fs-4x text-orange"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
-             </div>
-             <span class="fs-4 fw-bold text-gray-800">Tidak ada user ditemukan.</span>
-        </div>
-
-        <div v-else>
-            <TransitionGroup name="fade-grid" tag="div" class="row g-6">
-                <div class="col-md-6 col-lg-4 col-xl-3" v-for="user in filteredUsers" :key="user.uuid">
-                    
-                    <div class="card h-100 border-0 shadow-sm theme-card hover-elevate-up transition-300 group-card">
-                        <div class="card-body p-5 d-flex flex-column">
-                            
-                            <div class="d-flex align-items-center mb-5">
-                                <div class="symbol symbol-50px symbol-circle me-3">
-                                    <div class="symbol-label fw-bold fs-3 text-white" :class="getRandomColorClass(user.name)">
-                                        {{ getInitials(user.name) }}
-                                    </div>
-                                    <div class="symbol-badge bg-success start-100 top-100 border-4 h-15px w-15px ms-n2 mt-n2"></div>
-                                </div>
-                                <div class="d-flex flex-column overflow-hidden">
-                                    <a href="#" class="text-gray-900 text-hover-orange fw-bold fs-6 text-truncate transition-200" @click.prevent="openEditModal(user)">
-                                        {{ user.name }}
-                                    </a>
-                                    <span class="badge badge-light fw-bold fs-9 mt-1 w-fit-content" :class="getRoleBadgeClass(user.roles?.[0]?.name)">
-                                        {{ user.roles?.[0]?.name || 'User' }}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="d-flex flex-column gap-3 mb-5">
-                                <div class="d-flex align-items-center text-gray-600 fs-7">
-                                    <i class="ki-duotone ki-sms fs-5 me-2 text-gray-400"><span class="path1"></span><span class="path2"></span></i>
-                                    <span class="text-truncate">{{ user.email }}</span>
-                                </div>
-                                <div class="d-flex align-items-center text-gray-600 fs-7">
-                                    <i class="ki-duotone ki-phone fs-5 me-2 text-gray-400"><span class="path1"></span><span class="path2"></span></i>
-                                    <span>{{ user.phone || '-' }}</span>
-                                </div>
-                            </div>
-
-                            <div class="mt-auto d-flex gap-2 pt-4 border-top border-gray-200 border-dashed">
-                                <button v-if="userHasPermission('edit users')" @click="openEditModal(user)" class="btn btn-sm btn-light btn-active-light-orange fw-bold flex-grow-1">
-                                    <i class="ki-duotone ki-pencil fs-5"><span class="path1"></span><span class="path2"></span></i> Edit
-                                </button>
-                                <button v-if="userHasPermission('delete users')" @click="deleteUser(user.uuid)" class="btn btn-sm btn-light btn-active-light-danger fw-bold flex-grow-1">
-                                    <i class="ki-duotone ki-trash fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
-                                </button>
-                            </div>
-
-                        </div>
+        <!-- Loading State -->
+        <div v-if="loading" class="table-responsive">
+          <table class="table align-middle table-row-dashed fs-6 gy-5">
+            <thead>
+              <tr class="text-start text-gray-400 fw-bold fs-7 text-uppercase gs-0">
+                <th class="min-w-300px">User</th>
+                <th class="min-w-150px">Role</th>
+                <th class="min-w-150px">Kontak</th>
+                <th class="text-end min-w-100px">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="fw-semibold text-gray-600">
+              <tr v-for="i in 5" :key="i">
+                <td>
+                  <div class="d-flex align-items-center">
+                    <el-skeleton-item variant="circle" style="width: 50px; height: 50px" />
+                    <div class="ms-5">
+                      <el-skeleton-item variant="text" style="width: 150px" class="mb-2" />
+                      <el-skeleton-item variant="text" style="width: 200px" />
                     </div>
-
-                </div>
-            </TransitionGroup>
+                  </div>
+                </td>
+                <td><el-skeleton-item variant="text" style="width: 100px" /></td>
+                <td><el-skeleton-item variant="text" style="width: 120px" /></td>
+                <td><el-skeleton-item variant="text" style="width: 80px" /></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+
+        <!-- Data Table -->
+        <div v-else class="table-responsive">
+          <table class="table align-middle table-row-dashed fs-6 gy-5" id="kt_users_table">
+            <thead>
+              <tr class="text-start text-gray-400 fw-bold fs-7 text-uppercase gs-0">
+                <th class="min-w-300px">User</th>
+                <th class="min-w-150px">Role</th>
+                <th class="min-w-150px">Kontak</th>
+                <th class="text-end min-w-100px">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="fw-semibold text-gray-600">
+              <!-- Empty State -->
+              <tr v-if="tableData.length === 0">
+                <td colspan="4" class="text-center py-20">
+                  <div class="d-flex flex-column align-items-center">
+                    <div class="symbol symbol-100px symbol-circle mb-7">
+                      <span class="symbol-label bg-light-orange">
+                        <i class="ki-duotone ki-abstract-26 fs-3x text-orange">
+                          <span class="path1"></span>
+                          <span class="path2"></span>
+                        </i>
+                      </span>
+                    </div>
+                    <h3 class="fw-bold text-gray-800 mb-3">Tidak Ada Data</h3>
+                    <span class="text-gray-500 fs-6">Coba ubah kata kunci pencarian atau filter Anda.</span>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Data Rows -->
+              <tr v-for="row in tableData" :key="row.id" class="hover-table-row">
+                <td>
+                  <div class="d-flex align-items-center">
+                    <div class="symbol symbol-circle symbol-50px overflow-hidden me-3">
+                      <div class="symbol-label">
+                        <img 
+                          v-if="row.photo" 
+                          :src="row.photo" 
+                          class="w-100" 
+                        />
+                        <span v-else class="symbol-label fs-3 fw-bold text-orange bg-light-orange">
+                          {{ getInitials(row.name) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="d-flex flex-column">
+                      <a href="#" class="text-gray-800 text-hover-orange fw-bold mb-1">
+                        {{ row.name }}
+                      </a>
+                      <span class="text-gray-500 fw-semibold d-block fs-7">
+                        {{ row.email }}
+                      </span>
+                    </div>
+                  </div>
+                </td>
+
+                <td>
+                  <div class="d-flex flex-wrap gap-2">
+                    <span 
+                      v-for="role in row.roles" 
+                      :key="role.id" 
+                      class="badge badge-light-orange fw-bold"
+                    >
+                      {{ role.name.toUpperCase() }}
+                    </span>
+                  </div>
+                </td>
+
+                <td>
+                  <span v-if="row.phone" class="text-gray-700 fw-semibold">
+                    {{ row.phone }}
+                  </span>
+                  <span v-else class="text-muted fst-italic fs-7">Tidak tersedia</span>
+                </td>
+
+                <td class="text-end">
+                  <button 
+                    @click="handleEdit(row)" 
+                    class="btn btn-icon btn-bg-light btn-active-color-orange btn-sm me-1"
+                    data-bs-toggle="tooltip" 
+                    title="Edit"
+                  >
+                    <i class="ki-duotone ki-pencil fs-3">
+                      <span class="path1"></span>
+                      <span class="path2"></span>
+                    </i>
+                  </button>
+                  <button 
+                    @click="handleDelete(row.id)" 
+                    class="btn btn-icon btn-bg-light btn-active-color-danger btn-sm"
+                    data-bs-toggle="tooltip" 
+                    title="Delete"
+                  >
+                    <i class="ki-duotone ki-trash fs-3">
+                      <span class="path1"></span>
+                      <span class="path2"></span>
+                      <span class="path3"></span>
+                      <span class="path4"></span>
+                      <span class="path5"></span>
+                    </i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="pagination.total > 0" class="d-flex flex-stack flex-wrap pt-10">
+          <div class="fs-6 fw-semibold text-gray-700">
+            Menampilkan {{ (pagination.current_page - 1) * pagination.per_page + 1 }} hingga 
+            {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} 
+            dari {{ pagination.total }} data
+          </div>
+
+          <el-pagination
+            background
+            layout="prev, pager, next"
+            :total="pagination.total"
+            :page-size="pagination.per_page"
+            :current-page="pagination.current_page"
+            @current-change="handlePageChange"
+            class="pagination-orange"
+          />
+        </div>
+      </div>
     </div>
 
-    <FormModal 
-        :user-data="selectedUser" 
-        @user-updated="refreshTable" 
-    />
+    <!-- Form Modal Component -->
+    <Form ref="formRef" @saved="fetchData" />
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
-import { useAuthStore } from "@/stores/auth";
+import { ref, reactive, onMounted } from 'vue';
 import ApiService from "@/core/services/ApiService";
-import Swal from "sweetalert2";
-import { Modal } from "bootstrap";
-import FormModal from "./Form.vue"; 
+import { debounce } from 'lodash';
+import Swal from 'sweetalert2';
+import Form from './Form.vue';
 
-// --- INTERFACE (DIPERBAIKI AGAR COCOK DENGAN FORM.VUE) ---
-interface Role { 
-    id: number; 
-    name: string; 
-    full_name: string; // Tambahkan ini agar cocok dengan Form.vue
+// --- TYPES ---
+interface Role {
+    id: number;
+    name: string;
 }
 
-interface User { 
-    uuid: string; 
-    name: string; 
-    email: string; 
-    phone: string; 
-    roles: Role[]; 
+interface User {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string;
+    photo?: string;
+    roles: Role[];
 }
 
-const authStore = useAuthStore();
-const users = ref<User[]>([]);
-const loading = ref(true);
-const selectedUser = ref<User | null>(null); // Type User sekarang sudah cocok dengan prop userData
-const searchQuery = ref("");
-const filterRole = ref('all');
-const isDropdownOpen = ref(false);
+// --- STATE ---
+const loading = ref(false);
+const tableData = ref<User[]>([]);
+const search = ref('');
+const filterRole = ref('');
+const rolesList = ref<Role[]>([]);
+const formRef = ref<any>(null);
 
-const userHasPermission = (permission: string) => authStore.user?.all_permissions?.includes(permission) ?? false;
-
-// --- Dropdown Logic ---
-const toggleDropdown = () => { isDropdownOpen.value = !isDropdownOpen.value; };
-const closeDropdown = () => { isDropdownOpen.value = false; };
-const setFilterRole = (role: string) => { filterRole.value = role; closeDropdown(); };
-
-const vClickOutside = {
-    mounted(el: any, binding: any) {
-        el.clickOutsideEvent = function(event: Event) { if (!(el === event.target || el.contains(event.target))) binding.value(event, el); };
-        document.body.addEventListener('click', el.clickOutsideEvent);
-    },
-    unmounted(el: any) { document.body.removeEventListener('click', el.clickOutsideEvent); },
-};
-
-// --- Computed ---
-const activeRoleLabel = computed(() => filterRole.value === 'all' ? 'Semua Role' : filterRole.value);
-
-const uniqueRoles = computed(() => {
-    const roles = users.value.map(u => u.roles?.[0]?.name).filter(Boolean);
-    return [...new Set(roles)];
+const pagination = reactive({
+    current_page: 1,
+    per_page: 10,
+    total: 0
 });
 
-const filteredUsers = computed(() => {
-    let result = users.value;
-    if (searchQuery.value) {
-        const q = searchQuery.value.toLowerCase();
-        result = result.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.phone.includes(q));
-    }
-    if (filterRole.value !== 'all') {
-        result = result.filter(u => u.roles?.[0]?.name === filterRole.value);
-    }
-    return result;
-});
-
-// --- Utils ---
+// Helper: Initials
 const getInitials = (name: string) => {
     if (!name) return "?";
-    const parts = name.split(" ");
-    return parts.length > 1 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
+    return name.split(' ').map(n => n.charAt(0)).join('').substring(0, 2).toUpperCase();
 };
 
-const getRandomColorClass = (name: string) => {
-    const colors = ['bg-orange', 'bg-primary', 'bg-success', 'bg-danger', 'bg-info', 'bg-dark'];
-    return colors[name.length % colors.length]; // Deterministic random based on name length
-};
+// --- API METHODS ---
 
-const getRoleBadgeClass = (roleName: string) => {
-    if (roleName === 'super-admin' || roleName === 'admin') return 'badge-light-danger text-danger';
-    if (roleName === 'cashier') return 'badge-light-warning text-warning';
-    return 'badge-light-primary text-primary';
-};
-
-// --- Actions ---
-const fetchUsers = async () => {
+const fetchRolesList = async () => {
     try {
-        loading.value = true;
-        const response = await ApiService.get("/master/users");
-        users.value = response.data.data || response.data;
+        const response = await ApiService.get("master/all-roles");
+        rolesList.value = response.data;
     } catch (error) {
-        console.error("Gagal memuat user:", error);
-    } finally {
-        loading.value = false;
+        console.error("Gagal load list roles", error);
     }
 };
 
-const refreshTable = () => { fetchUsers(); };
+const fetchData = async (page = 1) => {
+    loading.value = true;
+    try {
+        const response = await ApiService.query("master/users", {
+            page: page,
+            per_page: pagination.per_page,
+            search: search.value,
+            role: filterRole.value
+        });
+        
+        tableData.value = response.data.data;
+        pagination.current_page = response.data.current_page;
+        pagination.per_page = response.data.per_page;
+        pagination.total = response.data.total;
 
-const openAddModal = () => {
-    selectedUser.value = null;
-    const modalEl = document.getElementById("kt_modal_user");
-    if (modalEl) new Modal(modalEl).show();
+    } catch (error) {
+        console.error("Error fetching users:", error);
+    } finally {
+        setTimeout(() => {
+            loading.value = false;
+        }, 300);
+    }
 };
 
-const openEditModal = (user: User) => {
-    selectedUser.value = { ...user };
-    const modalEl = document.getElementById("kt_modal_user");
-    if (modalEl) new Modal(modalEl).show();
+// --- HANDLERS ---
+
+const handleSearch = debounce(() => {
+    fetchData(1);
+}, 500);
+
+const handleFilterChange = () => {
+    fetchData(1);
 };
 
-const deleteUser = (uuid: string) => {
+const resetFilters = () => {
+    search.value = '';
+    filterRole.value = '';
+    fetchData(1);
+};
+
+const handlePageChange = (newPage: number) => {
+    fetchData(newPage);
+};
+
+const handleAdd = () => {
+    if (formRef.value) {
+        formRef.value.open();
+    }
+};
+
+const handleEdit = (row: User) => {
+    if (formRef.value) {
+        formRef.value.open(row);
+    }
+};
+
+const handleDelete = (id: number) => {
     Swal.fire({
-        text: "Hapus user ini?",
+        title: "Yakin ingin menghapus?",
+        text: "Data yang dihapus tidak dapat dikembalikan!",
         icon: "warning",
         showCancelButton: true,
-        confirmButtonText: "Ya, Hapus",
+        confirmButtonText: "Ya, Hapus!",
         cancelButtonText: "Batal",
-        customClass: { confirmButton: "btn fw-bold btn-danger", cancelButton: "btn fw-bold btn-light" },
+        buttonsStyling: false,
+        customClass: {
+            confirmButton: "btn btn-danger",
+            cancelButton: "btn btn-light"
+        }
     }).then(async (result) => {
         if (result.isConfirmed) {
             try {
-                await ApiService.delete(`/master/users/${uuid}`);
-                Swal.fire("Berhasil", "User dihapus.", "success");
-                fetchUsers();
-            } catch (error) {
-                Swal.fire("Error", "Gagal menghapus user.", "error");
+                await ApiService.delete(`master/users/${id}`);
+                Swal.fire({
+                    text: "User berhasil dihapus.",
+                    icon: "success",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: { confirmButton: "btn btn-orange" }
+                });
+                fetchData(pagination.current_page);
+            } catch (error: any) {
+                Swal.fire({
+                    title: "Gagal!",
+                    text: error.response?.data?.message || "Gagal menghapus data.",
+                    icon: "error",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: { confirmButton: "btn btn-orange" }
+                });
             }
         }
     });
 };
 
-onMounted(fetchUsers);
+// Lifecycle
+onMounted(() => {
+    fetchData();
+    fetchRolesList();
+});
 </script>
 
 <style scoped>
 /* ========================
-   THEME & COLORS
+   ORANGE THEME COLORS
    ======================== */
-.text-orange { color: #F68B1E !important; }
-.bg-light-orange { background-color: #FFF8F1 !important; }
-.bg-orange { background-color: #F68B1E !important; }
-.btn-orange { background-color: #F68B1E; color: white; border: none; }
-.btn-orange:hover { background-color: #d97814; color: white; }
-.hover-text-orange:hover { color: #F68B1E !important; }
-.box-shadow-orange { box-shadow: 0 4px 12px rgba(246, 139, 30, 0.3); }
-
-/* ========================
-   CARD & ANIMATION
-   ======================== */
-.group-card { transition: all 0.3s ease; }
-.group-card:hover { z-index: 10; }
-.hover-elevate-up:hover { transform: translateY(-5px); box-shadow: 0 15px 35px rgba(0,0,0,0.12) !important; }
-
-/* Animations */
-.animate-item { opacity: 0; animation: fadeUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; animation-delay: var(--delay, 0s); }
-@keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-.animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.fade-grid-enter-active, .fade-grid-leave-active { transition: all 0.4s ease; }
-.fade-grid-enter-from, .fade-grid-leave-to { opacity: 0; transform: translateY(20px); }
-.animate-pulse { animation: pulse 2s infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
-
-/* ========================
-   DROPDOWN & CUSTOM UI
-   ======================== */
-.dropdown-wrapper { position: relative; z-index: 100; }
-.dropdown-wrapper:has(.custom-dropdown-menu) { z-index: 9999 !important; }
-
-.btn-custom-select {
-    background-color: #F9F9F9; border: 1px solid transparent; border-radius: 12px; height: 42px; transition: all 0.3s ease;
+.text-orange { 
+  color: #F68B1E !important; 
 }
-.btn-custom-select:hover, .btn-custom-select.active { background-color: #ffffff; border-color: #F68B1E; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-.transition-icon { transition: transform 0.3s ease; }
-.rotate-180 { transform: rotate(180deg); color: #F68B1E !important; }
 
-.custom-dropdown-menu {
-    position: absolute; top: 110%; left: 0; width: 100%; min-width: 180px; background: white; z-index: 99999 !important; border: 1px solid rgba(0,0,0,0.05);
+.bg-orange { 
+  background-color: #F68B1E !important; 
 }
-.dropdown-item-custom { display: block; text-decoration: none; color: #5E6278; transition: all 0.2s ease; cursor: pointer; }
-.dropdown-item-custom:hover { background-color: #F5F8FA; color: #F68B1E; transform: translateX(5px); }
-.dropdown-item-custom.selected { background-color: #FFF4E6; color: #F68B1E; font-weight: 700; }
 
-.dropdown-anim-enter-active { animation: dropdown-in 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-.dropdown-anim-leave-active { animation: dropdown-out 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
-@keyframes dropdown-in { 0% { opacity: 0; transform: translateY(-10px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes dropdown-out { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-10px) scale(0.95); } }
+.bg-light-orange { 
+  background-color: rgba(246, 139, 30, 0.1) !important; 
+}
+
+.border-orange { 
+  border-color: #F68B1E !important; 
+}
+
+.btn-orange {
+  background-color: #F68B1E;
+  border-color: #F68B1E;
+  color: #fff;
+}
+
+.btn-orange:hover {
+  background-color: #e57b0e;
+  border-color: #e57b0e;
+  color: #fff;
+}
+
+.btn-active-color-orange:hover,
+.btn-active-color-orange:focus,
+.btn-active-color-orange:active {
+  color: #F68B1E !important;
+}
+
+.text-hover-orange:hover {
+  color: #F68B1E !important;
+}
+
+/* Badge Orange */
+.badge-light-orange {
+  background-color: rgba(246, 139, 30, 0.1);
+  color: #F68B1E;
+}
 
 /* ========================
-   DARK MODE
+   TABLE ENHANCEMENTS
    ======================== */
-[data-bs-theme="dark"] .theme-card { background-color: #1e1e2d !important; color: #ffffff; }
-[data-bs-theme="dark"] .theme-dropdown { background-color: #1e1e2d; border-color: #323248; }
-[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
-[data-bs-theme="dark"] .text-gray-800 { color: #e1e3ea !important; }
-[data-bs-theme="dark"] .text-gray-700 { color: #CDCDDE !important; }
-[data-bs-theme="dark"] .bg-body { background-color: #1e1e2d !important; }
-[data-bs-theme="dark"] .bg-light-subtle { background-color: #1b1b29 !important; border-color: #323248 !important; }
-[data-bs-theme="dark"] .bg-light-orange { background-color: #2b2b40 !important; }
-[data-bs-theme="dark"] .border-gray-200 { border-color: #323248 !important; }
-[data-bs-theme="dark"] .form-control-solid { background-color: #1b1b29 !important; border-color: #323248 !important; color: #ffffff; }
-[data-bs-theme="dark"] .btn-custom-select { background-color: #1b1b29; border-color: #323248; color: #CDCDDE; }
-[data-bs-theme="dark"] .btn-custom-select:hover, [data-bs-theme="dark"] .btn-custom-select.active { border-color: #F68B1E; color: #ffffff; }
-[data-bs-theme="dark"] .custom-dropdown-menu { background-color: #1e1e2d; border: 1px solid #323248; }
-[data-bs-theme="dark"] .dropdown-item-custom { color: #9A9CAE; }
-[data-bs-theme="dark"] .dropdown-item-custom:hover { background-color: #2b2b40; color: #F68B1E; }
-[data-bs-theme="dark"] .dropdown-item-custom.selected { background-color: rgba(246, 139, 30, 0.15); }
+.hover-table-row {
+  transition: all 0.3s ease;
+}
+
+.hover-table-row:hover {
+  background-color: rgba(246, 139, 30, 0.03);
+}
+
+[data-bs-theme="dark"] .hover-table-row:hover {
+  background-color: rgba(246, 139, 30, 0.08);
+}
+
+/* Card flush styling */
+.card-flush {
+  box-shadow: 0px 0px 20px 0px rgba(76, 87, 125, 0.02);
+}
+
+.card-flush > .card-header {
+  border-bottom: 0;
+}
+
+/* Smooth animations */
+.animate__animated {
+  animation-duration: 0.6s;
+}
+
+/* ========================
+   EL-SELECT ORANGE THEME
+   ======================== */
+.metronic-select-orange :deep(.el-input__wrapper) {
+  background-color: var(--bs-body-bg);
+  border-color: var(--bs-gray-300);
+}
+
+.metronic-select-orange :deep(.el-input__wrapper:hover) {
+  border-color: #F68B1E;
+}
+
+.metronic-select-orange :deep(.el-input__wrapper.is-focus) {
+  border-color: #F68B1E;
+  box-shadow: 0 0 0 0.25rem rgba(246, 139, 30, 0.15);
+}
+
+.metronic-select-orange :deep(.el-select__caret) {
+  color: var(--bs-gray-500);
+}
+
+[data-bs-theme="dark"] .metronic-select-orange :deep(.el-input__wrapper) {
+  background-color: #1e1e2d;
+  border-color: #323248;
+}
+
+/* ========================
+   EL-PAGINATION ORANGE
+   ======================== */
+.pagination-orange :deep(.el-pager li:hover) {
+  color: #F68B1E;
+}
+
+.pagination-orange :deep(.el-pager li.is-active) {
+  background-color: #F68B1E;
+  color: #fff;
+}
+
+.pagination-orange :deep(.btn-prev:hover),
+.pagination-orange :deep(.btn-next:hover) {
+  color: #F68B1E;
+}
+
+[data-bs-theme="dark"] .pagination-orange :deep(.el-pagination) {
+  --el-pagination-bg-color: #1e1e2d;
+  --el-pagination-button-color: #92929f;
+}
+
+/* ========================
+   DARK MODE OVERRIDES
+   ======================== */
+[data-bs-theme="dark"] .bg-light-orange {
+  background-color: rgba(246, 139, 30, 0.15) !important;
+}
+
+[data-bs-theme="dark"] .badge-light-orange {
+  background-color: rgba(246, 139, 30, 0.15);
+}
 </style>
