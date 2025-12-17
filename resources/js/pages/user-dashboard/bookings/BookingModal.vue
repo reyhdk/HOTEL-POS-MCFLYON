@@ -17,7 +17,7 @@
               </div>
             </div>
 
-            <div class="d-flex flex-column mb-8 fv-row">
+            <div class="d-flex flex-column mb-8 fv-row bg-light p-5 rounded">
               <div class="d-flex flex-stack d-flex-wrap">
                 <div class="flex-grow-1">
                   <span class="text-muted fw-semibold">Kamar</span>
@@ -58,6 +58,14 @@
 
             <form @submit.prevent="submitBooking">
               <h4 class="mb-5">Data Diri Anda</h4>
+              
+              <div v-if="!isLoggedIn && !isLoadingUser" class="mb-5 alert alert-primary d-flex align-items-center p-3">
+                 <i class="ki-duotone ki-information fs-2hx text-primary me-3"><span class="path1"></span><span class="path2"></span></i>
+                 <div class="d-flex flex-column">
+                    <span>Sudah punya akun? <strong>Login</strong> agar data terisi otomatis.</span>
+                 </div>
+              </div>
+
               <div class="fv-row mb-7">
                 <label class="form-label required fs-6 fw-semibold">Nama Lengkap</label>
                 <input v-model="formData.guest_name" type="text" class="form-control" required placeholder="Masukkan nama lengkap Anda"/>
@@ -70,26 +78,25 @@
                 <label class="form-label required fs-6 fw-semibold">Nomor Telepon</label>
                 <input v-model="formData.guest_phone" type="tel" class="form-control" required placeholder="Contoh: 08123456789"/>
               </div>
+
               <div class="d-flex align-items-center mb-8 bg-light-warning rounded p-4 border border-warning border-dashed">
-    <i class="ki-duotone ki-shield-tick fs-2x me-4 text-warning">
-        <span class="path1"></span><span class="path2"></span>
-    </i>
-    
-                  <div class="flex-grow-1">
+                <i class="ki-duotone ki-shield-tick fs-2x me-4 text-warning">
+                    <span class="path1"></span><span class="path2"></span>
+                </i>
+                <div class="flex-grow-1">
                       <span class="fw-bold text-gray-800 fs-6 d-block">Booking Incognito (Privasi)</span>
                       <span class="text-gray-600 fw-semibold fs-7">
                           Nama Anda akan disamarkan di layar resepsionis & sistem publik hotel.
                       </span>
-                  </div>
-
-                  <div class="form-check form-check-custom form-check-solid form-switch">
+                </div>
+                <div class="form-check form-check-custom form-check-solid form-switch">
                       <input 
                           class="form-check-input w-45px h-30px" 
                           type="checkbox" 
                           id="is_incognito_online"
                           v-model="formData.is_incognito" 
                       />
-                  </div>
+                </div>
               </div>
             </form>
           </div>
@@ -100,7 +107,7 @@
           </div>
         </div>
         <div class="modal-footer flex-center">
-            <button type="reset" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
             <button @click="submitBooking" type="button" class="btn btn-lg btn-primary" :disabled="isLoading">
               <span v-if="!isLoading" class="indicator-label">
                 Konfirmasi & Pesan
@@ -116,12 +123,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import type { PropType } from 'vue';
 import { Modal } from 'bootstrap';
-import axios from '@/libs/axios'; // Pastikan path axios Anda benar
+import axios from '@/libs/axios'; 
 import { toast } from 'vue3-toastify';
 
+// Declare Snap global variable (Midtrans)
 declare const snap: any;
 
 const props = defineProps({
@@ -133,6 +141,8 @@ const emit = defineEmits(['booking-success']);
 
 const modalRef = ref<HTMLElement | null>(null);
 const isLoading = ref(false);
+const isLoggedIn = ref(false);
+const isLoadingUser = ref(false);
 
 const formData = ref({
   guest_name: '',
@@ -141,6 +151,7 @@ const formData = ref({
   is_incognito: false
 });
 
+// --- Computed Properties ---
 const durationInNights = computed(() => {
   if (!props.bookingDates?.check_in_date || !props.bookingDates?.check_out_date) return 0;
   const start = new Date(props.bookingDates.check_in_date);
@@ -155,6 +166,7 @@ const totalCost = computed(() => {
   return props.room.price_per_night * durationInNights.value;
 });
 
+// --- Helpers ---
 const formatDate = (dateString: string) => {
   if (!dateString) return '...';
   const options: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -166,9 +178,33 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
 };
 
+// --- Fetch User Data (Auto-fill) ---
+const fetchCurrentUser = async () => {
+    try {
+        isLoadingUser.value = true;
+        // Asumsi endpoint standar Laravel Sanctum/Breeze: /api/user
+        // Jika gagal (401), berarti guest belum login.
+        const { data } = await axios.get('/user');
+        
+        if (data) {
+            isLoggedIn.value = true;
+            formData.value.guest_name = data.name || '';
+            formData.value.guest_email = data.email || '';
+            formData.value.guest_phone = data.phone_number || ''; // Pastikan field ini ada di User model
+        }
+    } catch (e) {
+        isLoggedIn.value = false;
+        // Silent error: User mungkin memang belum login
+    } finally {
+        isLoadingUser.value = false;
+    }
+};
+
+// --- Submit Booking ---
 const submitBooking = async () => {
+  // 1. Validasi Frontend
   if (!formData.value.guest_name.trim() || !formData.value.guest_email.trim() || !formData.value.guest_phone.trim()) {
-    toast.warn("Harap isi semua kolom yang diperlukan.");
+    toast.warn("Harap isi data diri Anda dengan lengkap.");
     return;
   }
   if (!props.room) {
@@ -188,26 +224,29 @@ const submitBooking = async () => {
       is_incognito: formData.value.is_incognito, 
     };
 
+    // 2. Kirim ke Backend
+    // Backend akan cek validitas tanggal (Anti-Bentrok)
     const response = await axios.post('/public/bookings', payload);
     const snapToken = response.data.snap_token;
 
     if (!snapToken) {
-        throw new Error('Snap Token tidak diterima dari server.');
+        throw new Error('Gagal mendapatkan token pembayaran.');
     }
 
+    // 3. Tampilkan Popup Midtrans
     snap.pay(snapToken, {
-        onSuccess: function(result){
-            toast.success('Pembayaran berhasil! Booking Anda telah dikonfirmasi.');
+        onSuccess: function(result: any){
+            toast.success('Pembayaran berhasil! Kode Booking telah dikirim ke email Anda.');
             emit('booking-success');
             Modal.getInstance(modalRef.value as HTMLElement)?.hide();
         },
-        onPending: function(result){
-            toast.info('Pembayaran Anda tertunda. Harap selesaikan pembayaran.');
+        onPending: function(result: any){
+            toast.info('Menunggu pembayaran. Silakan selesaikan pembayaran Anda.');
             emit('booking-success');
             Modal.getInstance(modalRef.value as HTMLElement)?.hide();
         },
-        onError: function(result){
-            toast.error('Pembayaran Gagal. Silakan coba lagi.');
+        onError: function(result: any){
+            toast.error('Pembayaran Gagal atau Dibatalkan.');
         },
         onClose: function(){
             toast.warn('Anda menutup jendela pembayaran sebelum selesai.');
@@ -215,16 +254,35 @@ const submitBooking = async () => {
     });
 
   } catch (error: any) {
-    const message = error.response?.data?.message || 'Terjadi kesalahan saat memproses pesanan.';
-    toast.error(message);
+    // 4. Handle Error Spesifik
+    if (error.response?.status === 409) {
+        // Ini adalah error dari logic "Anti-Bentrok" kita di Backend
+        toast.error('Maaf, kamar ini baru saja dibooking orang lain untuk tanggal tersebut. Silakan pilih kamar lain.');
+        Modal.getInstance(modalRef.value as HTMLElement)?.hide();
+        emit('booking-success'); // Refresh list kamar agar kamar ini hilang
+    } else {
+        const message = error.response?.data?.message || 'Terjadi kesalahan saat memproses pesanan.';
+        toast.error(message);
+    }
   } finally {
     isLoading.value = false;
   }
 };
 
+// --- Lifecycle & Watchers ---
+onMounted(() => {
+    fetchCurrentUser();
+});
+
 watch(() => props.room, () => {
-  formData.value.guest_name = '';
-  formData.value.guest_email = '';
-  formData.value.guest_phone = '';
+  // Jika room berubah (misal buka tutup modal), kita reset form,
+  // tapi jika user sudah login, kita isi lagi datanya.
+  if (!isLoggedIn.value) {
+      formData.value.guest_name = '';
+      formData.value.guest_email = '';
+      formData.value.guest_phone = '';
+  } else {
+      fetchCurrentUser(); // Refresh data user just in case
+  }
 });
 </script>

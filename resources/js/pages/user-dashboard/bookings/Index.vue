@@ -10,11 +10,27 @@
       <div class="row g-3 align-items-end">
         <div class="col-lg-3 col-md-6">
           <label class="form-label fw-semibold">Tanggal Check-in:</label>
-          <el-date-picker v-model="searchParams.check_in_date" type="date" placeholder="Pilih tanggal" class="w-100" format="DD-MM-YYYY" value-format="YYYY-MM-DD" />
+          <el-date-picker 
+            v-model="searchParams.check_in_date" 
+            type="date" 
+            placeholder="Pilih tanggal" 
+            class="w-100" 
+            format="DD-MM-YYYY" 
+            value-format="YYYY-MM-DD"
+            :disabled-date="disabledDate" 
+          />
         </div>
         <div class="col-lg-3 col-md-6">
           <label class="form-label fw-semibold">Tanggal Check-out:</label>
-          <el-date-picker v-model="searchParams.check_out_date" type="date" placeholder="Pilih tanggal" class="w-100" format="DD-MM-YYYY" value-format="YYYY-MM-DD" />
+          <el-date-picker 
+            v-model="searchParams.check_out_date" 
+            type="date" 
+            placeholder="Pilih tanggal" 
+            class="w-100" 
+            format="DD-MM-YYYY" 
+            value-format="YYYY-MM-DD"
+            :disabled-date="disabledDateCheckout"
+          />
         </div>
 
         <div class="col-lg-2 col-md-6">
@@ -56,40 +72,49 @@
       <div v-else-if="!availableRooms.length && hasSearched" class="text-center py-10">
         <i class="ki-duotone ki-magnifier-r fs-3x text-muted mb-4"></i>
         <p class="fw-bold fs-4">Maaf, Kamar Tidak Ditemukan</p>
-        <p class="text-muted">Tidak ada kamar yang tersedia dengan kriteria tersebut. Silakan coba tanggal atau filter lain.</p>
+        <p class="text-muted">Tidak ada kamar tersedia untuk tanggal atau kriteria tersebut. <br>Kemungkinan kamar sudah dibooking tamu lain.</p>
       </div>
 
       <div v-else-if="!hasSearched" class="text-center py-10">
         <i class="ki-duotone ki-calendar-8 fs-3x text-muted mb-4"></i>
         <p class="fw-bold fs-4">Silakan Pilih Tanggal Menginap</p>
-        <p class="text-muted">Pilih tanggal check-in dan check-out untuk melihat kamar yang tersedia.</p>
+        <p class="text-muted">Tentukan tanggal check-in dan check-out untuk melihat ketersediaan.</p>
       </div>
 
       <div v-else class="row g-5">
         <div v-for="room in availableRooms" :key="room.id" class="col-md-6 col-lg-4">
-          <div class="card h-100 shadow-sm border border-light-subtle card-flush">
-            <img :src="room.image_url || '/media/misc/pattern-4.jpg'" class="card-img-top" alt="Room Image" style="height: 200px; object-fit: cover;">
+          <div class="card h-100 shadow-sm border border-light-subtle card-flush transition-hover">
+            <div class="position-relative">
+                <img :src="room.image_url || '/media/misc/pattern-4.jpg'" class="card-img-top" alt="Room Image" style="height: 200px; object-fit: cover;">
+                <span class="position-absolute top-0 end-0 badge badge-success m-3">Tersedia</span>
+            </div>
+            
             <div class="card-body d-flex flex-column p-5">
               <span class="badge badge-light-info align-self-start mb-3">{{ room.type }}</span>
-              <h5 class="card-title fs-4 fw-bold">{{ room.room_number }}</h5>
-              <p class="card-text text-muted flex-grow-1 mb-4">{{ room.description }}</p>
+              <h5 class="card-title fs-4 fw-bold">Kamar No. {{ room.room_number }}</h5>
+              <p class="card-text text-muted flex-grow-1 mb-4 text-truncate-3">{{ room.description }}</p>
 
               <div class="mb-4">
                 <h6 class="fw-semibold text-gray-700 fs-7 mb-3">Fasilitas:</h6>
-                <div v-if="room.facilities && room.facilities.length > 0" class="d-flex flex-wrap gap-3">
+                <div v-if="room.facilities && room.facilities.length > 0" class="d-flex flex-wrap gap-2">
                   <div v-for="facility in room.facilities" :key="facility.id" class="symbol symbol-30px" v-tooltip :title="facility.name">
                     <img v-if="facility.icon_url" :src="facility.icon_url" :alt="facility.name" />
-                    <span v-else class="symbol-label bg-light-primary text-primary fs-7">{{ facility.name.charAt(0) }}</span>
+                    <span v-else class="symbol-label bg-light-primary text-primary fs-7 fw-bold">{{ facility.name.charAt(0) }}</span>
                   </div>
                 </div>
-                <div v-else class="text-muted fs-7">
-                    Tidak ada fasilitas khusus.
+                <div v-else class="text-muted fs-7 fst-italic">
+                    Standar
                 </div>
               </div>
 
               <div class="d-flex justify-content-between align-items-center mt-auto pt-4 border-top">
-                <span class="fw-bold fs-3 text-primary">{{ formatCurrency(room.price_per_night) }}<small class="fs-8 text-muted">/malam</small></span>
-                <button @click="openBookingModal(room)" class="btn btn-success">Pesan Sekarang</button>
+                <div class="d-flex flex-column">
+                    <span class="fw-bold fs-3 text-primary">{{ formatCurrency(room.price_per_night) }}</span>
+                    <small class="fs-8 text-muted">per malam</small>
+                </div>
+                <button @click="openBookingModal(room)" class="btn btn-sm btn-primary">
+                    Pesan Sekarang
+                </button>
               </div>
             </div>
           </div>
@@ -98,7 +123,11 @@
     </div>
   </div>
 
-  <BookingModal :room="selectedRoom" :booking-dates="searchParams" @booking-success="handleBookingSuccess"/>
+  <BookingModal 
+    :room="selectedRoom" 
+    :booking-dates="searchParams" 
+    @booking-success="handleBookingSuccess"
+  />
 </template>
 
 <script setup lang="ts">
@@ -108,58 +137,68 @@ import { toast } from 'vue3-toastify';
 import BookingModal from './BookingModal.vue';
 import { Modal } from 'bootstrap';
 
-// Interface untuk Fasilitas
-interface Facility {
-  id: number;
-  name: string;
-  icon_url: string | null;
-}
+// Interface
+interface Facility { id: number; name: string; icon_url: string | null; }
 
-// State untuk menyimpan parameter pencarian
+// State
 const searchParams = ref({
   check_in_date: '',
   check_out_date: '',
   facility_ids: [] as number[],
-  type: '', // Tambahkan properti type
+  type: '', 
 });
 
-// State lainnya
 const availableRooms = ref<any[]>([]);
 const selectedRoom = ref<any | null>(null);
 const allFacilities = ref<Facility[]>([]);
 const isLoadingFacilities = ref(true);
 const isLoading = ref(false);
-const hasSearched = ref(false); // Untuk membedakan state awal dan state "tidak ditemukan"
+const hasSearched = ref(false);
 
-// Computed property untuk menonaktifkan tombol pencarian
 const isSearchDisabled = computed(() => {
   return isLoading.value || !searchParams.value.check_in_date || !searchParams.value.check_out_date;
 });
 
-// Fungsi helper untuk format mata uang
+// Helpers
 const formatCurrency = (value: number) => {
   if (!value || isNaN(value)) return "Rp 0";
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
 };
 
-// Fungsi untuk mengambil daftar fasilitas dari API
+// Disable dates in past
+const disabledDate = (time: Date) => {
+  return time.getTime() < Date.now() - 8.64e7; // Disable yesterday
+};
+
+// Disable checkout date <= checkin date
+const disabledDateCheckout = (time: Date) => {
+    if (!searchParams.value.check_in_date) return disabledDate(time);
+    const checkIn = new Date(searchParams.value.check_in_date);
+    return time.getTime() <= checkIn.getTime();
+};
+
 const getFacilities = async () => {
   try {
     isLoadingFacilities.value = true;
     const response = await axios.get('/public/facilities');
     allFacilities.value = response.data;
   } catch (error) {
-    toast.error('Gagal memuat daftar fasilitas.');
+    // Silent fail optional
   } finally {
     isLoadingFacilities.value = false;
   }
 };
 
-// Fungsi untuk memanggil API pencarian kamar
 const searchRooms = async () => {
   if (!searchParams.value.check_in_date || !searchParams.value.check_out_date) {
     toast.warn("Harap isi tanggal check-in dan check-out terlebih dahulu.");
     return;
+  }
+  
+  // Validasi tambahan: Check-out harus > Check-in
+  if (searchParams.value.check_out_date <= searchParams.value.check_in_date) {
+      toast.error("Tanggal Check-out harus setelah tanggal Check-in.");
+      return;
   }
 
   isLoading.value = true;
@@ -167,40 +206,57 @@ const searchRooms = async () => {
   availableRooms.value = [];
 
   try {
+    // API ini sekarang sudah menggunakan logika "Anti-Bentrok" di backend
     const response = await axios.get('/public/available-rooms', {
       params: searchParams.value
     });
     availableRooms.value = response.data;
   } catch (error: any) {
     if (error.response && error.response.status === 422) {
-      toast.error('Input tidak valid. Pastikan tanggal check-out setelah tanggal check-in.');
+      toast.error(error.response.data.message || 'Input tanggal tidak valid.');
     } else {
-      toast.error('Gagal mengambil data kamar.');
+      toast.error('Gagal memuat data kamar. Silakan coba lagi.');
     }
-    console.error(error);
   } finally {
     isLoading.value = false;
   }
 };
 
-// Fungsi untuk membuka modal booking
 const openBookingModal = (room: any) => {
+  // Double check dates
+  if (!searchParams.value.check_in_date || !searchParams.value.check_out_date) {
+      toast.warn("Sesi pencarian kadaluarsa. Silakan cari ulang.");
+      return;
+  }
   selectedRoom.value = room;
-  const modalEl = document.getElementById('kt_modal_booking'); // Pastikan ID modal booking benar
+  const modalEl = document.getElementById('kt_modal_booking');
   if(modalEl) {
     const modal = Modal.getOrCreateInstance(modalEl);
     modal.show();
   }
 };
 
-// Fungsi setelah booking berhasil
 const handleBookingSuccess = () => {
-  toast.success("Kamar berhasil dipesan! Daftar kamar akan diperbarui.");
+  // Jika booking sukses, kita refresh pencarian agar kamar yg baru dibooking hilang dari list
   searchRooms();
 };
 
-// Mengambil data fasilitas saat komponen dimuat
 onMounted(() => {
   getFacilities();
 });
 </script>
+
+<style scoped>
+.transition-hover {
+    transition: transform 0.2s ease-in-out;
+}
+.transition-hover:hover {
+    transform: translateY(-5px);
+}
+.text-truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+</style>

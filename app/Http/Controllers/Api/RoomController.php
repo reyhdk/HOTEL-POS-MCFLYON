@@ -48,27 +48,79 @@ class RoomController extends Controller
      */
     public function getAvailableRooms(Request $request)
     {
-        $validated = $request->validate([
-            'check_in_date' => 'nullable|date|after_or_equal:today',
-            'check_out_date' => 'nullable|date|after_or_equal:check_in_date',
-            'facility_ids' => 'nullable|array',
-            'facility_ids.*' => 'exists:facilities,id',
-            'type' => 'nullable|string|in:Standard,Deluxe,Suite'
+        // 1. Validasi Input
+        $request->validate([
+            'check_in_date' => 'required|date|after_or_equal:today',
+            'check_out_date' => 'required|date|after:check_in_date',
         ]);
 
-        $query = Room::with('facilities')->where('status', 'available');
+        $checkIn = $request->check_in_date;
+        $checkOut = $request->check_out_date;
 
-        $query->when(!empty($validated['type']), function ($q) use ($validated) {
-            $q->where('type', $validated['type']);
+        // Filter Opsional
+        $type = $request->query('type');
+        $facilityIds = $request->query('facility_ids');
+
+        // 2. Query Pencarian
+        $query = Room::query();
+
+        // -----------------------------------------------------------
+        // [BARU] LOGIKA PERIODE KETERSEDIAAN (Tersedia Mulai - Sampai)
+        // -----------------------------------------------------------
+        // Logika: 
+        // Jika kamar punya tanggal 'tersedia_mulai', maka:
+        // 1. Tanggal Check-in tamu harus >= tersedia_mulai (Kamar sudah buka)
+        // 2. Tanggal Check-out tamu harus <= tersedia_sampai (Kamar belum tutup)
+        // Jika kolom ini NULL, berarti kamar tersedia selamanya.
+
+        $query->where(function ($q) use ($checkIn, $checkOut) {
+            $q->where(function ($sub) use ($checkIn, $checkOut) {
+                // Kasus A: Kamar punya batas waktu (Specific Period)
+                $sub->whereNotNull('tersedia_mulai')
+                    ->whereNotNull('tersedia_sampai')
+                    ->whereDate('tersedia_mulai', '<=', $checkIn)  // Kamar buka sblm/pas check-in
+                    ->whereDate('tersedia_sampai', '>=', $checkOut); // Kamar tutup stlh/pas check-out
+            })
+                ->orWhere(function ($sub) {
+                    // Kasus B: Kamar tidak punya batas waktu (Always Available)
+                    $sub->whereNull('tersedia_mulai')
+                        ->orWhereNull('tersedia_sampai');
+                });
         });
 
-        $query->when(!empty($validated['facility_ids']), function ($q) use ($validated) {
-            foreach ($validated['facility_ids'] as $facilityId) {
-                $q->whereHas('facilities', fn($subQuery) => $subQuery->where('facilities.id', $facilityId));
-            }
+        // -----------------------------------------------------------
+        // LOGIKA ANTI-BENTROK (BOOKING OVERLAP)
+        // -----------------------------------------------------------
+        // Cari kamar yang TIDAK punya booking CONFIRMED/PAID di tanggal tersebut.
+        $query->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
+            $q->whereIn('status', ['confirmed', 'paid', 'checked_in'])
+                ->where(function ($subQ) use ($checkIn, $checkOut) {
+                    // Logika Overlap: (StartA < EndB) && (EndA > StartB)
+                    $subQ->where('check_in_date', '<', $checkOut)
+                        ->where('check_out_date', '>', $checkIn);
+                });
         });
 
-        return $query->latest()->get();
+        // Filter Status Fisik
+        // Gunakan strtolower atau pastikan database konsisten. 
+        // Kita filter maintenance saja, supaya status 'dirty' (karena tamu checkout pagi) tetap bisa dibooking untuk nanti sore/besok.
+        $query->where('status', '!=', 'maintenance');
+
+        // Filter Tipe Kamar
+        if ($type) {
+            $query->where('type', $type);
+        }
+
+        // Filter Fasilitas
+        if (!empty($facilityIds)) {
+            $query->whereHas('facilities', function ($q) use ($facilityIds) {
+                $q->whereIn('facilities.id', $facilityIds);
+            });
+        }
+
+        $rooms = $query->with('facilities')->get();
+
+        return response()->json($rooms);
     }
 
     /**

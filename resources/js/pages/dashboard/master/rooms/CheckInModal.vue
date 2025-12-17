@@ -1,182 +1,247 @@
 <template>
   <div class="modal fade" id="kt_modal_check_in" ref="modalRef" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-500px">
-      <div class="modal-content rounded-4 border-0 theme-modal shadow-lg">
+    <div class="modal-dialog modal-dialog-centered mw-550px">
+      <div class="modal-content rounded-3 border-0 shadow-lg animate__animated animate__zoomIn animate__faster">
         
-        <div class="modal-header border-0 pb-0 justify-content-between align-items-center py-4 px-5">
-            <div>
-                <h2 class="fw-bold m-0 fs-3 text-gray-900">Check-in</h2>
-                <div class="text-gray-500 fs-7 fw-semibold mt-1">
-                    Kamar <span class="text-orange fw-bold">#{{ roomData?.room_number }}</span>
+        <div class="modal-header border-0 bg-gradient-orange position-relative">
+          <div class="w-100 position-relative z-index-1 py-4">
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="d-flex align-items-center gap-3">
+                <div class="symbol symbol-45px symbol-circle bg-white bg-opacity-20 animate__animated animate__bounceIn">
+                  <i class="ki-duotone ki-home fs-2 text-white"><span class="path1"></span><span class="path2"></span></i>
                 </div>
+                <div>
+                  <h2 class="text-white fw-bold mb-0 fs-3">Kamar #{{ roomData?.room_number }}</h2>
+                  <div class="text-white text-opacity-75 fs-8">{{ formatCurrency(roomData?.price_per_night) }}/malam</div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-icon btn-sm btn-light position-absolute top-0 end-0 m-3" data-bs-dismiss="modal">
+                <i class="ki-duotone ki-cross fs-2"><span class="path1"></span><span class="path2"></span></i>
+              </button>
             </div>
-            <div class="btn btn-sm btn-icon btn-active-light-primary rounded-circle" data-bs-dismiss="modal">
-                <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
-            </div>
+          </div>
         </div>
 
-        <div class="modal-body scroll-y px-5 pb-5 pt-2">
-          <el-form @submit.prevent="submit" :model="formData" :rules="currentRules" ref="formRef" label-position="top" class="modern-form">
+        <div class="modal-body px-5 pb-5 pt-4">
+          
+          <div v-if="existingBookingToday" class="alert bg-light-warning border border-warning rounded-3 p-3 mb-4 animate__animated animate__fadeInDown">
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="d-flex align-items-center gap-2">
+                <i class="ki-duotone ki-calendar-tick fs-2 text-warning animate__animated animate__pulse animate__infinite"><span class="path1"></span><span class="path2"></span></i>
+                <div>
+                  <div class="fw-bold text-gray-900 fs-7">Booking Hari Ini!</div>
+                  <div class="text-gray-700 fs-8">{{ existingBookingToday.guest.name }}</div>
+                </div>
+              </div>
+              <button type="button" @click="setModeToBooking(existingBookingToday)" class="btn btn-warning btn-sm">
+                Proses
+              </button>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <div class="btn-group w-100" role="group">
+              <button type="button" 
+                class="btn btn-sm fw-bold py-3 transition-mode" 
+                :class="checkInMode === 'walk_in' ? 'btn-orange' : 'btn-light-orange'"
+                @click="checkInMode = 'walk_in'">
+                <i class="ki-duotone ki-entrance-right fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+                Walk-In
+              </button>
+              <button type="button" 
+                class="btn btn-sm fw-bold py-3 transition-mode"
+                :class="checkInMode === 'booking_existing' ? 'btn-orange' : 'btn-light-orange'"
+                @click="checkInMode = 'booking_existing'">
+                <i class="ki-duotone ki-calendar-tick fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+                Booking
+              </button>
+            </div>
+          </div>
+
+          <el-form @submit.prevent="submit" :model="formData" :rules="currentRules" ref="formRef" label-position="top" class="metronic-form">
             
-            <div class="mb-5">
+            <transition name="slide-fade" mode="out-in">
+              
+              <div v-if="checkInMode === 'walk_in'" key="walk-in" class="content-transition">
+                <div class="mb-4">
+                  <label class="form-label fw-bold text-gray-700 fs-7 mb-2">Pilih Tamu</label>
+                  <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" id="guest_existing" v-model="guestType" value="existing">
+                    <label class="btn btn-outline btn-outline-dashed btn-outline-orange btn-active-light-orange fs-8 py-2" for="guest_existing">
+                      <i class="ki-duotone ki-profile-circle fs-3 me-1"><span class="path1"></span><span class="path2"></span></i>
+                      Tamu Lama
+                    </label>
+                    <input type="radio" class="btn-check" id="guest_new" v-model="guestType" value="new">
+                    <label class="btn btn-outline btn-outline-dashed btn-outline-orange btn-active-light-orange fs-8 py-2" for="guest_new">
+                      <i class="ki-duotone ki-user-tick fs-3 me-1"><span class="path1"></span><span class="path2"></span></i>
+                      Tamu Baru
+                    </label>
+                  </div>
+                </div>
+
+                <div v-if="guestType === 'existing'" class="mb-4">
+                  <el-form-item prop="guest_id">
+                    <el-select
+                      v-model="formData.guest_id"
+                      filterable
+                      remote
+                      reserve-keyword
+                      placeholder="Cari nama/HP..."
+                      :remote-method="searchGuests"
+                      :loading="loadingGuests"
+                      class="w-100"
+                      size="large">
+                      <template #prefix>
+                        <i class="ki-duotone ki-magnifier fs-4 text-gray-500"><span class="path1"></span><span class="path2"></span></i>
+                      </template>
+                      <el-option
+                        v-for="item in guestOptions"
+                        :key="item.id"
+                        :label="item.name"
+                        :value="item.id">
+                        <div class="d-flex justify-content-between">
+                          <span class="fw-bold fs-8">{{ item.name }}</span>
+                          <span class="text-muted fs-9">{{ item.phone_number }}</span>
+                        </div>
+                      </el-option>
+                    </el-select>
+                  </el-form-item>
+                </div>
+              
+                <div v-else class="mb-4">
+                  <div class="mb-3">
+                    <label class="form-label required fw-bold fs-8">Nama Lengkap</label>
+                    <el-input v-model="newGuestData.name" placeholder="Nama tamu" size="large" />
+                  </div>
+                  <div class="row">
+                    <div class="col-7">
+                      <label class="form-label required fw-bold fs-8">No. WhatsApp</label>
+                      <el-input v-model="newGuestData.phone_number" placeholder="08xx" size="large" />
+                    </div>
+                    <div class="col-5">
+                      <label class="form-label fw-bold fs-8">Email</label>
+                      <el-input v-model="newGuestData.email" placeholder="Opsional" size="large" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mb-4">
+                  <label class="form-label fw-bold text-gray-700 fs-7 mb-2">Periode Menginap</label>
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <el-date-picker 
+                        v-model="formData.check_in_date" 
+                        type="date" 
+                        class="w-100" 
+                        size="large" 
+                        disabled 
+                        placeholder="Check-In"
+                        format="DD/MM/YYYY"
+                        value-format="YYYY-MM-DD" />
+                    </div>
+                    <div class="col-6">
+                      <el-form-item prop="check_out_date">
+                        <el-date-picker 
+                          v-model="formData.check_out_date" 
+                          type="date" 
+                          class="w-100" 
+                          size="large"
+                          :disabled-date="disabledDate"
+                          format="DD/MM/YYYY"
+                          value-format="YYYY-MM-DD"
+                          placeholder="Check-Out" />
+                      </el-form-item>
+                    </div>
+                  </div>
+                  <div v-if="calculatedDuration > 0" class="bg-light-orange rounded-2 p-2 mt-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <span class="text-orange fs-8 fw-bold">{{ calculatedDuration }} Malam</span>
+                      <span class="text-orange fs-6 fw-bold">{{ formatCurrency(calculatedTotalPrice) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mb-4">
+                  <label class="form-label fw-bold text-gray-700 fs-7 mb-2">Pembayaran</label>
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <div class="payment-card" 
+                        :class="{ 'active': formData.payment_method === 'cash' }"
+                        @click="formData.payment_method = 'cash'">
+                        <i class="ki-duotone ki-dollar fs-2 text-success"><span class="path1"></span><span class="path2"></span></i>
+                        <span class="fw-bold fs-8">Tunai</span>
+                      </div>
+                    </div>
+                    <div class="col-6">
+                      <div class="payment-card" 
+                        :class="{ 'active': formData.payment_method === 'midtrans' }"
+                        @click="formData.payment_method = 'midtrans'">
+                        <i class="ki-duotone ki-scan-barcode fs-2 text-orange"><span class="path1"></span><span class="path2"></span></i>
+                        <span class="fw-bold fs-8">QRIS</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <div v-else key="booking" class="content-transition">
+                <div class="text-center mb-4">
+                  <div class="symbol symbol-60px symbol-circle mb-3 bg-light-orange mx-auto">
+                    <i class="ki-duotone ki-calendar-search fs-2x text-orange"><span class="path1"></span><span class="path2"></span></i>
+                  </div>
+                  <h5 class="fw-bold text-gray-900 mb-1 fs-6">Pilih Booking</h5>
+                  <p class="text-muted fs-8 mb-0">Status harus <span class="badge badge-success badge-sm">Paid</span></p>
+                </div>
+
+                <el-form-item prop="booking_id">
+                  <el-select 
+                    v-model="formData.booking_id" 
+                    placeholder="Cari booking..." 
+                    class="w-100" 
+                    size="large"
+                    filterable>
+                    <el-option
+                      v-for="book in availableBookings"
+                      :key="book.id"
+                      :label="book.guest.name"
+                      :value="book.id">
+                      <div class="d-flex justify-content-between align-items-center py-1">
+                        <div class="flex-grow-1 me-3">
+                          <div class="fw-bold fs-8 text-gray-900">{{ book.guest.name }}</div>
+                          <div class="text-muted fs-9">{{ formatDate(book.check_in_date) }} - {{ formatDate(book.check_out_date) }}</div>
+                        </div>
+                        <span class="badge badge-success badge-sm flex-shrink-0">LUNAS</span>
+                      </div>
+                    </el-option>
+                  </el-select>
+                </el-form-item>
                 
-                <div v-if="!isNewGuest" class="animate__animated animate__fadeIn">
-                    
-                    <el-form-item prop="guest_id" class="mb-0">
-                        <template #label><span class="required fw-bold fs-8 text-gray-600 text-uppercase ls-1">Pilih Tamu</span></template>
-                        
-                        <el-select 
-                            v-model="formData.guest_id" 
-                            filterable 
-                            placeholder="Cari Tamu " 
-                            class="w-100 metronic-input" 
-                            :loading="loadingGuests"
-                            no-data-text="Data tidak ditemukan"
-                            no-match-text="Nama tidak ditemukan"
-                        >
-                            <template #prefix><i class="ki-duotone ki-user fs-4 text-gray-500 me-2"><span class="path1"></span><span class="path2"></span></i></template>
-                            <el-option v-for="guest in guests" :key="guest.id" :label="guest.name" :value="guest.id">
-                                <div class="d-flex justify-content-between align-items-center w-100">
-                                    <span class="fw-bold text-gray-800">{{ guest.name }}</span>
-                                    <span class="fs-9 text-gray-400">{{ guest.phone_number }}</span>
-                                </div>
-                            </el-option>
-                        </el-select>
-                    </el-form-item>
-                    
-                    <div class="d-flex align-items-center bg-light-info rounded p-2 mt-4 mb-2">
-                        <i class="ki-duotone ki-information-2 fs-5 text-info me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-                        <span class="text-gray-600 fs-9">Cari nama tamu yang sudah terdaftar di atas.</span>
-                    </div>
+                <div v-if="availableBookings.length === 0" class="alert alert-warning p-3">
+                  <div class="d-flex align-items-center">
+                    <i class="ki-duotone ki-information-4 fs-2 text-warning me-2"><span class="path1"></span><span class="path2"></span></i>
+                    <div class="fs-8">Tidak ada booking valid untuk hari ini</div>
+                  </div>
                 </div>
+              </div>
+            </transition>
 
-                <div v-else class="bg-light-orange rounded p-4 border border-orange border-dashed animate__animated animate__fadeIn">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="symbol symbol-30px me-3">
-                            <div class="symbol-label bg-orange text-white">
-                                <i class="ki-duotone ki-user-tick fs-3 text-white"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-                            </div>
-                        </div>
-                        <span class="fw-bold text-gray-800 fs-7">Registrasi Tamu Cepat</span>
-                    </div>
-
-                    <el-form-item prop="new_guest_name" class="mb-3">
-                        <label class="required fw-bold fs-9 text-gray-600 text-uppercase mb-1">Nama Lengkap</label>
-                        <el-input v-model="formData.new_guest_name" placeholder="Contoh: Budi Santoso" class="metronic-input" />
-                    </el-form-item>
-
-                    <div class="row g-3">
-                        <div class="col-6">
-                            <el-form-item prop="new_guest_phone" class="mb-0">
-                                <label class="required fw-bold fs-9 text-gray-600 text-uppercase mb-1">No. HP </label>
-                                <el-input v-model="formData.new_guest_phone" placeholder="No Handphone" class="metronic-input" />
-                            </el-form-item>
-                        </div>
-                        <div class="col-6">
-                            <el-form-item prop="new_guest_email" class="mb-0">
-                                <label class="required fw-bold fs-9 text-gray-600 text-uppercase mb-1">Email</label>
-                                <el-input v-model="formData.new_guest_email" placeholder="Email" class="metronic-input" />
-                            </el-form-item>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="d-flex justify-content-end mt-3">
-                    <button type="button" @click="toggleGuestMode" class="btn btn-sm btn-link btn-color-orange btn-active-color-primary fw-bold fs-8 px-0">
-                        {{ isNewGuest ? '← Kembali ke Pencarian Database' : 'Tamu Baru ?' }}
-                    </button>
-                </div>
-            </div>
-
-            <div class="separator separator-dashed my-4"></div>
-
-            <div class="bg-light-subtle rounded-3 p-4 mb-5 border border-dashed border-gray-300">
-                <div class="row g-4">
-                    <div class="col-6">
-                        <el-form-item prop="check_in_date" class="mb-0">
-                            <template #label><span class="required fw-bold fs-9 text-gray-500 text-uppercase">Check-in</span></template>
-                            <el-date-picker v-model="formData.check_in_date" type="date" class="w-100 metronic-date" placeholder="Tgl Masuk" format="DD/MM/YYYY" value-format="YYYY-MM-DD" :clearable="false"/>
-                        </el-form-item>
-                    </div>
-                    <div class="col-6">
-                        <el-form-item prop="check_out_date" class="mb-0">
-                            <template #label><span class="required fw-bold fs-9 text-gray-500 text-uppercase">Check-out</span></template>
-                            <el-date-picker v-model="formData.check_out_date" type="date" class="w-100 metronic-date" placeholder="Tgl Keluar" format="DD/MM/YYYY" value-format="YYYY-MM-DD" :clearable="false"/>
-                        </el-form-item>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mb-5">
-                <div class="d-flex flex-stack bg-light-primary rounded border border-dashed border-primary border-active p-3">
-                    <div class="d-flex align-items-center me-2">
-                        <i class="ki-duotone ki-eye-slash fs-2 me-3 text-primary">
-                            <span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span>
-                        </i>
-                        <div class="flex-grow-1">
-                            <span class="fw-bold text-gray-800 fs-7 d-block">Mode Incognito</span>
-                            <span class="text-gray-500 fw-semibold fs-9">Privasi tamu di layar publik</span>
-                        </div>
-                    </div>
-                    <div class="form-check form-check-custom form-check-solid form-switch form-check-sm">
-                        <input class="form-check-input" type="checkbox" v-model="formData.is_incognito" :true-value="true" :false-value="false" />
-                    </div>
-                </div>
-            </div>
-
-            <div class="mb-5">
-                <label class="fw-bold fs-8 text-gray-600 text-uppercase ls-1 mb-3 d-block">Metode Pembayaran</label>
-                <div class="row g-3">
-                    <div class="col-6" v-for="method in paymentMethods" :key="method.value">
-                        <div @click="formData.payment_method = method.value"
-                             class="payment-card d-flex align-items-center p-3 rounded-3 border cursor-pointer transition-300 h-100 position-relative overflow-hidden"
-                             :class="formData.payment_method === method.value ? 'border-orange bg-light-orange active' : 'border-gray-300 bg-white hover-border-gray-400'">
-                             
-                             <div class="symbol symbol-35px me-3">
-                                 <div class="symbol-label rounded-circle" :class="formData.payment_method === method.value ? 'bg-orange text-white' : 'bg-light text-gray-500'">
-                                     <i :class="method.icon" class="fs-4"></i>
-                                 </div>
-                             </div>
-                             
-                             <div class="d-flex flex-column">
-                                 <span class="fw-bold fs-7" :class="formData.payment_method === method.value ? 'text-orange' : 'text-gray-700'">{{ method.label }}</span>
-                                 <span class="fs-9 text-muted">{{ method.desc }}</span>
-                             </div>
-                             
-                             <i v-if="formData.payment_method === method.value" class="ki-duotone ki-check-circle fs-4 text-orange position-absolute top-0 end-0 m-2"><span class="path1"></span><span class="path2"></span></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div v-if="totalCost > 0" class="d-flex align-items-center justify-content-between bg-light-success rounded-3 px-5 py-4 mb-6 border border-success border-dashed animate__animated animate__fadeIn">
-                <div class="d-flex align-items-center">
-                    <div class="symbol symbol-40px me-3">
-                        <div class="symbol-label bg-white text-success shadow-sm rounded-circle">
-                            <i class="ki-duotone ki-bill fs-2 text-success"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span><span class="path6"></span></i>
-                        </div>
-                    </div>
-                    <div class="d-flex flex-column">
-                        <span class="text-gray-600 fw-bold fs-8 text-uppercase">Total Biaya</span>
-                        <span class="text-gray-800 fw-bolder fs-6">{{ durationInNights }} Malam x {{ formatCurrency(roomData?.price_per_night) }}</span>
-                    </div>
-                </div>
-                <div class="text-end">
-                    <span class="d-block text-success fw-bolder fs-2">{{ formatCurrency(totalCost) }}</span>
-                </div>
-            </div>
-
-            <div class="d-flex gap-3 pt-2">
-                <button type="button" class="btn btn-light w-100 fw-bold text-gray-600" data-bs-dismiss="modal">Batal</button>
-                <button class="btn btn-orange w-100 fw-bold shadow-sm hover-elevate" type="submit" :disabled="loading">
-                    <span v-if="!loading">
-                        {{ formData.payment_method === 'cash' ? 'Check-in & Bayar' : 'Lanjut Pembayaran' }} 
-                        <i class="ki-duotone ki-arrow-right fs-4 ms-2 text-white"><span class="path1"></span><span class="path2"></span></i>
-                    </span>
-                    <span v-else class="indicator-progress">
-                        {{ loadingText }} <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
-                    </span>
-                </button>
+            <div class="d-flex justify-content-between align-items-center mt-5 pt-4 border-top">
+              <div class="form-check form-check-sm">
+                <input class="form-check-input" type="checkbox" v-model="formData.is_incognito" id="incognito" />
+                <label class="form-check-label fs-8 fw-bold" for="incognito">
+                  <i class="ki-duotone ki-eye-slash fs-5 me-1"><span class="path1"></span><span class="path2"></span></i>
+                  Incognito
+                </label>
+              </div>
+              
+              <button type="submit" class="btn btn-orange px-5 hover-scale" :disabled="loading">
+                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+                <span class="fw-bold fs-7">
+                  {{ checkInMode === 'walk_in' ? 'Check-In' : 'Verifikasi' }}
+                </span>
+                <i v-if="!loading" class="ki-duotone ki-arrow-right fs-4 ms-1"><span class="path1"></span><span class="path2"></span></i>
+              </button>
             </div>
 
           </el-form>
@@ -186,269 +251,424 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref, onMounted, watch, computed } from "vue";
-import ApiService from "@/core/services/ApiService";
-import Swal from "sweetalert2";
-import { Modal } from "bootstrap";
-import type { FormInstance, FormRules } from 'element-plus';
+<script>
+import axios from 'axios';
+import { Modal } from 'bootstrap';
+import moment from 'moment';
+import { ElMessage } from 'element-plus';
 
-// ===== INTERFACES =====
-interface Guest {
-    id: number;
-    name: string;
-    phone_number: string;
-}
+export default {
+  name: 'CheckInModal',
+  emits: ['success'],
+  data() {
+    return {
+      modalInstance: null,
+      roomData: null,
+      loading: false,
+      loadingGuests: false,
+      
+      checkInMode: 'walk_in',
+      guestType: 'existing',
+      
+      guestOptions: [],
+      availableBookings: [],
+      existingBookingToday: null,
 
-interface PaymentMethod {
-    label: string;
-    value: string;
-    icon: string;
-    desc: string;
-}
-
-interface FormData {
-    room_id: number | null;
-    guest_id: number | null;
-    check_in_date: string;
-    check_out_date: string;
-    payment_method: string;
-    is_incognito: boolean;
-    new_guest_name: string;
-    new_guest_phone: string;
-    new_guest_email: string;
-}
-
-declare const snap: any;
-
-const props = defineProps<{ roomData: any }>();
-const emit = defineEmits(['checkin-success', 'close-modal']);
-
-// ===== REFS =====
-const formRef = ref<FormInstance>();
-const modalRef = ref<HTMLElement | null>(null);
-const loading = ref(false);
-const loadingGuests = ref(false);
-const guests = ref<Guest[]>([]);
-const isNewGuest = ref(false);
-const loadingText = ref('Memproses...');
-
-const paymentMethods = ref<PaymentMethod[]>([
-    { label: 'Tunai', value: 'cash', icon: 'ki-duotone ki-wallet', desc: 'Bayar di Receptionist' },
-    { label: 'QRIS', value: 'midtrans', icon: 'ki-duotone ki-scan-barcode', desc: 'Auto Payment' }
-]);
-
-// ===== FORM DATA =====
-const getInitialFormData = (): FormData => ({
-    room_id: null,
-    guest_id: null,
-    check_in_date: '',
-    check_out_date: '',
-    payment_method: 'cash',
-    is_incognito: false,
-    new_guest_name: '',
-    new_guest_phone: '',
-    new_guest_email: '',
-});
-
-const formData = ref<FormData>(getInitialFormData());
-
-// ===== RULES =====
-const currentRules = computed<FormRules>(() => {
-    const commonRules = {
-        check_in_date: [{ required: true, message: "Wajib diisi", trigger: "change" }],
-        check_out_date: [{ required: true, message: "Wajib diisi", trigger: "change" }],
+      formData: {
+        room_id: null,
+        guest_id: null,
+        booking_id: null,
+        check_in_date: moment().format('YYYY-MM-DD'),
+        check_out_date: moment().add(1, 'days').format('YYYY-MM-DD'),
+        payment_method: 'cash',
+        is_incognito: false,
+      },
+      
+      newGuestData: { name: '', email: '', phone_number: '' }
     };
-
-    if (isNewGuest.value) {
+  },
+  computed: {
+    isNewGuest() { return this.guestType === 'new'; },
+    currentRules() {
+      if (this.checkInMode === 'walk_in') {
         return {
-            ...commonRules,
-            new_guest_name: [{ required: true, message: "Nama wajib diisi", trigger: "blur" }],
-            new_guest_phone: [{ required: true, message: "No HP wajib diisi", trigger: "blur" }],
+          guest_id: [{ required: !this.isNewGuest, message: 'Pilih tamu', trigger: 'change' }],
+          check_out_date: [{ required: true, message: 'Wajib diisi', trigger: 'change' }],
         };
-    } else {
+      } else {
         return {
-            ...commonRules,
-            guest_id: [{ required: true, message: "Silakan pilih tamu dari daftar", trigger: "change" }],
+          booking_id: [{ required: true, message: 'Pilih booking', trigger: 'change' }]
         };
+      }
+    },
+    calculatedDuration() {
+      if (!this.formData.check_out_date || !this.formData.check_in_date) return 0;
+      const checkIn = moment(this.formData.check_in_date);
+      const checkOut = moment(this.formData.check_out_date);
+      return Math.max(1, checkOut.diff(checkIn, 'days'));
+    },
+    calculatedTotalPrice() {
+      return this.calculatedDuration * (this.roomData?.price_per_night || 0);
     }
-});
+  },
+  methods: {
+    openModal(room) {
+      this.roomData = room;
+      this.resetState();
+      this.formData.room_id = room.id;
+      
+      this.fetchRoomBookings(room.id);
 
-// ===== COMPUTED =====
-const durationInNights = computed(() => {
-    if (!formData.value.check_in_date || !formData.value.check_out_date) return 0;
-    const diffTime = new Date(formData.value.check_out_date).getTime() - new Date(formData.value.check_in_date).getTime();
-    const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return nights > 0 ? nights : 0;
-});
-
-const totalCost = computed(() => {
-    if (!props.roomData || durationInNights.value <= 0) return 0;
-    return props.roomData.price_per_night * durationInNights.value;
-});
-
-// ===== METHODS =====
-const formatCurrency = (value: number) => {
-    if (!value || isNaN(value)) return "Rp 0";
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
-};
-
-const toggleGuestMode = () => {
-    isNewGuest.value = !isNewGuest.value;
-    if (formRef.value) formRef.value.clearValidate();
-};
-
-const getGuests = async () => {
-    try {
-        loadingGuests.value = true;
-        const { data } = await ApiService.get("/guests");
-        guests.value = data;
-    } catch (error) {
-        console.error("Gagal load tamu:", error);
-    } finally {
-        loadingGuests.value = false;
-    }
-};
-
-const createNewGuest = async () => {
-    const payload = {
-        name: formData.value.new_guest_name,
-        phone_number: formData.value.new_guest_phone,
-        email: formData.value.new_guest_email
-    };
-    const { data } = await ApiService.post("/guests", payload);
-    return data; 
-};
-
-const submit = () => {
-    if (!formRef.value) return;
+      if (!this.modalInstance) {
+        this.modalInstance = new Modal(this.$refs.modalRef);
+      }
+      this.modalInstance.show();
+    },
     
-    formRef.value.validate(async (valid: boolean) => {
+    resetState() {
+      this.checkInMode = 'walk_in';
+      this.guestType = 'existing';
+      this.existingBookingToday = null;
+      this.availableBookings = [];
+      this.guestOptions = [];
+      this.formData.guest_id = null;
+      this.formData.booking_id = null;
+      this.formData.check_in_date = moment().format('YYYY-MM-DD');
+      this.formData.check_out_date = moment().add(1, 'days').format('YYYY-MM-DD');
+      this.formData.payment_method = 'cash';
+      this.newGuestData = { name: '', email: '', phone_number: '' };
+    },
+
+    closeModal() {
+      if (this.modalInstance) this.modalInstance.hide();
+    },
+
+    async fetchRoomBookings(roomId) {
+      try {
+        const response = await axios.get('/bookings', {
+          params: { 
+            room_id: roomId, 
+            status_in: 'paid,confirmed,settlement',
+            date_gte: moment().format('YYYY-MM-DD') 
+          }
+        });
+        
+        this.availableBookings = response.data.data || [];
+        
+        const today = moment().format('YYYY-MM-DD');
+        this.existingBookingToday = this.availableBookings.find(b => b.check_in_date === today);
+      } catch (error) {
+        console.error("Fetch Error:", error);
+      }
+    },
+
+    setModeToBooking(booking) {
+      this.checkInMode = 'booking_existing';
+      this.formData.booking_id = booking.id;
+    },
+
+    async searchGuests(query) {
+      if (query.length < 3) return;
+      this.loadingGuests = true;
+      try {
+        const response = await axios.get('/api/guests', { params: { search: query } });
+        this.guestOptions = response.data.data;
+      } finally {
+        this.loadingGuests = false;
+      }
+    },
+    
+    async submit() {
+      this.$refs.formRef.validate(async (valid) => {
         if (!valid) return;
-        
-        if (durationInNights.value <= 0) {
-            Swal.fire({ text: "Durasi minimal 1 malam.", icon: "warning", confirmButtonText: "Ok" });
-            return;
-        }
-        
-        loading.value = true;
-        loadingText.value = 'Memproses...';
+        this.loading = true;
 
         try {
-            if (isNewGuest.value) {
-                loadingText.value = 'Menyimpan Tamu...';
-                try {
-                    const newGuest = await createNewGuest();
-                    formData.value.guest_id = newGuest.id; 
-                    guests.value.unshift(newGuest); 
-                } catch (err: any) {
-                    throw new Error(err.response?.data?.message || "Gagal menyimpan data tamu baru.");
-                }
-            }
-
-            loadingText.value = 'Check-in...';
-            const response = await ApiService.post('/check-in', {
-                room_id: formData.value.room_id,
-                guest_id: formData.value.guest_id,
-                check_in_date: formData.value.check_in_date,
-                check_out_date: formData.value.check_out_date,
-                payment_method: formData.value.payment_method,
-                is_incognito: formData.value.is_incognito
-            });
-
-            const handleSuccess = () => {
-                Swal.fire({ text: "Check-in Berhasil!", icon: "success", timer: 1500, showConfirmButton: false });
-                emit('checkin-success');
-                if (modalRef.value) Modal.getInstance(modalRef.value)?.hide();
-            };
-
-            if (response.data.snap_token) {
-                loading.value = false; 
-                snap.pay(response.data.snap_token, {
-                    onSuccess: handleSuccess,
-                    onPending: () => {
-                        Swal.fire("Pending", "Menunggu pembayaran selesai.", "info");
-                        emit('checkin-success');
-                        if (modalRef.value) Modal.getInstance(modalRef.value)?.hide();
-                    },
-                    onClose: () => Swal.fire("Dibatalkan", "Pembayaran belum diselesaikan.", "warning")
-                });
-            } else {
-                handleSuccess(); 
-            }
+          if (this.checkInMode === 'walk_in') {
+            let finalGuestId = this.formData.guest_id;
             
-        } catch (error: any) {
-            Swal.fire({ text: error.message || "Terjadi kesalahan.", icon: "error" });
-        } finally {
-            if (!formData.value.payment_method || formData.value.payment_method === 'cash') {
-                loading.value = false;
+            if (this.isNewGuest) {
+               if(!this.newGuestData.name) throw new Error("Nama tamu wajib diisi");
+               const guestRes = await axios.post('/guests', this.newGuestData);
+               finalGuestId = guestRes.data.data.id;
             }
+
+            const payload = { ...this.formData, guest_id: finalGuestId };
+            const response = await axios.post('/check-in/walk-in', payload);
+
+            if (response.data.status === 'pending_payment') {
+              this.handleMidtransPopup(response.data.snap_token);
+              return; 
+            }
+          } else {
+            await axios.post('/check-in/process-booking', { 
+              booking_id: this.formData.booking_id 
+            });
+          }
+
+          ElMessage.success("Check-in Berhasil!");
+          this.$emit('success');
+          this.closeModal();
+
+        } catch (error) {
+          const msg = error.response?.data?.message || error.message || 'Terjadi kesalahan.';
+          ElMessage.error(msg);
+        } finally {
+          this.loading = false;
         }
-    });
-};
+      });
+    },
 
-watch(() => props.roomData, (newVal) => {
-    if (newVal) {
-        const today = new Date();
-        const tomorrow = new Date();
-        tomorrow.setDate(today.getDate() + 1);
+    handleMidtransPopup(snapToken) {
+      if (typeof window.snap === 'undefined') {
+        ElMessage.error("Library Midtrans tidak terload.");
+        this.loading = false;
+        return;
+      }
+      window.snap.pay(snapToken, {
+        onSuccess: () => {
+          ElMessage.success("Pembayaran Lunas! Check-in diproses.");
+          this.$emit('success');
+          this.closeModal();
+        },
+        onPending: () => {
+          ElMessage.warning("Menunggu Pembayaran...");
+          this.$emit('success');
+          this.closeModal();
+        },
+        onError: () => ElMessage.error("Pembayaran Gagal."),
+        onClose: () => {
+           ElMessage.info("Pembayaran ditutup.");
+           this.loading = false;
+        }
+      });
+    },
 
-        formData.value = {
-            ...getInitialFormData(),
-            room_id: newVal.id,
-            check_in_date: today.toISOString().split('T')[0],
-            check_out_date: tomorrow.toISOString().split('T')[0],
-        };
-        isNewGuest.value = false; 
-        if (formRef.value) formRef.value.clearValidate();
-    }
-});
-
-onMounted(() => {
-    getGuests();
-});
+    formatCurrency(val) {
+      if(!val) return 'Rp 0';
+      return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
+    },
+    formatDate(date) { return moment(date).format('DD MMM YYYY'); },
+    disabledDate(time) { return time.getTime() < Date.now(); }
+  }
+}
 </script>
 
 <style scoped>
+/* Orange Theme */
 .text-orange { color: #F68B1E !important; }
-.bg-light-orange { background-color: #FFF8F1 !important; }
+.bg-orange { background-color: #F68B1E !important; }
+.bg-light-orange { background-color: #FFF4E6 !important; }
 .border-orange { border-color: #F68B1E !important; }
-.btn-orange { background-color: #F68B1E; color: white; border: none; }
-.btn-orange:hover { background-color: #d97814; }
-.btn-color-orange { color: #F68B1E; }
+.btn-outline-orange { border-color: #F68B1E !important; color: #F68B1E !important; }
 
-.required:after { content: "*"; color: #f1416c; margin-left: 3px; }
-
-:deep(.metronic-input .el-input__wrapper), 
-:deep(.metronic-date .el-input__wrapper) {
-    background-color: #F9F9F9;
-    box-shadow: none !important; 
-    border: 1px solid transparent; 
-    border-radius: 0.6rem; 
-    padding: 8px 12px;
-    height: 42px;
+.btn-orange {
+  background-color: #F68B1E;
+  color: white;
+  border: none;
+  transition: all 0.3s ease;
+}
+.btn-orange:hover {
+  background-color: #d67616;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(246, 139, 30, 0.4);
 }
 
-:deep(.metronic-input .el-input__wrapper.is-focus),
-:deep(.metronic-date .el-input__wrapper.is-focus) {
-    background-color: #ffffff;
-    border-color: #F68B1E !important;
-    box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1) !important;
+.btn-light-orange {
+  background-color: #FFF4E6;
+  color: #F68B1E;
+  border: 1px solid #FFE5C7;
 }
 
-.payment-card { transition: all 0.2s ease; }
-.payment-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-.payment-card.active { box-shadow: 0 4px 12px rgba(246, 139, 30, 0.15); }
-
-[data-bs-theme="dark"] .theme-modal { background-color: #1e1e2d; color: #ffffff; }
-[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
-[data-bs-theme="dark"] .text-gray-800 { color: #e1e3ea !important; }
-[data-bs-theme="dark"] .text-gray-600 { color: #CDCDDE !important; }
-[data-bs-theme="dark"] .bg-light-subtle { background-color: #1b1b29 !important; border-color: #323248 !important; }
-[data-bs-theme="dark"] .bg-light-orange { background-color: rgba(246, 139, 30, 0.15) !important; border-color: #F68B1E !important; }
-[data-bs-theme="dark"] .border-gray-300 { border-color: #323248 !important; }
-[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper) {
-    background-color: #1b1b29 !important; border-color: #323248 !important; color: white;
+.btn-light-orange:hover, .btn-light-orange.active {
+  background-color: #FFE5C7;
+  color: #F68B1E;
 }
-[data-bs-theme="dark"] :deep(.el-select-dropdown__item.hover) { background-color: #2b2b40 !important; color: #F68B1E; }
+
+/* Gradient Header */
+.bg-gradient-orange {
+  background: linear-gradient(135deg, #F68B1E 0%, #FF6B35 100%);
+}
+
+/* Animations */
+.hover-scale {
+  transition: transform 0.3s ease;
+}
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* Transition Mode Button */
+.transition-mode {
+  transition: all 0.3s ease;
+}
+
+/* Slide Fade Transition */
+.slide-fade-enter-active {
+  transition: all 0.4s ease;
+}
+
+.slide-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-fade-enter-from {
+  transform: translateX(20px);
+  opacity: 0;
+}
+
+.slide-fade-leave-to {
+  transform: translateX(-20px);
+  opacity: 0;
+}
+
+.content-transition {
+  transition: all 0.4s ease;
+}
+
+/* Payment Card Simple */
+.payment-card {
+  border: 2px solid #E4E6EF;
+  border-radius: 8px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.payment-card:hover {
+  border-color: #F68B1E;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(246, 139, 30, 0.2);
+}
+
+.payment-card.active {
+  border-color: #F68B1E;
+  background: #FFF4E6;
+  box-shadow: 0 4px 12px rgba(246, 139, 30, 0.25);
+}
+
+/* Element Plus Overrides */
+:deep(.el-input__wrapper) {
+  box-shadow: none !important;
+  background-color: #F9F9F9;
+  border: 1px solid #E1E3EA;
+  border-radius: 6px;
+  padding: 6px 12px;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-input__wrapper.is-focus) {
+  border-color: #F68B1E !important;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1) !important;
+}
+
+:deep(.el-input__wrapper:hover) {
+  border-color: #F68B1E;
+}
+
+:deep(.el-date-editor.el-input, .el-date-editor.el-input__wrapper) {
+  width: 100%;
+}
+
+:deep(.el-select-dropdown__item.is-selected) {
+  background-color: #FFF4E6;
+  color: #F68B1E;
+}
+
+:deep(.el-select-dropdown__item) {
+  padding: 8px 12px;
+  min-height: auto;
+}
+
+:deep(.btn-active-light-orange.active), :deep(.btn-check:checked + .btn-active-light-orange) {
+  background-color: #FFF4E6 !important;
+  border-color: #F68B1E !important;
+  color: #F68B1E !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate__animated.animate__fadeIn {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.animate__animated.animate__fadeInDown {
+  animation: fadeInDown 0.5s ease-out;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate__animated.animate__bounceIn {
+  animation: bounceIn 0.6s ease-out;
+}
+
+@keyframes bounceIn {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.animate__animated.animate__zoomIn {
+  animation: zoomIn 0.3s ease-out;
+}
+
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate__animated.animate__pulse {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.animate__faster {
+  animation-duration: 0.3s;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal-dialog {
+    margin: 10px;
+  }
+}
+
+/* Custom Scrollbar */
+.scroll-y::-webkit-scrollbar {
+  width: 5px;
+}
+
+.scroll-y::-webkit-scrollbar-track {
+  background: #F5F8FA;
+}
+
+.scroll-y::-webkit-scrollbar-thumb {
+  background: #F68B1E;
+  border-radius: 3px;
+}
+
+/* Badge */
+.badge-sm {
+  padding: 3px 8px;
+  font-size: 0.7rem;
+}
 </style>
