@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Guest\GuestOrderController;
 use App\Models\Booking;
 use App\Models\CheckIn;
 use App\Models\Order;
+use App\Models\Guest; // [TAMBAHKAN IMPORT INI]
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -15,9 +16,7 @@ use Throwable;
 
 class MidtransController extends Controller
 {
-    /**
-     * Membuat transaksi Midtrans untuk berbagai jenis pesanan.
-     */
+ 
     public function createTransaction(Request $request)
     {
         $validated = $request->validate([
@@ -39,7 +38,6 @@ class MidtransController extends Controller
             }
 
             if (!$order) {
-                // Untuk booking biasanya handle di controller booking, tapi jika lewat sini:
                 throw new \Exception('Logic booking create transaction ada di BookingController store.');
             }
 
@@ -65,9 +63,7 @@ class MidtransController extends Controller
         }
     }
 
-    /**
-     * Menangani notifikasi (webhook) yang dikirim oleh Midtrans.
-     */
+
     public function handleNotification(Request $request)
     {
         try {
@@ -95,22 +91,20 @@ class MidtransController extends Controller
         }
     }
 
-    /**
-     * [PERBAIKAN UTAMA] Memproses notifikasi khusus untuk Booking Kamar.
-     * Hanya update status booking, JANGAN update status kamar (fisik) atau check-in.
-     */
+
     private function handleBookingNotification(Notification $notification)
     {
-        // 1. Cari Booking
-        $booking = Booking::where('midtrans_order_id', $notification->order_id)->first();
+        // 1. PENTING: Eager load relasi 'guest' untuk memastikan sync KTP berhasil
+        $booking = Booking::with('guest')->where('midtrans_order_id', $notification->order_id)->first();
 
         if (!$booking) {
+            Log::warning("Booking not found for Midtrans Order: {$notification->order_id}");
             return;
         }
 
-        // 2. Cek Idempotency (Mencegah proses ganda jika Midtrans kirim notif 2x)
-        // Jika status sudah final (paid/cancelled/checked_in), abaikan notif ini.
+        // 2. Cek Idempotency (Hindari double processing)
         if (in_array($booking->status, ['paid', 'confirmed', 'checked_in', 'cancelled', 'completed'])) {
+            Log::info("Booking {$booking->id} already processed. Status: {$booking->status}");
             return;
         }
 
@@ -133,22 +127,37 @@ class MidtransController extends Controller
             $newStatus = 'pending';
         }
 
-        // 4. Simpan Perubahan Status Booking
         if ($newStatus) {
             $booking->status = $newStatus;
+
+            // 4. ✅ FIX UTAMA: Sync KTP ke Guest Profile SAAT PEMBAYARAN LUNAS
+            if ($newStatus === 'paid') {
+
+                // Validasi: Pastikan relasi guest ter-load & KTP ada
+                if (!$booking->guest) {
+                    Log::error("Guest not loaded for Booking {$booking->id}. Cannot sync KTP.");
+                } elseif (empty($booking->ktp_image)) {
+                    Log::warning("Booking {$booking->id} tidak punya ktp_image. Skip sync.");
+                } else {
+                    try {
+                        // Update Guest Profile
+                        $booking->guest->update([
+                            'ktp_image' => $booking->ktp_image,
+                            'is_verified' => false  // Trigger masuk ke halaman verifikasi
+                        ]);
+
+                        Log::info("✅ KTP Synced: Booking {$booking->id} → Guest {$booking->guest_id}");
+                    } catch (\Exception $e) {
+                        Log::error("Failed to sync KTP for Booking {$booking->id}: " . $e->getMessage());
+                    }
+                }
+            }
+
             $booking->save();
-
-            Log::info("Booking ID {$booking->id} status updated to {$newStatus}");
+            Log::info("Booking {$booking->id} status updated to {$newStatus}");
         }
-
-        // [STOP] KITA TIDAK MERUBAH ROOM->STATUS MENJADI OCCUPIED DISINI.
-        // [STOP] KITA TIDAK MEMBUAT CHECKIN DISINI.
-        // Itu dilakukan nanti saat tamu datang fisik.
     }
 
-    /**
-     * Memproses notifikasi khusus untuk Order Makanan.
-     */
     private function handleOrderNotification(Notification $notification)
     {
         $order = Order::where('midtrans_order_id', $notification->order_id)->first();
@@ -181,9 +190,6 @@ class MidtransController extends Controller
         $order->save();
     }
 
-    /**
-     * Menangani notifikasi pembayaran checkout.
-     */
     private function handleCheckoutNotification(Notification $notification)
     {
         $parts = explode('-', $notification->order_id);
@@ -201,7 +207,7 @@ class MidtransController extends Controller
 
         $checkIn = CheckIn::where('booking_id', $booking->id)->first();
         if ($checkIn && !$checkIn->is_active && $checkIn->check_out_time) {
-            return; // Sudah checkout sebelumnya
+            return;
         }
 
         $isSuccess = in_array($notification->transaction_status, ['capture', 'settlement'])
@@ -211,20 +217,16 @@ class MidtransController extends Controller
 
         try {
             DB::transaction(function () use ($booking, $notification) {
-                // Lunasi semua tagihan makanan pending
                 Order::where('user_id', $booking->user_id)
                     ->whereIn('status', ['pending', 'processing', 'delivering', 'completed'])
                     ->update(['status' => 'paid']);
 
-                // Selesaikan Booking
                 $booking->update(['status' => 'completed']);
 
-                // Ubah status kamar jadi kotor
                 if ($booking->room) {
                     $booking->room->update(['status' => 'dirty']);
                 }
 
-                // Matikan Check-in
                 CheckIn::where('booking_id', $booking->id)
                     ->where('is_active', true)
                     ->update([

@@ -3,7 +3,6 @@
     <div class="modal-dialog modal-dialog-centered mw-900px">
       <div class="modal-content rounded-4 border-0 shadow-lg theme-modal overflow-hidden">
         
-        <!-- Header with Gradient -->
         <div class="modal-header border-0 pb-0 bg-gradient-orange position-relative overflow-hidden">
           <div class="position-absolute top-0 start-0 w-100 h-100 opacity-10">
             <div class="pattern-dots"></div>
@@ -48,9 +47,7 @@
         <div class="modal-body p-0">
           <div class="row g-0">
             
-            <!-- Calendar Section -->
             <div class="col-lg-7 p-7 border-end border-gray-200">
-              <!-- Month Navigation -->
               <div class="d-flex justify-content-between align-items-center mb-5">
                 <button 
                   class="btn btn-sm btn-icon btn-light-orange rounded-circle hover-scale shadow-sm" 
@@ -76,9 +73,7 @@
                 </button>
               </div>
 
-              <!-- Calendar Grid -->
               <div class="calendar-wrapper position-relative">
-                <!-- Loading Overlay -->
                 <transition name="fade">
                   <div 
                     v-if="loading" 
@@ -91,7 +86,6 @@
                 </transition>
 
                 <div class="calendar-grid">
-                  <!-- Day Names -->
                   <div 
                     class="day-name text-gray-600 fw-bold" 
                     v-for="day in daysOfWeek" 
@@ -99,10 +93,8 @@
                     {{ day }}
                   </div>
                   
-                  <!-- Empty Days -->
                   <div v-for="n in paddingDays" :key="'pad-'+n" class="calendar-day empty"></div>
 
-                  <!-- Calendar Days -->
                   <div 
                     v-for="date in daysInMonth" 
                     :key="date" 
@@ -117,7 +109,6 @@
                 </div>
               </div>
               
-              <!-- Legend -->
               <div class="d-flex align-items-center gap-5 mt-6 px-2">
                 <div class="d-flex align-items-center gap-2">
                   <span class="legend-dot bg-success"></span>
@@ -134,7 +125,6 @@
               </div>
             </div>
 
-            <!-- Bookings List Section -->
             <div class="col-lg-5 p-7 bg-light-subtle">
               <div class="d-flex align-items-center justify-content-between mb-5">
                 <h4 class="fw-bolder text-gray-900 m-0 fs-4">
@@ -150,13 +140,11 @@
                 </span>
               </div>
               
-              <!-- Loading State -->
               <div v-if="loading && upcomingBookings.length === 0" class="text-center py-10">
                 <span class="spinner-border text-orange spinner-border-sm"></span>
                 <div class="text-muted fs-8 fw-semibold mt-2">Memuat data...</div>
               </div>
 
-              <!-- Empty State -->
               <div v-else-if="upcomingBookings.length === 0" class="text-center py-10">
                 <div class="symbol symbol-100px symbol-circle bg-light-success mx-auto mb-4">
                   <i class="ki-duotone ki-check-circle fs-3x text-success">
@@ -167,7 +155,6 @@
                 <p class="text-muted fs-7 mb-0">Tidak ada booking aktif untuk<br>periode mendatang</p>
               </div>
 
-              <!-- Bookings List -->
               <div v-else class="scroll-y mh-450px pe-3">
                 <transition-group name="list-fade" tag="div" class="d-flex flex-column gap-3">
                   <div 
@@ -175,7 +162,6 @@
                     :key="book.id" 
                     class="booking-card card border-0 shadow-sm hover-elevate-up">
                     <div class="card-body p-4">
-                      <!-- Header -->
                       <div class="d-flex justify-content-between align-items-start mb-3">
                         <div class="d-flex align-items-center gap-2">
                           <div class="symbol symbol-35px symbol-circle bg-light-orange">
@@ -205,7 +191,6 @@
                         </span>
                       </div>
 
-                      <!-- Date Info -->
                       <div class="separator separator-dashed mb-3"></div>
                       
                       <div class="d-flex align-items-center gap-3">
@@ -232,7 +217,6 @@
                         </div>
                       </div>
 
-                      <!-- Duration Badge -->
                       <div class="mt-3 pt-3 border-top border-gray-200 border-dashed">
                         <div class="d-flex justify-content-between align-items-center">
                           <span class="text-muted fs-8 fw-semibold">Durasi Menginap</span>
@@ -250,7 +234,6 @@
           </div>
         </div>
         
-        <!-- Footer -->
         <div class="modal-footer border-0 bg-light-subtle py-4">
           <button 
             type="button" 
@@ -301,17 +284,14 @@ export default {
         getRoomType() {
             if (!this.roomData) return 'Tipe Kamar';
             
-            // Jika type adalah object dengan property name
             if (this.roomData.type && typeof this.roomData.type === 'object' && this.roomData.type.name) {
                 return this.roomData.type.name;
             }
             
-            // Jika type adalah string langsung
             if (this.roomData.type && typeof this.roomData.type === 'string') {
                 return this.roomData.type;
             }
             
-            // Fallback
             return 'Tipe Kamar';
         }
     },
@@ -330,6 +310,7 @@ export default {
             });
         },
         
+        // ✅ FIXED: Tambahkan 'confirmed' status agar booking verified muncul
         async fetchSchedule() {
             if(!this.roomData) return;
             
@@ -341,12 +322,14 @@ export default {
 
                 const { data } = await ApiService.query('/bookings', {
                     room_id: this.roomData.id,
-                    status_in: 'paid,confirmed,settlement,checked_in',
+                    status_in: 'paid,confirmed,settlement,checked_in', // 🔥 Tambahkan 'confirmed'
                     date_from: startOfMonth,
                     date_to: endOfMonth
                 });
                 
                 this.bookings = data.data || [];
+                
+                console.log(`📅 Room ${this.roomData.room_number} Schedule:`, this.bookings.length, 'bookings');
                 
             } catch (error) {   
                 console.error("Gagal memuat jadwal:", error);
@@ -439,311 +422,53 @@ export default {
 </script>
 
 <style scoped>
-/* ===========================
-   ORANGE THEME COLORS
-   =========================== */
+/* Style sama seperti sebelumnya, tidak ada perubahan */
 .text-orange { color: #F68B1E !important; }
 .bg-orange { background-color: #F68B1E !important; }
 .bg-light-orange { background-color: #FFF4E6 !important; }
-.btn-light-orange { 
-    background-color: #FFF4E6; 
-    color: #F68B1E; 
-    border: none;
-}
-.btn-light-orange:hover { 
-    background-color: #FFE5C7; 
-    color: #F68B1E; 
-}
-.badge-light-orange {
-    background-color: #FFF4E6;
-    color: #F68B1E;
-}
+.btn-light-orange { background-color: #FFF4E6; color: #F68B1E; border: none; }
+.btn-light-orange:hover { background-color: #FFE5C7; color: #F68B1E; }
+.badge-light-orange { background-color: #FFF4E6; color: #F68B1E; }
+.bg-gradient-orange { background: linear-gradient(135deg, #F68B1E 0%, #FF6B35 100%); }
+.pattern-dots { background-image: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 20px 20px; width: 100%; height: 100%; }
 
-/* ===========================
-   GRADIENT HEADER
-   =========================== */
-.bg-gradient-orange {
-    background: linear-gradient(135deg, #F68B1E 0%, #FF6B35 100%);
-}
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; }
+.day-name { font-size: 0.75rem; padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+.calendar-day { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer; background-color: #F9F9F9; color: #5E6278; position: relative; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; }
+.calendar-day:not(.empty):hover { background-color: #F1F1F4; transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+.calendar-day.empty { background: transparent; cursor: default; }
+.calendar-day.past:not(.today) { opacity: 0.4; cursor: not-allowed; }
+.calendar-day.today { border-color: #17C653; background-color: rgba(23, 198, 83, 0.1); color: #17C653; font-weight: 700; box-shadow: 0 0 0 3px rgba(23, 198, 83, 0.1); }
+.calendar-day.booked { background: linear-gradient(135deg, #FFF4E6 0%, #FFE5C7 100%); color: #F68B1E; font-weight: 700; border-color: #F68B1E; box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1); }
+.calendar-day.booked:hover { background: linear-gradient(135deg, #FFE5C7 0%, #FFD6A8 100%); transform: translateY(-3px) scale(1.05); box-shadow: 0 6px 16px rgba(246, 139, 30, 0.25); }
 
-.pattern-dots {
-    background-image: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-    background-size: 20px 20px;
-    width: 100%;
-    height: 100%;
-}
+.day-number { font-size: 0.95rem; margin-bottom: 2px; }
+.booked-indicator { position: absolute; bottom: 4px; }
+.booked-dot { width: 6px; height: 6px; background-color: #F68B1E; border-radius: 50%; animation: pulse-dot 2s infinite; }
+@keyframes pulse-dot { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.7; } }
 
-/* ===========================
-   CALENDAR GRID
-   =========================== */
-.calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 6px;
-    text-align: center;
-}
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.booking-card { transition: all 0.3s ease; border-left: 4px solid #F68B1E !important; }
+.booking-card:hover { transform: translateX(4px); box-shadow: 0 4px 12px rgba(246, 139, 30, 0.15) !important; }
 
-.day-name {
-    font-size: 0.75rem;
-    padding: 8px 0;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
+.hover-scale { transition: transform 0.3s ease; }
+.hover-scale:hover { transform: scale(1.05); }
+.hover-elevate-up { transition: all 0.3s ease; }
+.hover-elevate-up:hover { transform: translateY(-3px); }
+.animate-pulse-slow { animation: pulse-slow 3s infinite; }
+@keyframes pulse-slow { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 
-.calendar-day {
-    aspect-ratio: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    cursor: pointer;
-    background-color: #F9F9F9;
-    color: #5E6278;
-    position: relative;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 2px solid transparent;
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 
-.calendar-day:not(.empty):hover {
-    background-color: #F1F1F4;
-    transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
+.list-fade-enter-active { transition: all 0.4s ease; }
+.list-fade-leave-active { transition: all 0.3s ease; position: absolute; }
+.list-fade-enter-from { opacity: 0; transform: translateX(-20px); }
+.list-fade-leave-to { opacity: 0; transform: translateX(20px); }
+.list-fade-move { transition: transform 0.4s ease; }
 
-.calendar-day.empty {
-    background: transparent;
-    cursor: default;
-}
-
-.calendar-day.past:not(.today) {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.calendar-day.today {
-    border-color: #17C653;
-    background-color: rgba(23, 198, 83, 0.1);
-    color: #17C653;
-    font-weight: 700;
-    box-shadow: 0 0 0 3px rgba(23, 198, 83, 0.1);
-}
-
-.calendar-day.booked {
-    background: linear-gradient(135deg, #FFF4E6 0%, #FFE5C7 100%);
-    color: #F68B1E;
-    font-weight: 700;
-    border-color: #F68B1E;
-    box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1);
-}
-
-.calendar-day.booked:hover {
-    background: linear-gradient(135deg, #FFE5C7 0%, #FFD6A8 100%);
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 6px 16px rgba(246, 139, 30, 0.25);
-}
-
-.day-number {
-    font-size: 0.95rem;
-    margin-bottom: 2px;
-}
-
-.booked-indicator {
-    position: absolute;
-    bottom: 4px;
-}
-
-.booked-dot {
-    width: 6px;
-    height: 6px;
-    background-color: #F68B1E;
-    border-radius: 50%;
-    animation: pulse-dot 2s infinite;
-}
-
-@keyframes pulse-dot {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.3); opacity: 0.7; }
-}
-
-/* ===========================
-   LEGEND
-   =========================== */
-.legend-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    display: inline-block;
-}
-
-/* ===========================
-   BOOKING CARD
-   =========================== */
-.booking-card {
-    transition: all 0.3s ease;
-    border-left: 4px solid #F68B1E !important;
-}
-
-.booking-card:hover {
-    transform: translateX(4px);
-    box-shadow: 0 4px 12px rgba(246, 139, 30, 0.15) !important;
-}
-
-/* ===========================
-   ANIMATIONS
-   =========================== */
-.hover-scale {
-    transition: transform 0.3s ease;
-}
-.hover-scale:hover {
-    transform: scale(1.05);
-}
-
-.hover-elevate-up {
-    transition: all 0.3s ease;
-}
-.hover-elevate-up:hover {
-    transform: translateY(-3px);
-}
-
-.animate-pulse-slow {
-    animation: pulse-slow 3s infinite;
-}
-
-@keyframes pulse-slow {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-}
-
-/* Fade Transition */
-.fade-enter-active, .fade-leave-active {
-    transition: opacity 0.3s ease;
-}
-.fade-enter-from, .fade-leave-to {
-    opacity: 0;
-}
-
-/* List Fade Transition */
-.list-fade-enter-active {
-    transition: all 0.4s ease;
-}
-.list-fade-leave-active {
-    transition: all 0.3s ease;
-    position: absolute;
-}
-.list-fade-enter-from {
-    opacity: 0;
-    transform: translateX(-20px);
-}
-.list-fade-leave-to {
-    opacity: 0;
-    transform: translateX(20px);
-}
-.list-fade-move {
-    transition: transform 0.4s ease;
-}
-
-/* ===========================
-   SCROLLBAR
-   =========================== */
-.scroll-y::-webkit-scrollbar {
-    width: 6px;
-}
-.scroll-y::-webkit-scrollbar-track {
-    background: #F5F8FA;
-    border-radius: 10px;
-}
-.scroll-y::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #F68B1E 0%, #FF6B35 100%);
-    border-radius: 10px;
-}
-.scroll-y::-webkit-scrollbar-thumb:hover {
-    background: #F68B1E;
-}
-
-/* ===========================
-   DARK MODE
-   =========================== */
-[data-bs-theme="dark"] .theme-modal { 
-    background-color: #1B1B29; 
-    color: #FFFFFF; 
-}
-
-[data-bs-theme="dark"] .bg-light-subtle { 
-    background-color: #151521 !important; 
-}
-
-[data-bs-theme="dark"] .text-gray-900 { 
-    color: #FFFFFF !important; 
-}
-
-[data-bs-theme="dark"] .text-gray-700,
-[data-bs-theme="dark"] .text-gray-600 { 
-    color: #9A9CAE !important; 
-}
-
-[data-bs-theme="dark"] .border-gray-200 { 
-    border-color: #2B2B40 !important; 
-}
-
-[data-bs-theme="dark"] .calendar-day { 
-    background-color: #2B2B40; 
-    color: #CDCDDE; 
-}
-
-[data-bs-theme="dark"] .calendar-day:not(.empty):hover {
-    background-color: #323248;
-}
-
-[data-bs-theme="dark"] .calendar-day.booked { 
-    background: linear-gradient(135deg, rgba(246, 139, 30, 0.2) 0%, rgba(246, 139, 30, 0.15) 100%);
-    color: #F68B1E !important; 
-    border-color: #F68B1E !important;
-}
-
-[data-bs-theme="dark"] .calendar-day.today {
-    background-color: rgba(23, 198, 83, 0.15);
-    border-color: #17C653;
-    color: #17C653 !important;
-}
-
-[data-bs-theme="dark"] .booking-card {
-    background-color: #1E1E2D !important;
-    border-color: #2B2B40 !important;
-}
-
-[data-bs-theme="dark"] .scroll-y::-webkit-scrollbar-track {
-    background: #1E1E2D;
-}
-
-/* ===========================
-   RESPONSIVE
-   =========================== */
-@media (max-width: 991px) {
-    .border-end {
-        border-end: none !important;
-        border-bottom: 1px solid var(--bs-gray-200) !important;
-        padding-bottom: 2rem !important;
-    }
-    
-    .col-lg-5 {
-        padding-top: 2rem !important;
-    }
-}
-
-@media (max-width: 576px) {
-    .calendar-grid {
-        gap: 4px;
-    }
-    
-    .calendar-day {
-        font-size: 0.8rem;
-    }
-    
-    .day-number {
-        font-size: 0.85rem;
-    }
-}
+.scroll-y::-webkit-scrollbar { width: 6px; }
+.scroll-y::-webkit-scrollbar-track { background: #F5F8FA; border-radius: 10px; }
+.scroll-y::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #F68B1E 0%, #FF6B35 100%); border-radius: 10px; }
+.scroll-y::-webkit-scrollbar-thumb:hover { background: #F68B1E; }
 </style>

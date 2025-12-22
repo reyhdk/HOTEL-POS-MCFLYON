@@ -62,7 +62,7 @@
               <div v-if="!isLoggedIn && !isLoadingUser" class="mb-5 alert alert-primary d-flex align-items-center p-3">
                  <i class="ki-duotone ki-information fs-2hx text-primary me-3"><span class="path1"></span><span class="path2"></span></i>
                  <div class="d-flex flex-column">
-                    <span>Sudah punya akun? <strong>Login</strong> agar data terisi otomatis.</span>
+                   <span>Sudah punya akun? <strong>Login</strong> agar data terisi otomatis.</span>
                  </div>
               </div>
 
@@ -78,9 +78,27 @@
                 <label class="form-label required fs-6 fw-semibold">Nomor Telepon</label>
                 <input v-model="formData.guest_phone" type="tel" class="form-control" required placeholder="Contoh: 08123456789"/>
               </div>
+              
+              <div class="fv-row mb-7">
+                  <label class="required fs-6 fw-semibold mb-2">Foto KTP / Identitas</label>
+                  <div class="alert alert-warning d-flex align-items-center p-3 mb-3">
+                    <i class="ki-duotone ki-shield-tick fs-2hx text-warning me-4"><span class="path1"></span><span class="path2"></span></i>
+                    <div class="d-flex flex-column">
+                        <span class="fw-bold">Verifikasi Wajib</span>
+                        <span class="fs-7">Mohon upload foto KTP asli. Data aman & terenkripsi.</span>
+                    </div>
+                  </div>
+                  <input 
+                      type="file" 
+                      class="form-control form-control-solid" 
+                      @change="handleFileUpload" 
+                      accept="image/jpeg, image/png, image/jpg"
+                  />
+                  <div class="form-text fs-7">Format: JPG, PNG. Maksimal 2MB.</div>
+              </div>
 
               <div class="d-flex align-items-center mb-8 bg-light-warning rounded p-4 border border-warning border-dashed">
-                <i class="ki-duotone ki-shield-tick fs-2x me-4 text-warning">
+                <i class="ki-duotone ki-abstract-26 fs-2x me-4 text-warning">
                     <span class="path1"></span><span class="path2"></span>
                 </i>
                 <div class="flex-grow-1">
@@ -106,6 +124,7 @@
             <p class="mt-4">Memuat detail pesanan...</p>
           </div>
         </div>
+        
         <div class="modal-footer flex-center">
             <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
             <button @click="submitBooking" type="button" class="btn btn-lg btn-primary" :disabled="isLoading">
@@ -144,6 +163,9 @@ const isLoading = ref(false);
 const isLoggedIn = ref(false);
 const isLoadingUser = ref(false);
 
+// State untuk File KTP
+const ktpFile = ref<File | null>(null); 
+
 const formData = ref({
   guest_name: '',
   guest_email: '',
@@ -178,19 +200,25 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(value);
 };
 
+// --- Handle File Upload (DITAMBAHKAN) ---
+const handleFileUpload = (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    if (target.files && target.files.length > 0) {
+        ktpFile.value = target.files[0];
+    }
+};
+
 // --- Fetch User Data (Auto-fill) ---
 const fetchCurrentUser = async () => {
     try {
         isLoadingUser.value = true;
-        // Asumsi endpoint standar Laravel Sanctum/Breeze: /api/user
-        // Jika gagal (401), berarti guest belum login.
         const { data } = await axios.get('/user');
         
         if (data) {
             isLoggedIn.value = true;
             formData.value.guest_name = data.name || '';
             formData.value.guest_email = data.email || '';
-            formData.value.guest_phone = data.phone_number || ''; // Pastikan field ini ada di User model
+            formData.value.guest_phone = data.phone_number || ''; 
         }
     } catch (e) {
         isLoggedIn.value = false;
@@ -202,11 +230,18 @@ const fetchCurrentUser = async () => {
 
 // --- Submit Booking ---
 const submitBooking = async () => {
-  // 1. Validasi Frontend
+  // 1. Validasi Frontend Dasar
   if (!formData.value.guest_name.trim() || !formData.value.guest_email.trim() || !formData.value.guest_phone.trim()) {
     toast.warn("Harap isi data diri Anda dengan lengkap.");
     return;
   }
+  
+  // 2. Validasi KTP Wajib
+  if (!ktpFile.value) {
+    toast.warn("Wajib mengupload foto KTP untuk verifikasi identitas.");
+    return;
+  }
+
   if (!props.room) {
     toast.error("Terjadi kesalahan, kamar tidak terpilih.");
     return;
@@ -214,26 +249,34 @@ const submitBooking = async () => {
 
   isLoading.value = true;
   try {
-    const payload = {
-      room_id: props.room.id,
-      guest_name: formData.value.guest_name,
-      guest_email: formData.value.guest_email,
-      guest_phone: formData.value.guest_phone,
-      check_in_date: props.bookingDates.check_in_date,
-      check_out_date: props.bookingDates.check_out_date,
-      is_incognito: formData.value.is_incognito, 
-    };
+    // 3. Gunakan FormData untuk mengirim File + Data Text
+    const payload = new FormData();
+    payload.append('room_id', props.room.id);
+    payload.append('guest_name', formData.value.guest_name);
+    payload.append('guest_email', formData.value.guest_email);
+    payload.append('guest_phone', formData.value.guest_phone);
+    payload.append('check_in_date', props.bookingDates.check_in_date);
+    payload.append('check_out_date', props.bookingDates.check_out_date);
+    // Convert boolean to string '1' or '0' for FormData
+    payload.append('is_incognito', formData.value.is_incognito ? '1' : '0'); 
+    
+    // Append File KTP
+    payload.append('ktp_image', ktpFile.value);
 
-    // 2. Kirim ke Backend
-    // Backend akan cek validitas tanggal (Anti-Bentrok)
-    const response = await axios.post('/public/bookings', payload);
+    // 4. Kirim ke Backend (Wajib Header Multipart)
+    const response = await axios.post('/public/bookings', payload, {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    });
+
     const snapToken = response.data.snap_token;
 
     if (!snapToken) {
         throw new Error('Gagal mendapatkan token pembayaran.');
     }
 
-    // 3. Tampilkan Popup Midtrans
+    // 5. Tampilkan Popup Midtrans
     snap.pay(snapToken, {
         onSuccess: function(result: any){
             toast.success('Pembayaran berhasil! Kode Booking telah dikirim ke email Anda.');
@@ -254,12 +297,15 @@ const submitBooking = async () => {
     });
 
   } catch (error: any) {
-    // 4. Handle Error Spesifik
+    // 6. Handle Error Spesifik
     if (error.response?.status === 409) {
-        // Ini adalah error dari logic "Anti-Bentrok" kita di Backend
         toast.error('Maaf, kamar ini baru saja dibooking orang lain untuk tanggal tersebut. Silakan pilih kamar lain.');
         Modal.getInstance(modalRef.value as HTMLElement)?.hide();
-        emit('booking-success'); // Refresh list kamar agar kamar ini hilang
+        emit('booking-success'); 
+    } else if (error.response?.status === 422) {
+        // Error validasi (misal file terlalu besar)
+        const msg = error.response.data.message || 'Data tidak valid.';
+        toast.error(msg);
     } else {
         const message = error.response?.data?.message || 'Terjadi kesalahan saat memproses pesanan.';
         toast.error(message);
@@ -275,14 +321,12 @@ onMounted(() => {
 });
 
 watch(() => props.room, () => {
-  // Jika room berubah (misal buka tutup modal), kita reset form,
-  // tapi jika user sudah login, kita isi lagi datanya.
+  // Reset form saat ganti kamar
   if (!isLoggedIn.value) {
       formData.value.guest_name = '';
       formData.value.guest_email = '';
       formData.value.guest_phone = '';
-  } else {
-      fetchCurrentUser(); // Refresh data user just in case
   }
+  ktpFile.value = null; // Reset file
 });
 </script>

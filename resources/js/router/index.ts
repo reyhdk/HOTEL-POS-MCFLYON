@@ -168,6 +168,17 @@ const routes: Array<RouteRecordRaw> = [
                 meta: { pageTitle: "Kamar" },
             },
             {
+                path: "master/verification",
+                name: "admin-verification",
+                component: () =>
+                    import("@/pages/dashboard/master/verification/Index.vue"),
+                meta: {
+                    pageTitle: "Verifikasi KTP",
+                    breadcrumbs: ["Master Data", "Verifikasi KTP"],
+                    role : ["admin", "receptionist"]
+                },
+            },
+            {
                 path: "master/facilities",
                 name: "admin-master-facilities",
                 component: () =>

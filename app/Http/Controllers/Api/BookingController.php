@@ -7,177 +7,172 @@ use App\Models\Booking;
 use App\Models\Guest;
 use App\Models\Room;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Midtrans\Snap;  
+use Illuminate\Support\Facades\Storage;
+use Midtrans\Snap;
 use Midtrans\Config;
 use Throwable;
+use Carbon\Carbon;
 
 class BookingController extends Controller
 {
     public function __construct()
     {
-        // Konfigurasi Midtrans (Opsional jika ingin di-init di sini)
-        \Midtrans\Config::$serverKey = config('services.midtrans.server_key');
-        \Midtrans\Config::$isProduction = config('services.midtrans.is_production');
-        \Midtrans\Config::$isSanitized = config('services.midtrans.is_sanitized', true);
-        \Midtrans\Config::$is3ds = config('services.midtrans.is_3ds', true);
+        Config::$serverKey = config('services.midtrans.server_key');
+        Config::$isProduction = config('services.midtrans.is_production');
+        Config::$isSanitized = config('services.midtrans.is_sanitized', true);
+        Config::$is3ds = config('services.midtrans.is_3ds', true);
     }
 
-    // app/Http/Controllers/Api/BookingController.php
-
+    /**
+     * ✅ FIXED: Menampilkan daftar booking dengan Filter Lengkap
+     * Mendukung filter untuk Kalender & Check-in Modal
+     */
     public function index(Request $request)
     {
-        // Start Query
         $query = Booking::with(['guest', 'room'])
-            ->orderBy('check_in_date', 'asc');
+            ->orderBy('created_at', 'desc');
 
-        // 1. Filter Room ID (Wajib untuk Modal Jadwal)
+        // Filter by Room
         if ($request->has('room_id') && $request->filled('room_id')) {
             $query->where('room_id', $request->room_id);
         }
 
-        // 2. Filter Status
+        // ✅ Filter by Multiple Status (status_in) - UNTUK KALENDER & CHECK-IN MODAL
         if ($request->has('status_in')) {
-            $statuses = explode(',', $request->status_in);
+            $statuses = is_array($request->status_in)
+                ? $request->status_in
+                : explode(',', $request->status_in);
+
             $query->whereIn('status', $statuses);
-        } elseif ($request->has('status')) {
+        }
+
+        // Filter by Single Status (backward compatibility)
+        if ($request->has('status') && !$request->has('status_in')) {
             $query->where('status', $request->status);
         }
 
-        // 3. Filter Tanggal (LOGIKA BARU - LEBIH KUAT)
-        if ($request->has('date_from') && $request->has('date_to')) {
-            // Parsing tanggal agar aman (abaikan jam/menit)
-            $from = Carbon::parse($request->date_from)->startOfDay();
-            $to   = Carbon::parse($request->date_to)->endOfDay();
+        // Filter by Status Verifikasi KTP (pending, verified, rejected)
+        if ($request->has('verification_status')) {
+            $query->where('verification_status', $request->verification_status);
+        }
 
-            /* LOGIKA OVERLAP / IRISAN JADWAL:
-           Booking dianggap tampil di kalender bulan ini jika:
-           1. Tanggal Masuk Booking <= Tanggal Akhir Kalender
-           2. DAN Tanggal Keluar Booking >= Tanggal Awal Kalender
-        */
-            $query->where(function ($q) use ($from, $to) {
-                $q->whereDate('check_in_date', '<=', $to)
-                    ->whereDate('check_out_date', '>=', $from);
+        // ✅ Filter by Date Range (date_from & date_to) - UNTUK KALENDER
+        if ($request->has('date_from') && $request->has('date_to')) {
+            $query->where(function ($q) use ($request) {
+                $q->whereBetween('check_in_date', [$request->date_from, $request->date_to])
+                    ->orWhereBetween('check_out_date', [$request->date_from, $request->date_to])
+                    ->orWhere(function ($sub) use ($request) {
+                        $sub->where('check_in_date', '<=', $request->date_from)
+                            ->where('check_out_date', '>=', $request->date_to);
+                    });
             });
         }
-        // Fallback untuk CheckInModal (Hanya lihat yg check-in hari ini/masa depan)
-        elseif ($request->has('date_gte')) {
-            $query->whereDate('check_in_date', '>=', $request->date_gte);
+
+        // ✅ Filter by Date Greater Than or Equal (date_gte) - UNTUK CHECK-IN MODAL
+        if ($request->has('date_gte')) {
+            $query->where('check_in_date', '>=', $request->date_gte);
         }
 
-        // 4. Search Teks
-        if ($request->has('search') && $request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('midtrans_order_id', 'like', "%{$search}%")
-                    ->orWhereHas('guest', function ($guest) use ($search) {
-                        $guest->where('name', 'like', "%{$search}%");
-                    });
+        // OLD: Filter by Date Range (backward compatibility)
+        if ($request->has('start_date') && $request->has('end_date') && !$request->has('date_from')) {
+            $query->where(function ($q) use ($request) {
+                $q->whereBetween('check_in_date', [$request->start_date, $request->end_date])
+                    ->orWhereBetween('check_out_date', [$request->start_date, $request->end_date]);
             });
         }
 
         $bookings = $query->get();
 
-        return response()->json(['data' => $bookings]);
+        return response()->json([
+            'data' => $bookings,
+            'meta' => [
+                'total' => $bookings->count(),
+                'filters_applied' => [
+                    'room_id' => $request->room_id,
+                    'status_in' => $request->status_in,
+                    'date_from' => $request->date_from,
+                    'date_to' => $request->date_to,
+                    'date_gte' => $request->date_gte,
+                ]
+            ]
+        ]);
     }
+
     /**
-     * Menyimpan data booking baru dan membuat transaksi Midtrans.
-     * (Logika asli Anda dipertahankan)
+     * Membuat Booking Baru (Termasuk Upload KTP & Midtrans)
      */
     public function store(Request $request)
     {
-        // 1. Validasi Input
         $validated = $request->validate([
             'room_id' => 'required|exists:rooms,id',
+            'check_in_date' => 'required|date|after_or_equal:today',
+            'check_out_date' => 'required|date|after:check_in_date',
             'guest_name' => 'required|string|max:255',
             'guest_email' => 'required|email|max:255',
             'guest_phone' => 'required|string|max:20',
-            'check_in_date' => 'required|date|after_or_equal:today',
-            'check_out_date' => 'required|date|after:check_in_date',
-            'is_incognito'   => 'nullable|boolean',
+            'ktp_image' => 'required|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        // =========================================================================
-        // LOGIKA CEK BLACKLIST
-        // =========================================================================
-        $blacklistedGuest = Guest::where('is_blacklisted', true)
-            ->where(function ($query) use ($validated) {
-                $query->where('email', $validated['guest_email'])
-                    ->orWhere('phone_number', $validated['guest_phone']);
-            })
-            ->first();
-
-        if ($blacklistedGuest) {
-            $reason = $blacklistedGuest->blacklist_reason ? " (Alasan: {$blacklistedGuest->blacklist_reason})" : "";
-            return response()->json([
-                'message' => 'Maaf, permintaan booking Anda ditolak karena identitas Anda masuk dalam daftar Blacklist hotel kami.' . $reason
-            ], 403);
-        }
-
-        // 2. Kalkulasi Harga & Durasi
-        $room = Room::findOrFail($validated['room_id']);
-
-        $checkInDate = Carbon::parse($validated['check_in_date']);
-        $checkOutDate = Carbon::parse($validated['check_out_date']);
-
-        $durationInNights = $checkOutDate->diffInDays($checkInDate);
-        if ($durationInNights < 1) $durationInNights = 1;
-
-        $totalPrice = $room->price_per_night * $durationInNights;
-        $booking = null;
-
+        DB::beginTransaction();
         try {
-            DB::transaction(function () use ($validated, $checkInDate, $checkOutDate, $totalPrice, &$booking, $request) {
+            // Cek Ketersediaan Kamar
+            $isAvailable = !Booking::where('room_id', $validated['room_id'])
+                ->where('status', '!=', 'cancelled')
+                ->where('status', '!=', 'rejected')
+                ->where(function ($query) use ($validated) {
+                    $query->whereBetween('check_in_date', [$validated['check_in_date'], $validated['check_out_date']])
+                        ->orWhereBetween('check_out_date', [$validated['check_in_date'], $validated['check_out_date']])
+                        ->orWhere(function ($q) use ($validated) {
+                            $q->where('check_in_date', '<=', $validated['check_in_date'])
+                                ->where('check_out_date', '>=', $validated['check_out_date']);
+                        });
+                })->exists();
 
-                $lockedRoom = Room::where('id', $validated['room_id'])->lockForUpdate()->first();
-
-                // Cek Bentrok Tanggal
-                $isBooked = Booking::where('room_id', $lockedRoom->id)
-                    ->whereIn('status', ['confirmed', 'paid', 'checked_in', 'settlement']) 
-                    ->where(function ($query) use ($checkInDate, $checkOutDate) {
-                        $query->where('check_in_date', '<', $checkOutDate)
-                            ->where('check_out_date', '>', $checkInDate);
-                    })
-                    ->exists();
-
-                if ($isBooked) {
-                    throw new \Exception('Maaf, kamar ini sudah terpesan untuk tanggal yang Anda pilih.');
-                }
-
-                if ($lockedRoom->status === 'maintenance') {
-                    throw new \Exception('Maaf, kamar ini sedang dalam perbaikan dan tidak dapat dipesan.');
-                }
-
-                // 4. Cari atau Buat Data Tamu
-                $guest = Guest::firstOrCreate(
-                    ['email' => $validated['guest_email']],
-                    ['name' => $validated['guest_name'], 'phone_number' => $validated['guest_phone']]
-                );
-
-                if ($guest->is_blacklisted) {
-                    throw new \Exception('Identitas tamu terdeteksi sebagai Blacklist.');
-                }
-
-
-                $booking = Booking::create([
-                    'room_id' => $lockedRoom->id,
-                    'guest_id' => $guest->id,
-                    'user_id' => auth()->id() ?? null,
-                    'check_in_date' => $checkInDate,
-                    'check_out_date' => $checkOutDate,
-                    'total_price' => $totalPrice,
-                    'status' => 'pending',
-                    'is_incognito' => $request->boolean('is_incognito'),
-                ]);
-            });
-
-            if (!$booking) {
-                throw new \Exception('Gagal membuat record booking di database.');
+            if (!$isAvailable) {
+                throw new \Exception('Kamar tidak tersedia pada tanggal yang dipilih (sudah terpesan).');
             }
 
+            // Handle Guest
+            $guest = Guest::updateOrCreate(
+                ['email' => $validated['guest_email']],
+                [
+                    'name' => $validated['guest_name'],
+                    'phone_number' => $validated['guest_phone']
+                ]
+            );
 
+            // Handle Upload KTP
+            $ktpPath = null;
+            if ($request->hasFile('ktp_image')) {
+                $ktpPath = $request->file('ktp_image')->store('booking_ktp', 'public');
+            }
+
+            // Hitung Harga Total
+            $room = Room::findOrFail($validated['room_id']);
+            $checkIn = Carbon::parse($validated['check_in_date']);
+            $checkOut = Carbon::parse($validated['check_out_date']);
+            $durationInNights = $checkIn->diffInDays($checkOut);
+            if ($durationInNights < 1) $durationInNights = 1;
+
+            $totalPrice = $room->price_per_night * $durationInNights;
+
+            // Buat Record Booking
+            $booking = Booking::create([
+                'room_id' => $room->id,
+                'guest_id' => $guest->id,
+                'user_id' => auth('sanctum')->id() ?? null,
+                'check_in_date' => $validated['check_in_date'],
+                'check_out_date' => $validated['check_out_date'],
+                'total_price' => $totalPrice,
+                'status' => 'pending',
+                'verification_status' => 'pending',
+                'ktp_image' => $ktpPath,
+                'is_incognito' => false,
+            ]);
+
+            // Generate Midtrans Snap Token
             $midtransOrderId = 'BOOK-' . $booking->id . '-' . time();
             $booking->midtrans_order_id = $midtransOrderId;
             $booking->save();
@@ -188,28 +183,109 @@ class BookingController extends Controller
                     'gross_amount' => (int) $totalPrice,
                 ],
                 'customer_details' => [
-                    'first_name' => $validated['guest_name'],
-                    'email' => $validated['guest_email'],
-                    'phone' => $validated['guest_phone'],
+                    'first_name' => $guest->name,
+                    'email' => $guest->email,
+                    'phone' => $guest->phone_number,
                 ],
                 'item_details' => [[
                     'id' => 'ROOM-' . $room->id,
                     'price' => (int) $room->price_per_night,
                     'quantity' => $durationInNights,
-                    'name' => 'Sewa Kamar ' . $room->number
+                    'name' => 'Sewa Kamar ' . $room->room_number
                 ]]
             ];
 
             $snapToken = Snap::getSnapToken($params);
 
+            DB::commit();
+
             return response()->json([
+                'message' => 'Booking berhasil dibuat. Mohon segera lakukan pembayaran.',
                 'snap_token' => $snapToken,
                 'booking_id' => $booking->id
-            ]);
+            ], 201);
         } catch (Throwable $e) {
+            DB::rollBack();
+
+            if (isset($ktpPath) && Storage::disk('public')->exists($ktpPath)) {
+                Storage::disk('public')->delete($ktpPath);
+            }
+
             Log::error('Booking Store Error: ' . $e->getMessage());
+
             $statusCode = str_contains($e->getMessage(), 'sudah terpesan') ? 409 : 500;
             return response()->json(['message' => $e->getMessage()], $statusCode);
+        }
+    }
+
+    /**
+     * Menampilkan detail booking
+     */
+    public function show($id)
+    {
+        $booking = Booking::with(['guest', 'room', 'user'])->findOrFail($id);
+        return response()->json($booking);
+    }
+
+    /**
+     * ADMIN: Verifikasi KTP (Terima)
+     */
+    public function verifyBooking($id)
+    {
+        $booking = Booking::findOrFail($id);
+
+        if ($booking->status == 'cancelled') {
+            return response()->json(['message' => 'Tidak bisa verifikasi. Booking sudah dibatalkan.'], 400);
+        }
+
+        $booking->update([
+            'verification_status' => 'verified',
+            'status' => 'confirmed' // ✅ Update status jadi confirmed
+        ]);
+
+        return response()->json(['message' => 'Identitas tamu berhasil diverifikasi.']);
+    }
+
+    /**
+     * ADMIN: Tolak KTP & Batalkan Booking
+     */
+    public function rejectBooking(Request $request, $id)
+    {
+        $request->validate([
+            'reason' => 'required|string|max:500'
+        ]);
+
+        $booking = Booking::findOrFail($id);
+
+        if ($booking->verification_status === 'rejected') {
+            return response()->json(['message' => 'Booking ini sudah ditolak sebelumnya.'], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            $message = 'Booking ditolak.';
+
+            if (in_array($booking->status, ['paid', 'settlement', 'captured'])) {
+                $message = 'Booking ditolak. Status sudah LUNAS, silakan lakukan Refund manual kepada tamu.';
+            } else {
+                try {
+                    \Midtrans\Transaction::cancel($booking->midtrans_order_id);
+                } catch (\Exception $e) {
+                    // Ignore
+                }
+            }
+
+            $booking->update([
+                'verification_status' => 'rejected',
+                'status' => 'cancelled',
+                'rejection_reason' => $request->reason
+            ]);
+
+            DB::commit();
+            return response()->json(['message' => $message]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Gagal memproses penolakan: ' . $e->getMessage()], 500);
         }
     }
 }

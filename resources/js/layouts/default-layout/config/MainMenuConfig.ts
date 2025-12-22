@@ -179,6 +179,12 @@ const MainMenuConfig: MenuItem[] = [
                         roles: ["admin"],
                     },
                     {
+                        heading: "Verifikasi KTP",
+                        route: "/admin/master/verification",
+                        keenthemesIcon: "shield-tick",
+                        roles: ["admin", "receptionist"],
+                    },
+                    {
                         heading: "Menu Makanan",
                         route: "/admin/master/menus",
                         name: "view menus",

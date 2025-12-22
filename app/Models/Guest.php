@@ -15,11 +15,20 @@ class Guest extends Model
     protected $fillable = [
         'name',
         'email',
-        'phone_number', 
+        'phone_number',                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+        'id_card_number', 
+        'is_verified',
         'address',
+        'ktp_image',
         'is_blacklisted',   
         'blacklist_reason'  
     ];
+
+    public function getKtpImageUrlAttribute()
+    {
+        return $this->ktp_image ? asset('storage/' . $this->ktp_image) : null;
+    }
+    protected $appends = ['ktp_image_url'];
 
     public function checkIns(): HasMany
     {

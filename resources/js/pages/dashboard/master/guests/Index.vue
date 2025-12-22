@@ -79,21 +79,35 @@
 
             <el-table :data="paginatedData" style="width: 100%" v-loading="loading" class="modern-table no-border-rows">
                 
+                <el-table-column label="Identitas" width="100">
+                    <template #default="scope">
+                        <div class="symbol symbol-50px rounded-2 overflow-hidden me-3">
+                             <el-image 
+                                v-if="scope.row.ktp_image_url"
+                                style="width: 50px; height: 50px; cursor: pointer"
+                                :src="scope.row.ktp_image_url" 
+                                :preview-src-list="[scope.row.ktp_image_url]"
+                                fit="cover"
+                                preview-teleported
+                            />
+                            <div v-else class="symbol-label bg-light-secondary text-gray-400 fs-8 fw-bold">
+                                No ID
+                            </div>
+                        </div>
+                    </template>
+                </el-table-column>
+
                 <el-table-column label="Nama Tamu" min-width="220">
                     <template #default="scope">
                         <div class="d-flex align-items-center py-2">
-                            <div class="symbol symbol-40px symbol-circle me-3">
-                                <span v-if="scope.row.is_blacklisted" class="symbol-label bg-light-danger text-danger fw-bold fs-6">
-                                    <i class="ki-duotone ki-cross fs-3"><span class="path1"></span><span class="path2"></span></i>
-                                </span>
-                                <span v-else class="symbol-label bg-light-orange text-orange fw-bold fs-6">
-                                    {{ getInitials(scope.row.name) }}
-                                </span>
-                            </div>
                             <div class="d-flex flex-column">
                                 <div class="d-flex align-items-center">
                                     <span class="text-gray-800 fw-bold fs-6 mb-1 me-2">{{ scope.row.name }}</span>
-                                    <span v-if="scope.row.is_blacklisted" class="badge badge-light-danger fw-bold fs-9">BLACKLISTED</span>
+                                    
+                                    <span v-if="scope.row.is_blacklisted" class="badge badge-light-danger fw-bold fs-9 me-1">BLACKLISTED</span>
+                                    <span v-if="scope.row.is_verified" class="badge badge-light-success fw-bold fs-9" title="Terverifikasi KTP">
+                                        <i class="ki-duotone ki-verify fs-7 text-success"><span class="path1"></span><span class="path2"></span></i>
+                                    </span>
                                 </div>
                                 <span class="text-gray-400 fs-9">{{ scope.row.email || '-' }}</span>
                             </div>
@@ -194,10 +208,12 @@ interface Guest {
     email: string;
     phone_number: string;
     address: string;
-    // Field baru
     is_blacklisted: boolean | number;
     blacklist_reason?: string;
     check_ins?: CheckIn[];
+    // [PERBAIKAN] Tambahkan Field ini
+    ktp_image_url?: string;
+    is_verified?: boolean | number;
 }
 
 // ===== STATE =====
@@ -209,7 +225,7 @@ const currentPage = ref(1);
 const pageSize = ref(10);
 
 // Modal
-const guestModalRef = ref<any>(null); // Ref untuk akses defineExpose di anak
+const guestModalRef = ref<any>(null);
 const isEditMode = ref(false);
 const selectedGuest = ref<Guest | null>(null);
 
@@ -258,7 +274,8 @@ const fetchGuests = async () => {
     loading.value = true;
     try {
         const response = await ApiService.get('/guests');
-        guests.value = response.data;
+        // [PERBAIKAN] Mengambil .data.data untuk Laravel Resource
+        guests.value = response.data.data; 
     } catch (error) {
         console.error("Error fetching guests:", error);
     } finally {
@@ -269,14 +286,12 @@ const fetchGuests = async () => {
 const openModal = () => {
     isEditMode.value = false;
     selectedGuest.value = null;
-    // Memanggil fungsi open() yang sudah di-expose di GuestModal.vue
     guestModalRef.value?.open();
 };
 
 const editGuest = (guest: Guest) => {
     isEditMode.value = true;
     selectedGuest.value = { ...guest };
-    // Memanggil fungsi open() yang sudah di-expose
     guestModalRef.value?.open();
 };
 
@@ -317,7 +332,7 @@ onMounted(() => {
 /* STAT CARDS */
 .card-stat-orange { border-left: 4px solid #F68B1E; }
 .card-stat-success { border-left: 4px solid #17C653; }
-.card-stat-danger { border-left: 4px solid #f1416c; } /* Merah untuk blacklist */
+.card-stat-danger { border-left: 4px solid #f1416c; }
 
 /* TABLE STYLING */
 :deep(.modern-table .el-table__header th) {
