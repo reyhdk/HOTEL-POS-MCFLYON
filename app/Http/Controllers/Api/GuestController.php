@@ -4,28 +4,27 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Guest;
-use App\Models\Booking; // ✅ [FIX] Wajib import Model Booking
+use App\Models\Booking; // Import Model Booking
+use App\Models\CheckIn; // ✅ [BARU] Import Model CheckIn (untuk Walk-in)
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB; // ✅ [FIX] Wajib import DB Facade
-use Illuminate\Support\Facades\Log; // ✅ [FIX] Untuk debugging error
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class GuestController extends Controller
 {
     /**
-     * Menampilkan daftar tamu dengan filter dan relasi.
+     * Menampilkan daftar tamu.
      */
     public function index(Request $request)
     {
         $query = Guest::query();
 
-        // 1. Eager Loading Checkins & Room
         $query->with(['checkIns' => function ($q) {
             $q->where('is_active', true)->with('room');
         }]);
 
-        // 2. Filter Pencarian
         if ($request->has('search') && $request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -35,7 +34,6 @@ class GuestController extends Controller
             });
         }
 
-        // 3. Filter Status Verifikasi
         if ($request->has('verification_status')) {
             if ($request->verification_status === 'pending') {
                 $query->where('is_verified', false)->whereNotNull('ktp_image');
@@ -46,14 +44,12 @@ class GuestController extends Controller
             }
         }
 
-        // 4. Pagination
         $guests = $query->latest()->paginate($request->per_page ?? 10);
-
         return response()->json($guests);
     }
 
     /**
-     * Simpan tamu baru (Walk-in).
+     * Simpan tamu baru.
      */
     public function store(Request $request)
     {
@@ -89,7 +85,7 @@ class GuestController extends Controller
     }
 
     /**
-     * Tampilkan detail tamu spesifik.
+     * Tampilkan detail tamu.
      */
     public function show($id)
     {
@@ -124,13 +120,12 @@ class GuestController extends Controller
 
         $data = $request->except(['ktp_image']);
 
-        // Handle ganti foto KTP
         if ($request->hasFile('ktp_image')) {
             if ($guest->ktp_image && Storage::disk('public')->exists($guest->ktp_image)) {
                 Storage::disk('public')->delete($guest->ktp_image);
             }
             $data['ktp_image'] = $request->file('ktp_image')->store('ktp_images', 'public');
-            $data['is_verified'] = false; // Reset verifikasi
+            $data['is_verified'] = false;
         }
 
         $guest->update($data);
@@ -148,12 +143,10 @@ class GuestController extends Controller
             return response()->json(['message' => 'Tamu tidak ditemukan'], 404);
         }
 
-        // Cek jika tamu sedang menginap
         if ($guest->checkIns()->where('is_active', true)->exists()) {
             return response()->json(['message' => 'Tidak bisa menghapus tamu yang sedang menginap.'], 400);
         }
 
-        // Hapus foto KTP
         if ($guest->ktp_image && Storage::disk('public')->exists($guest->ktp_image)) {
             Storage::disk('public')->delete($guest->ktp_image);
         }
@@ -184,9 +177,7 @@ class GuestController extends Controller
     }
 
     /**
-     * [FIXED] Tolak KTP Tamu (SAFE MODE)
-     * - Menghapus update kolom 'notes' untuk mencegah error SQL jika kolom tidak ada.
-     * - Memastikan Booking status berubah jadi 'rejected'.
+     * Tolak KTP Tamu:
      */
     public function rejectKtp($id)
     {
@@ -199,7 +190,7 @@ class GuestController extends Controller
         try {
             DB::transaction(function () use ($guest) {
 
-                // 1. CARI & BATALKAN BOOKING AKTIF/MENDATANG
+
                 Booking::where('guest_id', $guest->id)
                     ->whereIn('status', ['pending', 'awaiting_payment', 'confirmed', 'paid'])
                     ->where('check_in_date', '>=', now()->startOfDay())
@@ -207,23 +198,45 @@ class GuestController extends Controller
                         'status' => 'rejected'
                     ]);
 
-                // 2. Hapus file fisik KTP
+
+                $activeCheckIns = CheckIn::where('guest_id', $guest->id)
+                    ->where('is_active', true)
+                    ->with(['room', 'booking']) // Load booking terkait
+                    ->get();
+
+                foreach ($activeCheckIns as $checkIn) {
+                    $checkIn->update([
+                        'is_active' => false,
+                        'check_out_time' => now()
+                    ]);
+
+                    if ($checkIn->room) {
+                        $checkIn->room->update(['status' => 'dirty']);
+                    }
+
+                  
+                    if ($checkIn->booking) {
+                        $checkIn->booking->update([
+                            'status' => 'rejected', 
+                            'notes'  => 'Force Checkout: KTP Ditolak' 
+                        ]);
+                    }
+                }
+
                 if ($guest->ktp_image && Storage::disk('public')->exists($guest->ktp_image)) {
                     Storage::disk('public')->delete($guest->ktp_image);
                 }
 
-                // 3. Reset status tamu di database
                 $guest->ktp_image = null;
                 $guest->is_verified = false;
                 $guest->save();
             });
 
             return response()->json([
-                'message' => 'KTP ditolak. Booking terkait telah dibatalkan.',
+                'message' => 'KTP ditolak. Booking dibatalkan, Tamu dicheck-out, dan Jadwal dihapus.',
                 'data' => $guest
             ]);
         } catch (\Throwable $e) {
-            // PERBAIKAN DI SINI: Gunakan $guest->id
             Log::error('Gagal Reject KTP Guest ID ' . $guest->id . ': ' . $e->getMessage());
 
             return response()->json([
@@ -231,4 +244,5 @@ class GuestController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
-    }}
+    }
+}
