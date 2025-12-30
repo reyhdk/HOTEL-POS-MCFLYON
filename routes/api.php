@@ -42,10 +42,10 @@ Route::prefix('public')->group(function () {
     Route::get('/room-details/{room}', [RoomController::class, 'showPublic']);
     Route::post('/bookings', [BookingController::class, 'store']);
     Route::get('/facilities', [FacilityController::class, 'index']);
-    Route::get('/menus', [MenuController::class, 'index']); // Menu bisa dilihat publik
+    Route::get('/menus', [MenuController::class, 'index']);
 });
 
-// Settings Public (Logo, Nama Hotel, dll)
+// Settings Public
 Route::get('/settings', [SettingController::class, 'index']);
 
 // Authentication
@@ -54,7 +54,7 @@ Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
 });
 
-// Midtrans Webhook (Wajib Public)
+// Midtrans Webhook
 Route::post('/midtrans/notification', [MidtransController::class, 'handleNotification']);
 
 
@@ -104,21 +104,24 @@ Route::middleware('auth:api')->group(function () {
     });
 
     // --- Manajemen Tamu (Guest) ---
-    // [PENTING] Route Custom Verifikasi KTP harus DIBATAS resource guests
-    Route::post('/guests/{id}/verify', [GuestController::class, 'verify'])->middleware('can:view guests');
+    // [PERBAIKAN DI SINI] : Mengubah 'verify' menjadi 'verify-ktp' dan method 'verifyKtp'
+    Route::post('/guests/{id}/verify-ktp', [GuestController::class, 'verifyKtp'])->middleware('can:view guests');
     Route::post('/guests/{id}/reject-ktp', [GuestController::class, 'rejectKtp'])->middleware('can:view guests');
     Route::apiResource('guests', GuestController::class)->middleware('can:view guests');
 
     // --- Manajemen Booking ---
-    Route::post('/bookings/{id}/verify', [BookingController::class, 'verifyBooking']);
-    Route::post('/bookings/{id}/reject', [BookingController::class, 'rejectBooking']);
+    Route::post('/bookings/{id}/verify', [BookingController::class, 'verifyBooking'])->middleware('can:view guests');
+    Route::post('/bookings/{id}/reject', [BookingController::class, 'rejectBooking'])->middleware('can:view guests');
+
+    // Standard booking routes
     Route::get('/bookings', [BookingController::class, 'index']);
+    Route::get('/bookings/{id}', [BookingController::class, 'show']);
 
     // --- Check-In / Check-Out Operasional ---
     Route::post('/check-in', [CheckInController::class, 'store'])->middleware('can:create pos_orders');
-    Route::post('/check-in/process-booking', [CheckInController::class, 'storeFromBooking']); // Checkin Tamu Booking
-    Route::post('/check-in/walk-in', [CheckInController::class, 'storeWalkIn']); // Checkin Tamu Walk-in
-
+    Route::post('/check-in/process-booking', [CheckInController::class, 'storeFromBooking']);
+    Route::post('/check-in/walk-in', [CheckInController::class, 'storeWalkIn']);
+    Route::get('/debug-check-in-status', [UserCheckInStatusController::class, 'debugStatus']);
     Route::post('/check-out/{room}', [CheckInController::class, 'checkout'])->middleware('can:create pos_orders');
     Route::get('/admin/checkout-history', [CheckoutHistoryController::class, 'index'])->middleware('can:view checkout_history');
 
@@ -135,7 +138,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/folios/{room}/checkout', [FolioController::class, 'processFolioPaymentAndCheckout'])->middleware('can:manage payments');
     Route::get('/pos/occupied-rooms', [RoomController::class, 'getOccupiedRoomsForPos'])->middleware('can:create pos_orders');
 
-    // --- Online Orders (Dari Tamu di Kamar) ---
+    // --- Online Orders ---
     Route::get('/online-orders', [AdminOrderController::class, 'index'])->middleware('can:view online_orders');
     Route::get('/online-orders/{order}', [AdminOrderController::class, 'show'])->middleware('can:view online_orders');
     Route::put('/admin/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->middleware('can:view online_orders');
@@ -161,4 +164,4 @@ Route::middleware('auth:api')->group(function () {
         Route::apiResource('roles', RoleController::class)->middleware('can:view roles');
         Route::get('/permissions', [RoleController::class, 'getAllPermissions'])->middleware('can:view roles');
     });
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      });
+});

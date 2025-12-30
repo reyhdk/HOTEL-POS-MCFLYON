@@ -140,7 +140,7 @@
                         </transition>
                     </div>
 
-                    <button v-if="userHasPermission('create rooms')" class="btn btn-sm btn-orange fw-bold hover-scale ms-lg-2 box-shadow-orange" @click="openAddRoomModal">
+                    <button class="btn btn-sm btn-orange fw-bold hover-scale ms-lg-2 box-shadow-orange" @click="openAddRoomModal">
                         <i class="ki-duotone ki-plus fs-2 text-white"></i> Tambah
                     </button>
                 </div>
@@ -172,7 +172,7 @@
                     <div class="card h-100 border-0 shadow-sm theme-card hover-elevate-up transition-300 group-card">
                         
                         <div class="position-relative h-200px bg-secondary rounded-top-3 overflow-hidden room-image-container">
-                             <img :src="room.image_url || '/media/svg/files/blank-image.svg'" class="w-100 h-100 object-fit-cover room-img" alt="Room Image" />
+                             <img :src="getRoomImage(room)" class="w-100 h-100 object-fit-cover room-img" alt="Room Image" />
                              <div class="overlay-layer position-absolute w-100 h-100 transition-300 z-index-1"></div>
                              <div class="position-absolute top-0 start-0 w-100 h-4px status-border transition-300" :class="getStatusColor(room.status, 'bg')"></div>
 
@@ -194,7 +194,8 @@
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div>
                                     <div class="text-gray-500 fs-9 fw-bold text-uppercase ls-1 mb-1">{{ room.type }}</div>
-                                    <h3 class="fs-2 fw-bolder text-gray-900 hover-text-orange cursor-pointer transition-200 m-0" @click="openEditRoomModal(room)">
+                                    <h3 class="fs-2 fw-bolder text-gray-900 hover-text-orange cursor-pointer transition-200 m-0" 
+                                        @click="openEditRoomModal(room)">
                                         No. {{ room.room_number }}
                                     </h3>
                                 </div>
@@ -252,7 +253,7 @@
                                 <div class="flex-grow-1">
                                     <button v-if="room.status === 'available'" @click="openCheckInModal(room)" class="btn btn-sm btn-success w-100 fw-bold hover-scale action-btn">Check-in</button>
                                     <button v-if="room.status === 'occupied'" @click="processCheckout(room)" class="btn btn-sm btn-danger w-100 fw-bold hover-scale action-btn">Check-out</button>
-                                    <button v-if="['dirty','needs cleaning'].includes(room.status)" @click="markAsClean(room)" class="btn btn-sm btn-info w-100 fw-bold text-white hover-scale action-btn">Selesai</button>
+                                    <button v-if="['dirty','needs cleaning', 'request cleaning'].includes(room.status)" @click="markAsClean(room)" class="btn btn-sm btn-info w-100 fw-bold text-white hover-scale action-btn">Selesai</button>
                                 </div>
                                 
                                 <button 
@@ -277,18 +278,22 @@
                                     
                                     <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-2 w-200px theme-dropdown z-index-dropdown dropdown-animated">
                                         <li><div class="dropdown-header text-uppercase fs-9 fw-bold text-muted px-3">Opsi Menu</div></li>
-                                        <li v-if="userHasPermission('edit rooms')" class="dropdown-item-wrapper">
+                                        
+                                        <li class="dropdown-item-wrapper">
                                             <a href="#" class="dropdown-item rounded px-3 py-2 fw-semibold text-gray-700 hover-text-primary dropdown-item-animated" @click.prevent="openEditRoomModal(room)">
                                                 <i class="ki-duotone ki-pencil fs-5 me-2"><span class="path1"></span><span class="path2"></span></i> Edit Detail
                                             </a>
                                         </li>
+
                                         <li v-if="room.status === 'occupied'" class="dropdown-item-wrapper">
                                             <a href="#" class="dropdown-item rounded px-3 py-2 fw-semibold text-gray-700 hover-text-warning dropdown-item-animated" @click.prevent="requestCleaning(room)">
                                                 <i class="ki-duotone ki-broom fs-5 me-2"><span class="path1"></span><span class="path2"></span></i> Request Cleaning
                                             </a>
                                         </li>
-                                        <li v-if="userHasPermission('delete rooms')"><div class="dropdown-divider my-2 border-gray-200"></div></li>
-                                        <li v-if="userHasPermission('delete rooms')" class="dropdown-item-wrapper">
+                                        
+                                        <li><div class="dropdown-divider my-2 border-gray-200"></div></li>
+                                        
+                                        <li class="dropdown-item-wrapper">
                                             <a href="#" class="dropdown-item rounded px-3 py-2 fw-semibold text-danger hover-bg-light-danger dropdown-item-animated" @click.prevent="deleteRoom(room.id)">
                                                 <i class="ki-duotone ki-trash fs-5 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i> Hapus Data
                                             </a>
@@ -327,7 +332,8 @@ import Swal from "sweetalert2";
 import { Modal } from "bootstrap";
 import RoomModal from "./RoomModal.vue";
 import CheckInModal from "./CheckInModal.vue";
-import RoomScheduleModal from "./RoomScheduleModal.vue"; // [BARU] Import Component
+import RoomScheduleModal from "./RoomScheduleModal.vue"; 
+
 
 // ===== INTERFACES =====
 interface Facility { id: number; name: string; }
@@ -338,7 +344,8 @@ interface Room {
   status: string; 
   price_per_night: number; 
   description: string | null; 
-  image_url: string | null; 
+  image: string | null; // Response API biasanya field 'image'
+  image_url?: string | null; // Opsional
   facilities: Facility[]; 
   check_ins?: any[]; 
 }
@@ -353,9 +360,10 @@ const filterStatus = ref('all');
 const filterType = ref('all');
 const activeDropdown = ref<string | null>(null);
 
+
 // Refs Components
 const checkInModalRef = ref<any>(null);
-const scheduleModalRef = ref<any>(null); // [BARU] Ref untuk modal jadwal
+const scheduleModalRef = ref<any>(null); 
 
 // ===== DROPDOWN LOGIC =====
 const toggleDropdown = (name: string) => { 
@@ -457,6 +465,16 @@ const getActiveGuestName = (room: Room) => {
     return null;
 };
 
+const getRoomImage = (room: Room) => {
+    if (room.image) {
+        // Jika path sudah HTTP/HTTPS, gunakan langsung
+        if (room.image.startsWith('http')) return room.image;
+        // Jika tidak, tambahkan prefix storage
+        return `/storage/${room.image}`;
+    }
+    return '/media/svg/files/blank-image.svg'; // Default image
+};
+
 const isGuestIncognito = (room: Room): boolean => {
     if (room.status !== 'occupied') return false;
     if (!room.check_ins || room.check_ins.length === 0) return false;
@@ -528,7 +546,8 @@ const refreshData = () => getRooms();
 // ===== MODAL HANDLERS =====
 const openModal = (id: string, room: any = null) => { 
     selectedRoom.value = room ? { ...room } : null; 
-    new Modal(document.getElementById(id)!).show(); 
+    const modalEl = document.getElementById(id);
+    if (modalEl) new Modal(modalEl).show();
 };
 
 const openAddRoomModal = () => openModal('kt_modal_room');
@@ -541,7 +560,7 @@ const openCheckInModal = (room: Room) => {
     }
 };
 
-// [BARU] Open Schedule Modal
+// Open Schedule Modal
 const openScheduleModal = (room: Room) => {
     if (scheduleModalRef.value) {
         scheduleModalRef.value.openModal(room);
@@ -596,8 +615,14 @@ const requestCleaning = (room: Room) => {
     });
 };
 
+
 // ===== LIFECYCLE =====
-onMounted(getRooms);
+onMounted(() => {
+    getRooms();
+    
+    // DEBUGGING: Cek permission user di console
+    console.log("Current User Permissions:", authStore.user?.all_permissions);
+});
 </script>
 
 <style scoped>
@@ -626,50 +651,34 @@ onMounted(getRooms);
 /* ========================
    2. SMOOTH SHUFFLE ANIMATION
    ======================== */
-.list-shuffle-move { transition: transform 0.5s cubic-bezier(0.55, 0, 0.1, 1); }
-.list-shuffle-enter-active, .list-shuffle-leave-active { transition: all 0.5s cubic-bezier(0.55, 0, 0.1, 1); }
-.list-shuffle-enter-from, .list-shuffle-leave-to { opacity: 0; transform: scale(0.9); }
-.list-shuffle-leave-active { position: absolute; width: 100%; z-index: -1; visibility: hidden; }
+.list-shuffle-move { transition: transform 0.4s ease; }
+.list-shuffle-enter-active, .list-shuffle-leave-active { transition: all 0.4s ease; }
+.list-shuffle-enter-from, .list-shuffle-leave-to { opacity: 0; transform: translateY(20px); }
+.list-shuffle-leave-active { position: absolute; }
 
 /* ========================
-   3. DROPDOWN ANIMATION
+   3. CUSTOM DROPDOWN
    ======================== */
-.dropdown-anim-enter-active { animation: dropdown-in 0.2s ease-out; }
-.dropdown-anim-leave-active { animation: dropdown-out 0.15s ease-in; }
-@keyframes dropdown-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes dropdown-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-10px); } }
+.theme-dropdown { background: white; z-index: 1000 !important; }
+.dropdown-item-custom { display: block; width: 100%; color: #4B5675; text-decoration: none; transition: all 0.2s; font-size: 0.9rem; }
+.dropdown-item-custom:hover, .dropdown-item-custom.selected { background-color: #F68B1E; color: white; }
+.dropdown-anim-enter-active, .dropdown-anim-leave-active { transition: all 0.2s ease; }
+.dropdown-anim-enter-from, .dropdown-anim-leave-to { opacity: 0; transform: translateY(-10px); }
 
 /* ========================
-   4. COMPONENT STYLES
+   4. ROOM IMAGE & OVERLAY
    ======================== */
-.btn-custom-select { background-color: #ffffff; border: 1px solid #e4e6ef; color: #5E6278; height: 40px; transition: all 0.2s; border-radius: 8px; }
-.btn-custom-select:hover, .btn-custom-select.active { border-color: #F68B1E; color: #F68B1E; background-color: #FFF8F1; }
-.custom-dropdown-menu { background-color: #ffffff; position: absolute; top: 100%; left: 0; width: 100%; margin-top: 5px; z-index: 1050; }
-.dropdown-item-custom { display: block; width: 100%; color: #5E6278; text-decoration: none; transition: all 0.2s; font-size: 0.9rem; }
-.dropdown-item-custom:hover { background-color: #F3F6F9; color: #F68B1E; }
-.dropdown-item-custom.selected { background-color: #FFF4E6; color: #F68B1E; }
+.room-img { object-fit: cover; transition: transform 0.5s ease; }
+.group-card:hover .room-img { transform: scale(1.05); }
+.overlay-layer { background: linear-gradient(to bottom, rgba(0,0,0,0) 50%, rgba(0,0,0,0.6) 100%); opacity: 0.6; }
+.group-card:hover .overlay-layer { opacity: 0.8; }
+.backdrop-blur { backdrop-filter: blur(4px); background: rgba(0,0,0,0.3); }
 
 /* ========================
-   5. DARK MODE SUPPORT
+   5. ACTION BUTTONS
    ======================== */
-[data-bs-theme="dark"] .bg-body { background-color: #1e1e2d !important; }
-[data-bs-theme="dark"] .theme-card { background-color: #1e1e2d !important; border-color: #323248 !important; }
-[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
-[data-bs-theme="dark"] .bg-light-orange { background-color: rgba(246, 139, 30, 0.15) !important; }
-[data-bs-theme="dark"] .bg-light-success { background-color: rgba(23, 198, 83, 0.15) !important; }
-[data-bs-theme="dark"] .bg-light-danger { background-color: rgba(248, 40, 90, 0.15) !important; }
-[data-bs-theme="dark"] .bg-light-warning { background-color: rgba(255, 199, 0, 0.15) !important; }
-[data-bs-theme="dark"] .border-gray-200, [data-bs-theme="dark"] .border-gray-300 { border-color: #2B2B40 !important; }
-
-[data-bs-theme="dark"] .dropdown-item { color: #9A9CAE; }
-[data-bs-theme="dark"] .dropdown-item:hover { background-color: #2b2b40; color: #ffffff; }
-
-[data-bs-theme="dark"] .form-control-solid { background-color: #1b1b29 !important; border-color: #323248 !important; color: #ffffff; }
-
-[data-bs-theme="dark"] .btn-custom-select { background-color: #1b1b29; border-color: #323248; color: #CDCDDE; }
-[data-bs-theme="dark"] .btn-custom-select:hover, [data-bs-theme="dark"] .btn-custom-select.active { border-color: #F68B1E; background-color: #2b2b40; color: #F68B1E; }
-[data-bs-theme="dark"] .custom-dropdown-menu { background-color: #1e1e2d; border: 1px solid #323248 !important; }
-[data-bs-theme="dark"] .dropdown-item-custom { color: #CDCDDE; }
-[data-bs-theme="dark"] .dropdown-item-custom:hover { background-color: #2b2b40; color: #F68B1E; }
-[data-bs-theme="dark"] .dropdown-item-custom.selected { background-color: #2b2b40; color: #F68B1E; }
+.action-btn { transition: all 0.2s ease; }
+.action-btn:hover { filter: brightness(110%); transform: translateY(-2px); }
+.icon-dots { transition: color 0.3s; }
+.dropdown-toggle-custom::after { display: none; }
 </style>

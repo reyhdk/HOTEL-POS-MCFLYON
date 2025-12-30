@@ -26,20 +26,18 @@ class BookingController extends Controller
     }
 
     /**
-     * ✅ FIXED: Menampilkan daftar booking dengan Filter Lengkap
-     * Mendukung filter untuk Kalender & Check-in Modal
+     * ✅ Menampilkan daftar booking dengan Filter Lengkap
      */
     public function index(Request $request)
     {
         $query = Booking::with(['guest', 'room'])
             ->orderBy('created_at', 'desc');
 
-        // Filter by Room
         if ($request->has('room_id') && $request->filled('room_id')) {
             $query->where('room_id', $request->room_id);
         }
 
-        // ✅ Filter by Multiple Status (status_in) - UNTUK KALENDER & CHECK-IN MODAL
+        // Filter by Multiple Status (untuk Kalender & Check-in Modal)
         if ($request->has('status_in')) {
             $statuses = is_array($request->status_in)
                 ? $request->status_in
@@ -48,17 +46,15 @@ class BookingController extends Controller
             $query->whereIn('status', $statuses);
         }
 
-        // Filter by Single Status (backward compatibility)
         if ($request->has('status') && !$request->has('status_in')) {
             $query->where('status', $request->status);
         }
 
-        // Filter by Status Verifikasi KTP (pending, verified, rejected)
         if ($request->has('verification_status')) {
             $query->where('verification_status', $request->verification_status);
         }
 
-        // ✅ Filter by Date Range (date_from & date_to) - UNTUK KALENDER
+        // Filter by Date Range (untuk Kalender)
         if ($request->has('date_from') && $request->has('date_to')) {
             $query->where(function ($q) use ($request) {
                 $q->whereBetween('check_in_date', [$request->date_from, $request->date_to])
@@ -70,12 +66,12 @@ class BookingController extends Controller
             });
         }
 
-        // ✅ Filter by Date Greater Than or Equal (date_gte) - UNTUK CHECK-IN MODAL
+        // Filter by Date Greater Than or Equal (untuk Check-in Modal)
         if ($request->has('date_gte')) {
             $query->where('check_in_date', '>=', $request->date_gte);
         }
 
-        // OLD: Filter by Date Range (backward compatibility)
+        // OLD: Backward compatibility
         if ($request->has('start_date') && $request->has('end_date') && !$request->has('date_from')) {
             $query->where(function ($q) use ($request) {
                 $q->whereBetween('check_in_date', [$request->start_date, $request->end_date])
@@ -101,7 +97,7 @@ class BookingController extends Controller
     }
 
     /**
-     * Membuat Booking Baru (Termasuk Upload KTP & Midtrans)
+     * Membuat Booking Baru (Upload KTP & Midtrans)
      */
     public function store(Request $request)
     {
@@ -117,24 +113,20 @@ class BookingController extends Controller
 
         DB::beginTransaction();
         try {
-            // Cek Ketersediaan Kamar
+            $checkInReq = $validated['check_in_date'];
+            $checkOutReq = $validated['check_out_date'];
+
             $isAvailable = !Booking::where('room_id', $validated['room_id'])
-                ->where('status', '!=', 'cancelled')
-                ->where('status', '!=', 'rejected')
-                ->where(function ($query) use ($validated) {
-                    $query->whereBetween('check_in_date', [$validated['check_in_date'], $validated['check_out_date']])
-                        ->orWhereBetween('check_out_date', [$validated['check_in_date'], $validated['check_out_date']])
-                        ->orWhere(function ($q) use ($validated) {
-                            $q->where('check_in_date', '<=', $validated['check_in_date'])
-                                ->where('check_out_date', '>=', $validated['check_out_date']);
-                        });
+                ->whereNotIn('status', ['cancelled', 'rejected'])
+                ->where(function ($query) use ($checkInReq, $checkOutReq) {
+                    $query->where('check_in_date', '<', $checkOutReq)
+                        ->where('check_out_date', '>', $checkInReq);
                 })->exists();
 
             if (!$isAvailable) {
                 throw new \Exception('Kamar tidak tersedia pada tanggal yang dipilih (sudah terpesan).');
             }
 
-            // Handle Guest
             $guest = Guest::updateOrCreate(
                 ['email' => $validated['guest_email']],
                 [
@@ -143,13 +135,11 @@ class BookingController extends Controller
                 ]
             );
 
-            // Handle Upload KTP
             $ktpPath = null;
             if ($request->hasFile('ktp_image')) {
                 $ktpPath = $request->file('ktp_image')->store('booking_ktp', 'public');
             }
 
-            // Hitung Harga Total
             $room = Room::findOrFail($validated['room_id']);
             $checkIn = Carbon::parse($validated['check_in_date']);
             $checkOut = Carbon::parse($validated['check_out_date']);
@@ -158,7 +148,6 @@ class BookingController extends Controller
 
             $totalPrice = $room->price_per_night * $durationInNights;
 
-            // Buat Record Booking
             $booking = Booking::create([
                 'room_id' => $room->id,
                 'guest_id' => $guest->id,
@@ -172,7 +161,6 @@ class BookingController extends Controller
                 'is_incognito' => false,
             ]);
 
-            // Generate Midtrans Snap Token
             $midtransOrderId = 'BOOK-' . $booking->id . '-' . time();
             $booking->midtrans_order_id = $midtransOrderId;
             $booking->save();
@@ -228,26 +216,54 @@ class BookingController extends Controller
     }
 
     /**
-     * ADMIN: Verifikasi KTP (Terima)
+     * ✅ ADMIN: Verifikasi KTP (Terima)
      */
     public function verifyBooking($id)
     {
-        $booking = Booking::findOrFail($id);
+        $booking = Booking::with('guest')->findOrFail($id);
 
         if ($booking->status == 'cancelled') {
             return response()->json(['message' => 'Tidak bisa verifikasi. Booking sudah dibatalkan.'], 400);
         }
 
-        $booking->update([
-            'verification_status' => 'verified',
-            'status' => 'confirmed' // ✅ Update status jadi confirmed
-        ]);
+        if ($booking->verification_status === 'verified') {
+            return response()->json(['message' => 'Booking ini sudah diverifikasi sebelumnya.'], 400);
+        }
 
-        return response()->json(['message' => 'Identitas tamu berhasil diverifikasi.']);
+        try {
+            DB::beginTransaction();
+
+            $booking->update([
+                'verification_status' => 'verified',
+                'status' => 'confirmed'
+            ]);
+
+            if ($booking->guest && !$booking->guest->is_verified) {
+                if ($booking->ktp_image) {
+                    $booking->guest->update([
+                        'ktp_image' => $booking->ktp_image,
+                        'is_verified' => true
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            Log::info("✅ Booking {$booking->id} verified & confirmed");
+
+            return response()->json([
+                'message' => 'Booking berhasil diverifikasi dan dikonfirmasi.',
+                'booking' => $booking
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Booking Verify Error: " . $e->getMessage());
+            return response()->json(['message' => 'Gagal memverifikasi booking.'], 500);
+        }
     }
 
     /**
-     * ADMIN: Tolak KTP & Batalkan Booking
+     * ✅ FIX UTAMA: Tolak KTP & Batalkan Booking dengan Refund
      */
     public function rejectBooking(Request $request, $id)
     {
@@ -255,7 +271,7 @@ class BookingController extends Controller
             'reason' => 'required|string|max:500'
         ]);
 
-        $booking = Booking::findOrFail($id);
+        $booking = Booking::with('guest')->findOrFail($id);
 
         if ($booking->verification_status === 'rejected') {
             return response()->json(['message' => 'Booking ini sudah ditolak sebelumnya.'], 400);
@@ -263,29 +279,88 @@ class BookingController extends Controller
 
         DB::beginTransaction();
         try {
-            $message = 'Booking ditolak.';
+            $needsManualRefund = false;
+            $refundInfo = null;
 
-            if (in_array($booking->status, ['paid', 'settlement', 'captured'])) {
-                $message = 'Booking ditolak. Status sudah LUNAS, silakan lakukan Refund manual kepada tamu.';
-            } else {
+            // Hapus foto KTP dari booking
+            if ($booking->ktp_image && Storage::disk('public')->exists($booking->ktp_image)) {
+                Storage::disk('public')->delete($booking->ktp_image);
+                Log::info("🗑️ Deleted Booking KTP: {$booking->ktp_image}");
+            }
+
+            // Hapus foto KTP dari guest profile jika ada
+            if ($booking->guest && $booking->guest->ktp_image) {
+                if (Storage::disk('public')->exists($booking->guest->ktp_image)) {
+                    Storage::disk('public')->delete($booking->guest->ktp_image);
+                    Log::info("🗑️ Deleted Guest KTP: {$booking->guest->ktp_image}");
+                }
+                $booking->guest->update([
+                    'ktp_image' => null,
+                    'is_verified' => false
+                ]);
+            }
+
+            // 🔥 PERBAIKAN UTAMA: Update status SEBELUM cek refund
+            $booking->update([
+                'ktp_image' => null,
+                'verification_status' => 'rejected',
+                'status' => 'cancelled',
+                'rejection_reason' => $request->reason,
+                'rejected_at' => now() // Opsional: tambahkan timestamp
+            ]);
+
+            Log::info("❌ Booking {$booking->id} status updated to cancelled/rejected");
+
+            // Coba Refund jika sudah bayar
+            $paidStatuses = ['paid', 'settlement', 'confirmed'];
+            if (in_array($booking->status, $paidStatuses) && $booking->midtrans_order_id) {
                 try {
-                    \Midtrans\Transaction::cancel($booking->midtrans_order_id);
-                } catch (\Exception $e) {
-                    // Ignore
+                    \Midtrans\Transaction::refund($booking->midtrans_order_id, [
+                        'refund_key' => 'reject-' . $booking->id . '-' . time(),
+                        'amount' => (int) $booking->total_price,
+                        'reason' => 'Verifikasi KTP ditolak: ' . $request->reason
+                    ]);
+
+                    Log::info("💰 Auto Refund Success: Booking {$booking->id}");
+                    $refundInfo = 'Auto refund berhasil diproses.';
+                } catch (\Exception $refundError) {
+                    Log::warning("⚠️ Auto Refund Failed: " . $refundError->getMessage());
+                    $needsManualRefund = true;
+                    $refundInfo = [
+                        'booking_id' => $booking->id,
+                        'amount' => $booking->total_price,
+                        'guest_name' => $booking->guest->name,
+                        'order_id' => $booking->midtrans_order_id
+                    ];
                 }
             }
 
-            $booking->update([
-                'verification_status' => 'rejected',
-                'status' => 'cancelled',
-                'rejection_reason' => $request->reason
-            ]);
-
             DB::commit();
-            return response()->json(['message' => $message]);
+
+            $message = "Booking #{$booking->id} ditolak dan dibatalkan.";
+
+            if ($needsManualRefund) {
+                $message .= " ⚠️ Perlu REFUND MANUAL sebesar Rp " . number_format($booking->total_price, 0, ',', '.');
+            } elseif ($refundInfo && is_string($refundInfo)) {
+                $message .= " " . $refundInfo;
+            }
+
+            Log::info("✅ Booking {$booking->id} rejected successfully. Reason: {$request->reason}");
+
+            return response()->json([
+                'message' => $message,
+                'success' => true,
+                'needs_manual_refund' => $needsManualRefund,
+                'refund_info' => $needsManualRefund ? $refundInfo : null,
+                'booking' => $booking->fresh() // ✅ Return data terbaru
+            ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Gagal memproses penolakan: ' . $e->getMessage()], 500);
+            Log::error("Booking Reject Error: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Gagal menolak booking: ' . $e->getMessage(),
+                'success' => false
+            ], 500);
         }
     }
 }

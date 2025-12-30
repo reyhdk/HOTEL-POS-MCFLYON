@@ -16,14 +16,14 @@
             <div class="mb-4 mt-2">
                  <div class="image-upload-box d-flex align-items-center justify-content-center position-relative rounded-2 overflow-hidden border border-dashed border-gray-300 bg-light-subtle transition-300"
                       :class="{ 'has-image': imagePreview }"
-                      :style="{ backgroundImage: `url(${imagePreview})` }">
+                      :style="{ backgroundImage: imagePreview ? `url(${imagePreview})` : 'none' }">
                     
                     <div v-if="!imagePreview" class="text-center p-3">
                         <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
                             <i class="ki-duotone ki-picture fs-3 text-primary"><span class="path1"></span><span class="path2"></span></i>
                             <span class="fs-7 fw-bold text-gray-600">Upload Foto</span>
                         </div>
-                        <div class="fs-9 text-muted">Max 2MB (JPG/PNG)</div>
+                        <div class="fs-9 text-muted">Max 4MB (JPG/PNG)</div>
                     </div>
 
                     <div class="hover-overlay position-absolute w-100 h-100 d-flex align-items-center justify-content-center bg-dark bg-opacity-50 backdrop-blur">
@@ -73,13 +73,17 @@
                              <el-option value="available" label="Tersedia" />
                              <el-option value="occupied" label="Terisi" />
                              <el-option value="maintenance" label="Perbaikan" />
+                             <el-option value="dirty" label="Kotor" />
                         </el-select>
                     </el-form-item>
                 </div>
             </div>
 
-             <div class="bg-light-subtle rounded-2 p-3 mb-3 border border-dashed border-gray-300">
-                <label class="fw-bold fs-8 text-gray-700 text-uppercase mb-2 d-block">Periode Ketersediaan <span class="text-danger">*</span></label>
+            <div class="bg-light-subtle rounded-2 p-3 mb-3 border border-dashed border-gray-300">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="fw-bold fs-8 text-gray-700 text-uppercase mb-0">Periode Ketersediaan</label>
+                    <span class="badge badge-light-warning fs-9">Opsional</span>
+                </div>
                 <div class="d-flex gap-2">
                     <el-form-item prop="tersedia_mulai" class="mb-0 w-50">
                         <el-date-picker v-model="formData.tersedia_mulai" type="date" placeholder="Mulai" class="w-100 metronic-date" value-format="YYYY-MM-DD" size="small" />
@@ -89,6 +93,7 @@
                         <el-date-picker v-model="formData.tersedia_sampai" type="date" placeholder="Selesai" class="w-100 metronic-date" value-format="YYYY-MM-DD" size="small" />
                     </el-form-item>
                 </div>
+                <div class="form-text fs-9 mt-1 text-muted fst-italic">*Kosongkan jika tersedia selamanya.</div>
             </div>
 
             <el-form-item prop="facility_ids" class="mb-3">
@@ -128,8 +133,32 @@ import type { FormInstance, FormRules } from 'element-plus'
 
 // --- Interfaces ---
 interface Facility { id: number; name: string; }
-interface RoomData { id: number; room_number: string; type: string; status: string; price_per_night: number; description: string | null; image_url: string | null; tersedia_mulai: string | null; tersedia_sampai: string | null; facilities: Facility[]; }
-interface FormData { id: number | null; room_number: string; type: string; status: string; price_per_night: number | string; description: string | null; image: File | null; tersedia_mulai: string | null; tersedia_sampai: string | null; facility_ids: number[]; }
+// Sesuaikan dengan data yang dikembalikan API
+interface RoomData { 
+    id: number; 
+    room_number: string; 
+    type: string; 
+    status: string; 
+    price_per_night: number; 
+    description: string | null; 
+    image: string | null; // API biasanya mengembalikan field 'image' berisi path
+    image_url?: string | null; // Optional jika pakai accessor
+    tersedia_mulai: string | null; 
+    tersedia_sampai: string | null; 
+    facilities: Facility[]; 
+}
+interface FormData { 
+    id: number | null; 
+    room_number: string; 
+    type: string; 
+    status: string; 
+    price_per_night: number | string; 
+    description: string | null; 
+    image: File | null; 
+    tersedia_mulai: string | null; 
+    tersedia_sampai: string | null; 
+    facility_ids: number[]; 
+}
 
 const props = defineProps<{ roomData: RoomData | null }>();
 const emit = defineEmits(['room-updated', 'close-modal']);
@@ -143,33 +172,70 @@ const allFacilities = ref<Facility[]>([]);
 const loadingFacilities = ref(false);
 
 const isEditMode = computed(() => !!props.roomData);
-const getInitialFormData = (): FormData => ({ id: null, room_number: "", type: "", status: "available", price_per_night: "", description: null, image: null, tersedia_mulai: null, tersedia_sampai: null, facility_ids: [], });
+
+const getInitialFormData = (): FormData => ({ 
+    id: null, 
+    room_number: "", 
+    type: "", 
+    status: "available", 
+    price_per_night: "", 
+    description: null, 
+    image: null, 
+    tersedia_mulai: null, 
+    tersedia_sampai: null, 
+    facility_ids: [], 
+});
+
 const formData = ref<FormData>(getInitialFormData());
 
-// --- API ---
+// --- Helper: Get Full Image URL ---
+const getStorageUrl = (path: string | null) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    // Asumsi folder storage sudah dilink ke public/storage
+    return `/storage/${path}`;
+};
+
+// --- API Facilities ---
 const getFacilities = async () => { 
     try { 
         loadingFacilities.value = true; 
         const { data } = await ApiService.get("/facilities"); 
         allFacilities.value = data; 
-    } catch (e) { console.error(e); } 
-    finally { loadingFacilities.value = false; } 
+    } catch (e) { 
+        console.error("Gagal load fasilitas", e); 
+    } finally { 
+        loadingFacilities.value = false; 
+    } 
 };
 onMounted(getFacilities);
 
 const formatDate = (dateString: string | null) => dateString ? new Date(dateString).toISOString().split('T')[0] : null;
 
+// --- Watcher untuk Mode Edit/Tambah ---
 watch(() => props.roomData, (newVal) => {
   if (newVal) {
+    // Mode Edit
     formData.value = { 
-        ...newVal, 
-        image: null, 
+        ...getInitialFormData(), // Reset structure first
+        id: newVal.id,
+        room_number: newVal.room_number,
+        type: newVal.type,
+        status: newVal.status,
+        price_per_night: newVal.price_per_night,
+        description: newVal.description,
+        image: null, // File upload tetap null saat init
         facility_ids: newVal.facilities ? newVal.facilities.map(f => f.id) : [], 
         tersedia_mulai: formatDate(newVal.tersedia_mulai), 
         tersedia_sampai: formatDate(newVal.tersedia_sampai) 
     };
-    imagePreview.value = newVal.image_url;
+    
+    // Logic pintar untuk preview gambar dari backend
+    const imagePath = newVal.image_url || newVal.image;
+    imagePreview.value = getStorageUrl(imagePath);
+
   } else {
+    // Mode Tambah (Reset)
     formRef.value?.resetFields(); 
     formData.value = getInitialFormData(); 
     imagePreview.value = null;
@@ -180,7 +246,11 @@ const handleImageChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
   if (target.files && target.files[0]) {
     const file = target.files[0];
-    if (file.size > 2 * 1024 * 1024) return;
+    // Validasi size di frontend (4MB)
+    if (file.size > 4 * 1024 * 1024) {
+        Swal.fire({ text: "Ukuran file terlalu besar! Max 4MB.", icon: "warning" });
+        return;
+    }
     formData.value.image = file;
     const reader = new FileReader(); 
     reader.onload = (e) => { imagePreview.value = e.target?.result as string; }; 
@@ -188,40 +258,67 @@ const handleImageChange = (event: Event) => {
   }
 };
 
-const removeImage = () => { imagePreview.value = null; formData.value.image = null; };
+const removeImage = () => { 
+    imagePreview.value = null; 
+    formData.value.image = null; 
+    // Jika perlu, bisa tambahkan flag untuk menghapus gambar di backend (opsional)
+};
 
 const rules = ref<FormRules>({
-  room_number: [{ required: true, message: "Wajib", trigger: "blur" }],
-  type: [{ required: true, message: "Wajib", trigger: "change" }],
-  status: [{ required: true, message: "Wajib", trigger: "change" }],
-  price_per_night: [{ required: true, message: "Wajib", trigger: "blur" }],
-  tersedia_mulai: [{ required: true, message: "Wajib", trigger: "change" }],
-  tersedia_sampai: [{ required: true, message: "Wajib", trigger: "change" }],
+  room_number: [{ required: true, message: "Nomor kamar wajib diisi", trigger: "blur" }],
+  type: [{ required: true, message: "Tipe kamar wajib dipilih", trigger: "change" }],
+  status: [{ required: true, message: "Status wajib dipilih", trigger: "change" }],
+  price_per_night: [{ required: true, message: "Harga wajib diisi", trigger: "blur" }],
 });
 
 const submit = () => {
   if (!formRef.value) return;
+  
   formRef.value.validate(async (valid: boolean) => {
     if (valid) {
       loading.value = true;
+      
       const data = new FormData();
-      Object.entries(formData.value).forEach(([key, value]) => {
-          if (key === 'facility_ids') (value as number[]).forEach(id => data.append('facility_ids[]', String(id)));
-          else if (value !== null && value !== '') data.append(key, value as any);
-      });
+      
+      // Append Data
+      data.append('room_number', formData.value.room_number);
+      data.append('type', formData.value.type);
+      data.append('status', formData.value.status);
+      data.append('price_per_night', String(formData.value.price_per_night));
+      
+      if (formData.value.description) data.append('description', formData.value.description);
+      if (formData.value.tersedia_mulai) data.append('tersedia_mulai', formData.value.tersedia_mulai);
+      if (formData.value.tersedia_sampai) data.append('tersedia_sampai', formData.value.tersedia_sampai);
+      
+      // Handle Fasilitas (Array)
+      if (formData.value.facility_ids && formData.value.facility_ids.length > 0) {
+          formData.value.facility_ids.forEach(id => data.append('facility_ids[]', String(id)));
+      }
+
+      // Handle Image
+      if (formData.value.image) {
+          data.append('image', formData.value.image);
+      }
+
       try {
         if (isEditMode.value) { 
+            // Laravel Method Spoofing untuk PUT dengan File
             data.append('_method', 'PUT'); 
             await ApiService.post(`/rooms/${formData.value.id}`, data); 
         } else { 
             await ApiService.post("/rooms", data); 
         }
-        Swal.fire({ text: "Tersimpan!", icon: "success", timer: 1000, showConfirmButton: false }).then(() => { 
+        
+        Swal.fire({ text: "Data kamar berhasil disimpan!", icon: "success", timer: 1500, showConfirmButton: false }).then(() => { 
             if (modalRef.value) Modal.getInstance(modalRef.value)?.hide(); 
             emit("room-updated"); 
         });
       } catch (error: any) { 
-        Swal.fire({ text: "Gagal menyimpan", icon: "error" }); 
+        console.error("Error submitting room", error);
+        Swal.fire({ 
+            text: error.response?.data?.message || "Terjadi kesalahan saat menyimpan data.", 
+            icon: "error" 
+        }); 
       } finally { 
         loading.value = false; 
       }

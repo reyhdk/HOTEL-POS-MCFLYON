@@ -27,12 +27,11 @@ class TransactionExport implements FromView, ShouldAutoSize, WithStyles
         ]);
     }
 
-    // Style header agar tebal
     public function styles(Worksheet $sheet)
     {
         return [
             1    => ['font' => ['bold' => true, 'size' => 14]],
-            3    => ['font' => ['bold' => true]], // Baris header tabel
+            3    => ['font' => ['bold' => true]], 
         ];
     }
 }

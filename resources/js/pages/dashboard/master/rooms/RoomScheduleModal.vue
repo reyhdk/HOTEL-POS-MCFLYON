@@ -267,6 +267,7 @@ export default {
             bookings: [], 
             currentDate: new Date(),
             daysOfWeek: ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'],
+            refreshInterval: null, // ✅ TAMBAHAN: Auto refresh
         };
     },
     computed: {
@@ -303,14 +304,41 @@ export default {
             this.$nextTick(() => {
                 if (!this.modalInstance) {
                     const el = this.$refs.modalRef;
-                    if(el) this.modalInstance = new Modal(el);
+                    if(el) {
+                        this.modalInstance = new Modal(el);
+                        
+                        // ✅ TAMBAHAN: Setup event listener untuk auto refresh saat modal ditutup
+                        el.addEventListener('hidden.bs.modal', () => {
+                            this.stopAutoRefresh();
+                        });
+                    }
                 }
-                if(this.modalInstance) this.modalInstance.show();
-                this.fetchSchedule();
+                if(this.modalInstance) {
+                    this.modalInstance.show();
+                    this.fetchSchedule();
+                    this.startAutoRefresh(); // ✅ Mulai auto refresh
+                }
             });
         },
         
-        // ✅ FIXED: Tambahkan 'confirmed' status agar booking verified muncul
+        // ✅ TAMBAHAN: Auto refresh setiap 5 detik
+        startAutoRefresh() {
+            this.stopAutoRefresh(); // Clear existing interval
+            this.refreshInterval = setInterval(() => {
+                console.log('🔄 Auto refresh kalender...');
+                this.fetchSchedule();
+            }, 5000); // Refresh setiap 5 detik
+        },
+        
+        // ✅ TAMBAHAN: Stop auto refresh
+        stopAutoRefresh() {
+            if (this.refreshInterval) {
+                clearInterval(this.refreshInterval);
+                this.refreshInterval = null;
+            }
+        },
+        
+        // ✅ FIX UTAMA: Hanya tampilkan booking yang VERIFIED & AKTIF
         async fetchSchedule() {
             if(!this.roomData) return;
             
@@ -322,14 +350,23 @@ export default {
 
                 const { data } = await ApiService.query('/bookings', {
                     room_id: this.roomData.id,
-                    status_in: 'paid,confirmed,settlement,checked_in', // 🔥 Tambahkan 'confirmed'
                     date_from: startOfMonth,
                     date_to: endOfMonth
                 });
                 
-                this.bookings = data.data || [];
+                // 🔥 FILTER UTAMA: Hanya tampilkan booking yang TIDAK ditolak & TIDAK dibatalkan
+                this.bookings = (data.data || []).filter(booking => {
+                    // Exclude booking yang ditolak atau dibatalkan
+                    if (booking.verification_status === 'rejected') return false;
+                    if (booking.status === 'cancelled') return false;
+                    
+                    // Hanya tampilkan booking yang sudah lunas atau sedang check-in
+                    const validStatuses = ['paid', 'confirmed', 'verified', 'checked_in', 'settlement'];
+                    return validStatuses.includes(booking.status);
+                });
                 
-                console.log(`📅 Room ${this.roomData.room_number} Schedule:`, this.bookings.length, 'bookings');
+                console.log(`📅 Room ${this.roomData.room_number} Schedule:`, this.bookings.length, 'active bookings');
+                console.log('🔍 Raw data:', data.data?.length || 0, 'Filtered:', this.bookings.length);
                 
             } catch (error) {   
                 console.error("Gagal memuat jadwal:", error);
@@ -417,12 +454,16 @@ export default {
         formatDate(date) {
             return moment(date).format('DD MMM YYYY');
         }
+    },
+    
+    // ✅ TAMBAHAN: Cleanup saat component destroyed
+    beforeUnmount() {
+        this.stopAutoRefresh();
     }
 };
 </script>
 
 <style scoped>
-/* Style sama seperti sebelumnya, tidak ada perubahan */
 .text-orange { color: #F68B1E !important; }
 .bg-orange { background-color: #F68B1E !important; }
 .bg-light-orange { background-color: #FFF4E6 !important; }

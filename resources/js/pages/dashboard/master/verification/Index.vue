@@ -1,376 +1,483 @@
 <template>
-  <div class="card">
-    <div class="card-header border-0 pt-6">
-      <div class="card-title">
-        <div class="d-flex align-items-center position-relative my-1">
-          <i class="ki-duotone ki-magnifier fs-3 position-absolute ms-5">
-            <span class="path1"></span><span class="path2"></span>
-          </i>
-          <input
-            v-model="search"
-            type="text"
-            class="form-control form-control-solid w-250px ps-13"
-            placeholder="Cari Nama / HP..."
-            @input="handleSearch"
-          />
-        </div>
-      </div>
-      
-      <div class="card-toolbar">
-        <!-- ✅ Filter Toggle -->
-        <div class="btn-group me-3" role="group">
-          <input type="radio" class="btn-check" id="filter_all" v-model="filterStatus" value="all" />
-          <label class="btn btn-sm btn-outline btn-outline-primary" for="filter_all">Semua</label>
-          
-          <input type="radio" class="btn-check" id="filter_pending" v-model="filterStatus" value="pending" />
-          <label class="btn btn-sm btn-outline btn-outline-warning" for="filter_pending">Pending</label>
-          
-          <input type="radio" class="btn-check" id="filter_verified" v-model="filterStatus" value="verified" />
-          <label class="btn btn-sm btn-outline btn-outline-success" for="filter_verified">Verified</label>
-        </div>
-
-        <button type="button" class="btn btn-light-primary" @click="fetchData">
-          <i class="ki-duotone ki-arrows-circle fs-2"><span class="path1"></span><span class="path2"></span></i>
-          Refresh
-        </button>
-      </div>
-    </div>
-
-    <div class="card-body py-4">
-      <div class="table-responsive">
-        <table class="table align-middle table-row-dashed fs-6 gy-5">
-          <thead>
-            <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
-              <th class="min-w-200px">Tamu</th>
-              <th class="min-w-150px">Status Kamar</th>
-              <th class="min-w-100px">Kontak</th>
-              <th class="min-w-150px">Foto KTP</th>
-              <th class="min-w-100px">Status Verifikasi</th>
-              <th class="text-end min-w-100px">Aksi</th>
-            </tr>
-          </thead>
-          <tbody class="text-gray-600 fw-semibold">
-            <tr v-if="loading">
-              <td colspan="6" class="text-center py-5">
-                <div class="spinner-border text-primary" role="status"></div>
-                <div class="text-muted mt-2">Memuat data verifikasi...</div>
-              </td>
-            </tr>
-            
-            <tr v-else-if="filteredList.length === 0">
-              <td colspan="6" class="text-center py-5 text-muted">
-                <i class="ki-duotone ki-folder-check fs-1 d-block mb-2 text-gray-400"><span class="path1"></span><span class="path2"></span></i>
-                {{ getEmptyMessage }}
-              </td>
-            </tr>
-
-            <tr v-for="(item, index) in filteredList" :key="index" :class="{ 'opacity-50': isVerified(item) }">
-              
-              <td>
-                <div class="d-flex align-items-center">
-                  <div class="symbol symbol-circle symbol-50px overflow-hidden me-3">
-                    <div class="symbol-label fs-3 bg-light-primary text-primary">
-                      {{ item.name ? item.name.charAt(0).toUpperCase() : '?' }}
-                    </div>
-                  </div>
-                  <div class="d-flex flex-column">
-                    <span class="text-gray-800 text-hover-primary mb-1 fw-bold">{{ item.name }}</span>
-                    <span class="text-gray-500 fs-7">{{ item.email || 'Tidak ada email' }}</span>
-                  </div>
-                </div>
-              </td>
-
-              <td>
-                <div v-if="item.check_ins && item.check_ins.length > 0">
-                   <div class="d-flex flex-column">
-                       <span class="badge badge-light-success fw-bold fs-7 mb-1">
-                          <i class="ki-duotone ki-key fs-7 me-1 text-success"><span class="path1"></span><span class="path2"></span></i>
-                          Room {{ item.check_ins[0].room?.room_number || '?' }}
-                       </span>
-                       <span class="text-muted fs-9 fst-italic">Sedang Menginap (In-House)</span>
-                   </div>
-                </div>
-
-                <div v-else-if="item.bookings && item.bookings.length > 0">
-                   <div v-for="(booking, idx) in item.bookings" :key="idx" class="mb-2">
-                       <span class="badge badge-light-primary fw-bold fs-7 mb-1">
-                          <i class="ki-duotone ki-calendar-tick fs-7 me-1 text-primary"><span class="path1"></span><span class="path2"></span></i>
-                          Booking: Room {{ booking.room?.room_number || 'Random' }}
-                       </span>
-                       <div class="d-flex align-items-center text-gray-600 fs-8">
-                           <i class="ki-duotone ki-time fs-8 me-1"><span class="path1"></span><span class="path2"></span></i>
-                           {{ formatDate(booking.check_in_date) }}
-                       </div>
-                   </div>
-                </div>
-
-                <div v-else>
-                   <span class="badge badge-light-secondary text-gray-400 fs-8">Belum Check-in / Booking</span>
-                </div>
-              </td>
-
-              <td>
-                <div class="fw-bold">{{ item.phone_number }}</div>
-              </td>
-
-              <td>
-                <div 
-                  v-if="item.ktp_image_url"
-                  class="symbol symbol-75px symbol-2by3 cursor-pointer shadow-sm border border-gray-200"
-                  @click="openImageModal(item.ktp_image_url)"
-                >
-                  <img :src="item.ktp_image_url" alt="KTP" style="object-fit: cover" />
-                  <div class="symbol-badge bg-dark bg-opacity-50 top-50 start-50 translate-middle w-100 h-100 d-flex align-items-center justify-content-center opacity-0 hover-opacity-100 transition-opacity rounded">
-                    <i class="ki-duotone ki-eye fs-2 text-white"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-                  </div>
-                </div>
-                <span v-else class="text-muted fs-8 fst-italic">Gambar rusak / tidak ada</span>
-              </td>
-
-              <!-- ✅ Status Badge Dinamis -->
-              <td>
-                <span 
-                  v-if="isVerified(item)" 
-                  class="badge badge-light-success fw-bold border border-success">
-                    <i class="ki-duotone ki-check-circle fs-5 me-1 text-success">
-                      <span class="path1"></span><span class="path2"></span>
-                    </i>
-                    Terverifikasi
-                </span>
-                <span 
-                  v-else 
-                  class="badge badge-light-warning fw-bold border border-warning border-dashed">
-                    <i class="ki-duotone ki-time fs-5 me-1 text-warning">
-                      <span class="path1"></span><span class="path2"></span>
-                    </i>
-                    Menunggu Verifikasi
-                </span>
-              </td>
-
-              <!-- ✅ Tombol Aksi Conditional -->
-              <td class="text-end">
-                <template v-if="!isVerified(item)">
-                  <button 
-                    class="btn btn-sm btn-success me-2"
-                    @click="verifyGuest(item.id)"
-                    :disabled="processing === item.id"
-                    title="Terima & Verifikasi"
-                  >
-                    <span v-if="processing === item.id" class="spinner-border spinner-border-sm"></span>
-                    <span v-else><i class="ki-duotone ki-check fs-2"></i> Terima</span>
-                  </button>
-                  
-                  <button 
-                    class="btn btn-sm btn-icon btn-light-danger"
-                    @click="rejectGuest(item.id)"
-                    title="Tolak & Hapus Foto"
-                  >
-                    <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
-                  </button>
-                </template>
-
-                <template v-else>
-                  <span class="badge badge-light-success fs-8 px-3 py-2">
-                    <i class="ki-duotone ki-check-circle fs-5 me-1">
-                      <span class="path1"></span><span class="path2"></span>
-                    </i>
-                    Sudah Diverifikasi
-                  </span>
-                </template>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Modal Preview -->
-    <div v-if="showModal" class="modal-backdrop fade show" style="z-index: 1050;"></div>
-    <div v-if="showModal" class="modal fade show d-block" tabindex="-1" style="z-index: 1055;" @click.self="closeModal">
-      <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content shadow-lg">
-          <div class="modal-header border-0 pb-0 justify-content-between">
-            <h5 class="modal-title">Preview Identitas</h5>
-            <div class="btn btn-icon btn-sm btn-light-danger" @click="closeModal">
-              <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
+  <div class="d-flex flex-column gap-5">
+    
+    <div class="row g-5 mb-5">
+      <div class="col-md-4">
+        <div class="card bg-white hover-elevate-up shadow-sm border-0 h-100">
+          <div class="card-body d-flex align-items-center">
+            <div class="symbol symbol-50px me-3">
+              <div class="symbol-label bg-light-warning text-warning">
+                <i class="ki-duotone ki-time fs-2x"><span class="path1"></span><span class="path2"></span></i>
+              </div>
+            </div>
+            <div class="d-flex flex-column">
+              <span class="fw-bold text-gray-800 fs-5">Menunggu Verifikasi</span>
+              <span class="text-muted fw-semibold fs-7">{{ stats.pending }} Tamu Baru</span>
             </div>
           </div>
-          <div class="modal-body text-center p-5 bg-light-dark rounded-bottom">
-            <img :src="selectedImage" class="img-fluid rounded shadow" style="max-height: 80vh;" />
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-white hover-elevate-up shadow-sm border-0 h-100">
+          <div class="card-body d-flex align-items-center">
+            <div class="symbol symbol-50px me-3">
+              <div class="symbol-label bg-light-success text-success">
+                 <i class="ki-duotone ki-shield-tick fs-2x"><span class="path1"></span><span class="path2"></span></i>
+              </div>
+            </div>
+            <div class="d-flex flex-column">
+              <span class="fw-bold text-gray-800 fs-5">Terverifikasi</span>
+              <span class="text-muted fw-semibold fs-7">Data Valid & Aman</span>
+            </div>
+          </div>
+        </div>
+      </div>
+       <div class="col-md-4">
+        <div class="card bg-gradient-orange hover-elevate-up shadow-sm border-0 h-100">
+          <div class="card-body d-flex align-items-center position-relative overflow-hidden">
+             <div class="position-absolute top-0 end-0 opacity-10 pe-3 pt-3">
+                <i class="ki-duotone ki-user fs-4x text-white"><span class="path1"></span><span class="path2"></span></i>
+             </div>
+             <div class="d-flex flex-column z-index-1">
+              <span class="fw-bold text-white fs-5">Total Database</span>
+              <span class="text-white opacity-75 fw-semibold fs-7">{{ total }} Tamu Terdaftar</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
+
+    <div class="card shadow-sm mb-5">
+        <div class="card-body py-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center position-relative my-1">
+                <i class="ki-duotone ki-magnifier fs-3 position-absolute ms-4 text-gray-500">
+                  <span class="path1"></span><span class="path2"></span>
+                </i>
+                <input type="text" v-model="search" @input="handleSearch"
+                  class="form-control form-control-solid w-250px ps-12"
+                  placeholder="Cari Nama / Email..." />
+            </div>
+
+            <div class="nav-group d-inline-flex bg-light rounded-pill p-1">
+                <button v-for="tab in ['all', 'pending', 'verified']" :key="tab"
+                    @click="setFilter(tab)"
+                    class="btn btn-sm px-6 rounded-pill fw-bold transition-300 text-capitalize"
+                    :class="filterStatus === tab ? 'btn-white shadow-sm text-primary' : 'text-gray-600 hover-text-primary'">
+                    {{ tab === 'all' ? 'Semua' : tab }}
+                    <span v-if="tab === 'pending' && stats.pending > 0" class="badge badge-circle badge-danger w-6px h-6px ms-2 align-middle"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="loading" class="row g-6">
+        <div v-for="n in 6" :key="n" class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-5">
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="skeleton-circle w-50px h-50px me-3"></div>
+                        <div class="flex-grow-1">
+                            <div class="skeleton-line w-75 mb-2"></div>
+                            <div class="skeleton-line w-50"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-rect w-100 h-150px rounded mb-4"></div>
+                    <div class="d-flex gap-2">
+                        <div class="skeleton-rect w-50 h-40px rounded"></div>
+                        <div class="skeleton-rect w-50 h-40px rounded"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-else-if="list.length === 0" class="text-center py-15 card bg-transparent border-dashed border-gray-300">
+         <div class="mb-4">
+            <i class="ki-duotone ki-folder-added fs-5x text-gray-300"><span class="path1"></span><span class="path2"></span></i>
+         </div>
+         <h3 class="fw-bold text-gray-800">Data Kosong</h3>
+         <p class="text-muted">Tidak ada tamu yang sesuai dengan filter.</p>
+    </div>
+
+    <transition-group name="staggered" tag="div" class="row g-6" v-else>
+        <div v-for="(item, index) in list" :key="item.id" 
+             class="col-md-6 col-lg-4 staggered-item" 
+             :style="{ '--delay': index * 0.1 + 's' }">
+             
+             <div class="card h-100 border-0 shadow-sm card-hover-rise overflow-hidden position-relative">
+                
+                <div class="position-absolute top-0 start-0 bottom-0 w-4px"
+                     :class="needsVerification(item) ? 'bg-warning' : (item.is_verified ? 'bg-success' : 'bg-secondary')">
+                </div>
+
+                <div class="card-body p-0 d-flex flex-column">
+                    
+                    <div class="p-5 d-flex align-items-center">
+                        <div class="symbol symbol-50px me-3">
+                             <span class="symbol-label fw-bold fs-3" 
+                                :class="item.is_verified ? 'bg-light-success text-success' : 'bg-light-warning text-warning'">
+                                {{ item.name.charAt(0).toUpperCase() }}
+                             </span>
+                             <div v-if="item.is_verified" class="symbol-badge bg-success start-100 top-100 border-4 h-15px w-15px ms-n2 mt-n2"></div>
+                        </div>
+                        <div class="d-flex flex-column overflow-hidden">
+                            <span class="text-gray-800 fw-bold text-truncate fs-5">{{ item.name }}</span>
+                            <span class="text-gray-400 fs-7 text-truncate">{{ item.email }}</span>
+                        </div>
+                        <div class="ms-auto">
+                            <span class="badge badge-light fw-bold">#{{ item.id }}</span>
+                        </div>
+                    </div>
+
+                    <div class="px-5 pb-2 position-relative group-hover-trigger">
+                         <div class="rounded-3 overflow-hidden bg-light position-relative ktp-wrapper border border-gray-200" style="height: 180px;">
+                             <img v-if="item.ktp_image" 
+                                  :src="`/storage/${item.ktp_image}`" 
+                                  class="w-100 h-100 object-fit-cover transition-transform duration-500 hover-scale-img cursor-pointer"
+                                  @click="showKtpModal(item.ktp_image, item.name, item.id)">
+                             <div v-else class="w-100 h-100 d-flex align-items-center justify-content-center text-gray-400 flex-column">
+                                 <i class="ki-duotone ki-picture fs-3x mb-2 text-gray-300"><span class="path1"></span><span class="path2"></span></i>
+                                 <span class="fs-8">Belum Upload KTP</span>
+                             </div>
+
+                             <div v-if="item.ktp_image" class="position-absolute top-50 start-50 translate-middle opacity-0 hover-opacity-100 transition-300 pointer-events-none-on-mobile">
+                                 <button class="btn btn-icon btn-dark btn-circle shadow-lg" @click="showKtpModal(item.ktp_image, item.name, item.id)">
+                                     <i class="ki-duotone ki-magnifier fs-2"><span class="path1"></span><span class="path2"></span></i>
+                                 </button>
+                             </div>
+                         </div>
+                    </div>
+
+                    <div class="px-5 py-3">
+                         <div v-if="item.bookings && item.bookings.length > 0" class="d-flex align-items-center justify-content-between bg-light-primary rounded p-3 border border-primary border-opacity-10">
+                             <div class="d-flex flex-column">
+                                 <span class="text-gray-500 fs-8 fw-bold text-uppercase">Check-In</span>
+                                 <span class="text-gray-800 fw-bold fs-7">
+                                     {{ formatDate(item.bookings[0].check_in_date) }}
+                                 </span>
+                             </div>
+                             <div class="vr opacity-25"></div>
+                             <div class="d-flex flex-column text-end">
+                                 <span class="text-gray-500 fs-8 fw-bold text-uppercase">Status</span>
+                                 <span :class="getPaymentTextClass(item.bookings[0].status)" class="fw-bold fs-7 text-uppercase">
+                                     {{ item.bookings[0].status }}
+                                 </span>
+                             </div>
+                         </div>
+                         <div v-else class="text-center py-2 bg-light rounded text-muted fs-8 fst-italic">
+                             Belum ada data booking aktif
+                         </div>
+                    </div>
+
+                    <div class="mt-auto border-top p-4 bg-light bg-opacity-50">
+                        <div v-if="needsVerification(item)" class="d-flex gap-2">
+                             <button @click="rejectGuest(item.id)" class="btn btn-light-danger btn-sm flex-grow-1 fw-bold">
+                                 <i class="ki-duotone ki-cross fs-2"><span class="path1"></span><span class="path2"></span></i> Tolak
+                             </button>
+                             <button @click="verifyGuest(item.id)" class="btn btn-warning btn-sm flex-grow-1 fw-bold shadow-sm">
+                                 <i class="ki-duotone ki-check fs-2"><span class="path1"></span><span class="path2"></span></i> Verifikasi
+                             </button>
+                        </div>
+                        <div v-else class="d-flex justify-content-center">
+                             <span v-if="item.is_verified" class="text-success fw-bold fs-7 d-flex align-items-center">
+                                 <i class="ki-duotone ki-check-circle fs-5 me-1 text-success"><span class="path1"></span><span class="path2"></span></i>
+                                 Identitas Terverifikasi
+                             </span>
+                             <span v-else class="text-gray-400 fw-bold fs-7">
+                                 Data Belum Lengkap
+                             </span>
+                        </div>
+                    </div>
+
+                </div>
+             </div>
+        </div>
+    </transition-group>
+
+    <el-dialog v-model="ktpModalVisible" width="650px" align-center destroy-on-close :show-close="false" class="bg-transparent shadow-none">
+       <div class="modal-content-wrapper bg-body rounded-4 overflow-hidden shadow-lg position-relative animate__animated animate__zoomIn animate__faster">
+           
+           <div class="d-flex justify-content-between align-items-center px-6 py-4 border-bottom bg-white">
+               <h3 class="fw-bold m-0 text-gray-800">Review KTP Tamu</h3>
+               <div class="btn btn-icon btn-sm btn-light-danger rounded-circle" @click="ktpModalVisible = false">
+                   <i class="ki-duotone ki-cross fs-2"><span class="path1"></span><span class="path2"></span></i>
+               </div>
+           </div>
+
+           <div class="d-flex flex-column">
+               <div class="bg-dark d-flex align-items-center justify-content-center position-relative p-5 overflow-hidden pattern-bg" style="height: 400px;">
+                    <img :src="`/storage/${selectedKtpImage}`" 
+                         class="img-fluid rounded shadow-lg transition-transform" 
+                         :style="{ transform: `scale(${imageScale}) rotate(${imageRotation}deg)` }"
+                         style="max-height: 100%; object-fit: contain;">
+                    
+                    <div class="position-absolute bottom-0 mb-4 bg-white bg-opacity-10 backdrop-blur rounded-pill p-2 d-flex gap-2 border border-white border-opacity-10 shadow-lg">
+                        <button class="btn btn-icon btn-sm btn-custom-glass" @click="zoomOut"><i class="ki-duotone ki-minus text-white fs-3"></i></button>
+                        <button class="btn btn-icon btn-sm btn-custom-glass" @click="zoomIn"><i class="ki-duotone ki-plus text-white fs-3"></i></button>
+                        <div class="vr bg-white opacity-25 mx-1"></div>
+                        <button class="btn btn-icon btn-sm btn-custom-glass" @click="rotateRight"><i class="ki-duotone ki-refresh text-white fs-3"><span class="path1"></span><span class="path2"></span></i></button>
+                    </div>
+               </div>
+
+               <div class="px-6 py-5 bg-white">
+                   <div class="d-flex align-items-center justify-content-between mb-4">
+                       <div class="d-flex align-items-center">
+                           <div class="symbol symbol-40px me-3">
+                               <div class="symbol-label bg-light-primary text-primary fw-bold">{{ selectedGuestName.charAt(0) }}</div>
+                           </div>
+                           <div>
+                               <span class="text-gray-800 fw-bold fs-6 d-block">{{ selectedGuestName }}</span>
+                               <span class="text-gray-400 fs-8">ID Tamu: #{{ selectedGuestId }}</span>
+                           </div>
+                       </div>
+                   </div>
+
+                   <div class="d-flex gap-3">
+                       <button class="btn btn-light-danger flex-grow-1 fw-bold py-3" @click="ktpModalVisible = false; rejectGuest(selectedGuestId)">
+                           <i class="ki-duotone ki-cross-circle fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>
+                           Tolak Data
+                       </button>
+                       <button class="btn btn-warning flex-grow-1 fw-bold py-3 shadow-sm" @click="ktpModalVisible = false; verifyGuest(selectedGuestId)">
+                           <i class="ki-duotone ki-check-circle fs-2 me-2 text-white"><span class="path1"></span><span class="path2"></span></i>
+                           Konfirmasi Valid
+                       </button>
+                   </div>
+               </div>
+           </div>
+       </div>
+    </el-dialog>
 
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
-import ApiService from "@/core/services/ApiService"; 
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ref, onMounted, reactive } from "vue";
+import ApiService from "@/core/services/ApiService";
+import { ElMessage } from "element-plus";
+import { default as Swal } from "sweetalert2"; // Fix import
+import debounce from "lodash/debounce";
 
+// --- STATE MANAGEMENT ---
+const list = ref<any[]>([]);
 const loading = ref(false);
-const processing = ref<number | null>(null);
 const search = ref("");
-const filterStatus = ref("all"); // ✅ Filter State
-const listData = ref<any[]>([]);
-const showModal = ref(false);
-const selectedImage = ref("");
+const filterStatus = ref("pending"); 
 
-// ✅ Helper: Cek apakah tamu sudah verified
-const isVerified = (item: any): boolean => {
-  // Cek dari Guest Profile
-  if (item.is_verified === true) return true;
-  
-  // Cek dari Booking (jika ada booking yang statusnya verified)
-  if (item.bookings && item.bookings.length > 0) {
-    return item.bookings.some((b: any) => b.verification_status === 'verified');
-  }
-  
-  return false;
-};
+// Pagination State (Simplified for infinite scroll feel logic later if needed, now standard)
+const currentPage = ref(1);
+const lastPage = ref(1);
+const total = ref(0);
 
-// ✅ Filter berdasarkan search & status
-const filteredList = computed(() => {
-  let result = listData.value;
+// Stats
+const stats = reactive({ pending: 0 });
 
-  // Filter by search
-  if (search.value) {
-    const lowerSearch = search.value.toLowerCase();
-    result = result.filter(item => 
-      (item.name && item.name.toLowerCase().includes(lowerSearch)) ||
-      (item.phone_number && item.phone_number.includes(lowerSearch))
-    );
-  }
+// KTP Modal Controls
+const ktpModalVisible = ref(false);
+const selectedKtpImage = ref("");
+const selectedGuestName = ref("");
+const selectedGuestId = ref(0);
+const imageRotation = ref(0);
+const imageScale = ref(1);
 
-  // Filter by verification status
-  if (filterStatus.value === 'pending') {
-    result = result.filter(item => !isVerified(item));
-  } else if (filterStatus.value === 'verified') {
-    result = result.filter(item => isVerified(item));
-  }
-
-  return result;
-});
-
-// ✅ Empty state message
-const getEmptyMessage = computed(() => {
-  if (filterStatus.value === 'pending') {
-    return 'Tidak ada permintaan verifikasi pending saat ini.';
-  } else if (filterStatus.value === 'verified') {
-    return 'Belum ada tamu yang diverifikasi.';
-  }
-  return 'Tidak ada data tamu dengan foto KTP.';
-});
-
-onMounted(() => {
-  fetchData();
-});
-
+// --- HELPERS ---
 const formatDate = (dateString: string) => {
-    if(!dateString) return '-';
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('id-ID', { 
-        day: 'numeric', 
-        month: 'long', 
-        year: 'numeric' 
-    }).format(date);
+  if (!dateString) return "-";
+  return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(new Date(dateString));
 };
 
-// ✅ Fetch tanpa filter backend (ambil semua, filter di frontend)
-const fetchData = async () => {
+const getPaymentTextClass = (status: string) => {
+    switch (status) {
+        case 'paid': case 'settlement': return 'text-success';
+        case 'pending': return 'text-warning';
+        case 'cancelled': return 'text-danger';
+        default: return 'text-gray-600';
+    }
+}
+
+const needsVerification = (item: any): boolean => {
+    if (item.is_verified) return false;
+    if (item.bookings && item.bookings.length > 0) {
+        return item.bookings[0].verification_status === 'pending';
+    }
+    return !!item.ktp_image;
+};
+
+// --- IMAGE VIEWER ---
+const showKtpModal = (image: string, name: string, id: number) => {
+    selectedKtpImage.value = image;
+    selectedGuestName.value = name;
+    selectedGuestId.value = id;
+    imageRotation.value = 0;
+    imageScale.value = 1;
+    ktpModalVisible.value = true;
+}
+
+const zoomIn = () => { if (imageScale.value < 3) imageScale.value += 0.2; }
+const zoomOut = () => { if (imageScale.value > 0.5) imageScale.value -= 0.2; }
+const rotateRight = () => { imageRotation.value += 90; }
+
+// --- API ACTIONS ---
+const fetchData = async (page = 1) => {
   loading.value = true;
+  currentPage.value = page;
   try {
-    const response = await ApiService.query("guests", { 
-        verification_needed: 1 // Ambil semua yang punya KTP
-    });
-    listData.value = response.data.data || [];
-    
-    console.log("📋 Total guests with KTP:", listData.value.length);
-    
+    const params: any = { page: currentPage.value, search: search.value };
+    if (filterStatus.value !== 'all') params.verification_status = filterStatus.value;
+
+    const response = await ApiService.query("guests", params);
+    const data = response.data;
+
+    list.value = data.data;
+    lastPage.value = data.last_page;
+    total.value = data.total;
+    if(filterStatus.value === 'pending') stats.pending = data.total;
+
   } catch (error) {
-    console.error("Fetch Error:", error);
-    ElMessage.error("Gagal memuat data verifikasi.");
+    ElMessage.error("Gagal memuat data tamu.");
   } finally {
     loading.value = false;
   }
 };
 
-const openImageModal = (url: string) => {
-  if(!url) return;
-  selectedImage.value = url;
-  showModal.value = true;
-};
+const handleSearch = debounce(() => fetchData(1), 500);
+const setFilter = (status: string) => { filterStatus.value = status; fetchData(1); }
 
-const closeModal = () => {
-  showModal.value = false;
-  selectedImage.value = "";
-};
-
-const handleSearch = () => {
-  // Triggered by computed property
-};
-
-// ✅ Setelah verify, refresh data (tidak remove dari list)
+// --- SWEETALERT ---
 const verifyGuest = async (id: number) => {
-  processing.value = id;
-  try {
-    await ApiService.post(`guests/${id}/verify`, {});
-    ElMessage.success("Identitas berhasil diverifikasi!");
-    
-    // ✅ Refresh data untuk update status
-    await fetchData();
-    
-  } catch (error: any) {
-    const msg = error.response?.data?.message || "Gagal memverifikasi tamu.";
-    ElMessage.error(msg);
-  } finally {
-    processing.value = null;
+  const result = await Swal.fire({
+    title: 'Konfirmasi Verifikasi',
+    text: "Validasi KTP dan konfirmasi booking?",
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Ya, Validasi',
+    cancelButtonText: 'Batal',
+    buttonsStyling: false,
+    customClass: {
+      confirmButton: "btn btn-warning fw-bold",
+      cancelButton: "btn btn-light btn-active-light-primary fw-bold",
+      popup: "rounded-4"
+    }
+  });
+
+  if (result.isConfirmed) {
+    loading.value = true;
+    try {
+        await ApiService.post(`guests/${id}/verify-ktp`, {});
+        Swal.fire({
+            text: "Berhasil diverifikasi!",
+            icon: "success",
+            buttonsStyling: false,
+            confirmButtonText: "Ok",
+            customClass: { confirmButton: "btn btn-primary fw-bold" }
+        });
+        fetchData(currentPage.value); 
+    } catch (error: any) {
+        ElMessage.error("Gagal verifikasi.");
+        loading.value = false;
+    }
   }
 };
 
-const rejectGuest = (id: number) => {
-  ElMessageBox.confirm(
-    'Tindakan ini akan menghapus foto KTP dari database dan tamu harus mengupload ulang. Lanjutkan?',
-    'Tolak Verifikasi?',
-    {
-      confirmButtonText: 'Ya, Tolak',
-      cancelButtonText: 'Batal',
-      type: 'warning',
-      center: true
+const rejectGuest = async (id: number) => {
+  const result = await Swal.fire({
+    title: 'Tolak Verifikasi',
+    text: "Alasan penolakan:",
+    icon: 'warning',
+    input: 'text',
+    inputPlaceholder: 'Misal: KTP Buram',
+    showCancelButton: true,
+    confirmButtonText: 'Tolak',
+    cancelButtonText: 'Batal',
+    buttonsStyling: false,
+    customClass: {
+      confirmButton: "btn btn-danger fw-bold",
+      cancelButton: "btn btn-light fw-bold",
+      input: "form-control form-control-solid mt-3"
+    },
+    inputValidator: (value) => {
+        if (!value) return 'Wajib diisi!';
+        return null;
     }
-  ).then(async () => {
+  });
+
+  if (result.isConfirmed && result.value) {
     loading.value = true;
     try {
-        await ApiService.post(`guests/${id}/reject-ktp`, {});
-        ElMessage.success("Verifikasi ditolak. Foto dihapus.");
-        await fetchData(); 
+        await ApiService.post(`guests/${id}/reject-ktp`, { reason: result.value });
+        Swal.fire({
+            text: "Verifikasi Ditolak.",
+            icon: "info",
+            buttonsStyling: false,
+            confirmButtonText: "Ok",
+            customClass: { confirmButton: "btn btn-primary fw-bold" }
+        });
+        fetchData(currentPage.value); 
     } catch (error: any) {
-        const msg = error.response?.data?.message || "Gagal menolak data.";
-        ElMessage.error(msg);
+        ElMessage.error("Gagal.");
         loading.value = false;
     }
-  }).catch(() => {});
+  }
 };
+
+onMounted(() => fetchData());
 </script>
 
-<style scoped>
-.symbol-2by3 {
-    aspect-ratio: 3/2;
-    background-color: #f1f1f4;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+<style scoped lang="scss">
+/* --- Animations --- */
+.staggered-enter-active,
+.staggered-leave-active {
+  transition: all 0.4s ease;
+}
+.staggered-enter-from,
+.staggered-leave-to {
+  opacity: 0;
+  transform: translateY(30px) scale(0.95);
+}
+.staggered-item {
+  transition-delay: var(--delay);
 }
 
-/* ✅ Styling untuk filter buttons */
-.btn-check:checked + .btn-outline-primary { background-color: #009ef7; color: white; }
-.btn-check:checked + .btn-outline-warning { background-color: #ffc700; color: white; }
-.btn-check:checked + .btn-outline-success { background-color: #17c653; color: white; }
+/* --- Card Effects --- */
+.card-hover-rise {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+.card-hover-rise:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.08) !important;
+    z-index: 2;
+}
 
-/* ✅ Efek opacity untuk row yang sudah verified */
-.opacity-50 { opacity: 0.6; transition: opacity 0.3s; }
-.opacity-50:hover { opacity: 1; }
+/* --- KTP Preview Interaction --- */
+.hover-scale-img:hover {
+    transform: scale(1.05);
+}
+.hover-opacity-100:hover {
+    opacity: 1 !important;
+}
+
+/* --- Skeleton --- */
+.skeleton-circle { background: #eee; border-radius: 50%; animation: pulse 1.5s infinite; }
+.skeleton-line { height: 10px; background: #eee; border-radius: 4px; animation: pulse 1.5s infinite; }
+.skeleton-rect { background: #eee; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+
+/* --- Utils --- */
+.bg-gradient-orange { background: linear-gradient(135deg, #f68b1e 0%, #ffc700 100%); }
+.pattern-bg {
+    background-color: #1e1e2d;
+    background-image: radial-gradient(#ffffff 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: 0 0, 10px 10px;
+    background-opacity: 0.1;
+}
+.backdrop-blur { backdrop-filter: blur(8px); }
+.btn-custom-glass {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+}
+.btn-custom-glass:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
 </style>

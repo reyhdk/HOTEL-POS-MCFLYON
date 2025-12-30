@@ -4,19 +4,29 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Guest;
+use App\Models\Booking; // ✅ [FIX] Wajib import Model Booking
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB; // ✅ [FIX] Wajib import DB Facade
+use Illuminate\Support\Facades\Log; // ✅ [FIX] Untuk debugging error
 
 class GuestController extends Controller
 {
-
+    /**
+     * Menampilkan daftar tamu dengan filter dan relasi.
+     */
     public function index(Request $request)
     {
         $query = Guest::query();
 
-        // 1. Filter Pencarian (Search)
-        if ($request->has('search') && $request->search != '') {
+        // 1. Eager Loading Checkins & Room
+        $query->with(['checkIns' => function ($q) {
+            $q->where('is_active', true)->with('room');
+        }]);
+
+        // 2. Filter Pencarian
+        if ($request->has('search') && $request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -25,398 +35,200 @@ class GuestController extends Controller
             });
         }
 
-        // 2. ✅ Filter Verifikasi yang DIPERBAIKI
-        if ($request->has('verification_needed') && $request->verification_needed == 1) {
-            $query->where(function ($q) {
-                // Kondisi A: Tamu Walk-in (KTP ada di tabel Guests)
-                $q->where(function ($sub) {
-                    $sub->whereNotNull('ktp_image')
-                        ->where('ktp_image', '!=', '')
-                        ->where('is_verified', false);
-                })
-                    // Kondisi B: Tamu Booking Online (KTP ada di tabel Bookings)
-                    ->orWhereHas('bookings', function ($b) {
-                        $b->whereIn('status', ['paid', 'confirmed', 'settlement', 'pending'])
-                            ->whereNotNull('ktp_image')
-                            ->where('ktp_image', '!=', '')
-                            ->where('verification_status', 'pending');
-                    });
-            });
-
-            // 🔍 DEBUG: Log jumlah tamu yang perlu verifikasi
-            $count = $query->count();
-            Log::info("📋 Guests Needing Verification: {$count}");
+        // 3. Filter Status Verifikasi
+        if ($request->has('verification_status')) {
+            if ($request->verification_status === 'pending') {
+                $query->where('is_verified', false)->whereNotNull('ktp_image');
+            } elseif ($request->verification_status === 'verified') {
+                $query->where('is_verified', true);
+            } elseif ($request->verification_status === 'unverified') {
+                $query->where('is_verified', false)->whereNull('ktp_image');
+            }
         }
 
-        // 3. Filter Blacklist
-        if ($request->has('is_blacklisted')) {
-            $query->where('is_blacklisted', $request->boolean('is_blacklisted'));
-        }
+        // 4. Pagination
+        $guests = $query->latest()->paginate($request->per_page ?? 10);
 
-        // 4. Ambil data dengan relasi
-        $guests = $query->with([
-            'checkIns' => function ($q) {
-                $q->where('is_active', true)->with('room');
-            },
-            // Load booking terbaru yang relevan
-            'bookings' => function ($q) {
-                $q->whereIn('status', ['paid', 'confirmed', 'settlement', 'pending', 'checked_in'])
-                    ->where('check_in_date', '>=', now()->subDays(7)) // 7 hari terakhir
-                    ->with('room')
-                    ->orderBy('created_at', 'desc');
-            }
-        ])->latest()->get();
-
-        // 5. ✅ Fallback Gambar (Pinjam foto dari Booking jika Guest kosong)
-        $guests->transform(function ($guest) {
-            $imagePath = $guest->ktp_image;
-
-            // Jika di profil Guest kosong, cari di Booking terbarunya
-            if (empty($imagePath) && $guest->bookings->isNotEmpty()) {
-                $bookingWithImage = $guest->bookings->firstWhere(fn($b) => !empty($b->ktp_image));
-
-                if ($bookingWithImage) {
-                    $imagePath = $bookingWithImage->ktp_image;
-
-                    // 🔍 DEBUG: Log fallback
-                    Log::info("📸 Fallback KTP: Guest {$guest->id} ← Booking {$bookingWithImage->id}");
-                }
-            }
-
-            // Generate URL
-            if ($imagePath) {
-                $guest->ktp_image_url = str_contains($imagePath, 'http')
-                    ? $imagePath
-                    : asset('storage/' . $imagePath);
-            } else {
-                $guest->ktp_image_url = null;
-
-                // 🔍 DEBUG: Peringatan jika tidak ada gambar
-                if ($guest->is_verified === false) {
-                    Log::warning("⚠️ Guest {$guest->id} ({$guest->name}) needs verification but has NO KTP!");
-                }
-            }
-
-            return $guest;
-        });
-
-        return response()->json(['data' => $guests]);
+        return response()->json($guests);
     }
 
     /**
-     * Menyimpan tamu baru (Walk-in atau Manual)
+     * Simpan tamu baru (Walk-in).
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'phone_number' => 'required|string|max:20',
-            'email' => 'nullable|email|unique:guests,email',
+            'email' => 'nullable|email',
             'address' => 'nullable|string',
-            'id_card_image' => 'nullable|image|mimes:jpeg,png,jpg|max:4096',
+            'ktp_image' => 'nullable|image|max:4096',
         ]);
 
-        try {
-            // Upload KTP jika ada
-            $ktpPath = null;
-            if ($request->hasFile('id_card_image')) {
-                $ktpPath = $request->file('id_card_image')->store('ktp_images', 'public');
-            }
-
-            // Buat Guest Baru
-            $guest = Guest::create([
-                'name' => $validated['name'],
-                'phone_number' => $validated['phone_number'],
-                'email' => $validated['email'] ?? null,
-                'address' => $validated['address'] ?? null,
-                'ktp_image' => $ktpPath,
-                'is_verified' => false,
-                'is_blacklisted' => false
-            ]);
-
-            Log::info("✅ Guest Created: ID {$guest->id} | Name: {$guest->name}");
-
-            return response()->json([
-                'message' => 'Tamu berhasil ditambahkan.',
-                'data' => $guest
-            ], 201);
-        } catch (\Exception $e) {
-            // Cleanup jika gagal
-            if (isset($ktpPath) && Storage::disk('public')->exists($ktpPath)) {
-                Storage::disk('public')->delete($ktpPath);
-            }
-
-            Log::error("Guest Store Error: " . $e->getMessage());
-            return response()->json(['message' => 'Gagal menambahkan tamu.'], 500);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
         }
+
+        $ktpPath = null;
+        if ($request->hasFile('ktp_image')) {
+            $ktpPath = $request->file('ktp_image')->store('ktp_images', 'public');
+        }
+
+        $guest = Guest::firstOrCreate(
+            ['phone_number' => $request->phone_number],
+            [
+                'name' => $request->name,
+                'email' => $request->email,
+                'address' => $request->address,
+                'ktp_image' => $ktpPath,
+                'is_verified' => false
+            ]
+        );
+
+        return response()->json(['data' => $guest], 201);
     }
 
     /**
-     * Menampilkan detail satu tamu
+     * Tampilkan detail tamu spesifik.
      */
-    public function show(Guest $guest)
+    public function show($id)
     {
-        // Load relasi
-        $guest->load([
-            'checkIns.room',
-            'bookings' => function ($q) {
-                $q->with('room')->latest();
-            }
-        ]);
+        $guest = Guest::with(['checkIns.room', 'bookings'])->find($id);
 
-        $imagePath = $guest->ktp_image;
-
-        if (empty($imagePath)) {
-            $latestBooking = $guest->bookings()
-                ->whereNotNull('ktp_image')
-                ->latest()
-                ->first();
-
-            if ($latestBooking) {
-                $imagePath = $latestBooking->ktp_image;
-                Log::info("📸 Show Fallback: Guest {$guest->id} using Booking {$latestBooking->id} KTP");
-            }
-        }
-
-        // Generate URL
-        if ($imagePath) {
-            $guest->ktp_image_url = str_contains($imagePath, 'http')
-                ? $imagePath
-                : asset('storage/' . $imagePath);
-        } else {
-            $guest->ktp_image_url = null;
+        if (!$guest) {
+            return response()->json(['message' => 'Tamu tidak ditemukan'], 404);
         }
 
         return response()->json(['data' => $guest]);
     }
 
     /**
-     * Update data tamu
+     * Update data tamu.
      */
-    public function update(Request $request, Guest $guest)
+    public function update(Request $request, $id)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'nullable|email|unique:guests,email,' . $guest->id,
-            'phone_number' => 'required|string|max:20',
-            'address' => 'nullable|string',
+        $guest = Guest::find($id);
+        if (!$guest) {
+            return response()->json(['message' => 'Tamu tidak ditemukan'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'email' => 'nullable|email',
+            'ktp_image' => 'nullable|image|max:4096',
         ]);
 
-        try {
-            $guest->update($validated);
-
-            Log::info("✅ Guest Updated: ID {$guest->id}");
-
-            return response()->json([
-                'message' => 'Data tamu berhasil diperbarui.',
-                'data' => $guest
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Guest Update Error: " . $e->getMessage());
-            return response()->json(['message' => 'Gagal memperbarui data tamu.'], 500);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
         }
-    }
 
+        $data = $request->except(['ktp_image']);
 
-    public function verify($id)
-    {
-        $guest = Guest::findOrFail($id);
-
-        try {
-            // 1. Permanenkan foto dari booking ke guest jika kosong
-            if (empty($guest->ktp_image)) {
-                $latestBooking = $guest->bookings()
-                    ->whereNotNull('ktp_image')
-                    ->where('ktp_image', '!=', '')
-                    ->latest()
-                    ->first();
-
-                if ($latestBooking) {
-                    $guest->ktp_image = $latestBooking->ktp_image;
-                    Log::info("📸 Verify: Copied KTP from Booking {$latestBooking->id} to Guest {$guest->id}");
-                }
+        // Handle ganti foto KTP
+        if ($request->hasFile('ktp_image')) {
+            if ($guest->ktp_image && Storage::disk('public')->exists($guest->ktp_image)) {
+                Storage::disk('public')->delete($guest->ktp_image);
             }
-
-            // 2. Update status verifikasi Guest
-            $guest->update(['is_verified' => true]);
-
-            // 3. ✅ FIX UTAMA: Update semua booking terkait
-            $updatedCount = $guest->bookings()
-                ->where('verification_status', 'pending')
-                ->whereIn('status', ['paid', 'settlement']) // Yang sudah bayar
-                ->update([
-                    'verification_status' => 'verified',
-                    'status' => 'confirmed'  // 🔥 INI YANG PENTING - Agar masuk kalender & list check-in
-                ]);
-
-            Log::info("✅ Guest Verified: ID {$guest->id} | Bookings updated: {$updatedCount}");
-
-            return response()->json([
-                'message' => 'Identitas tamu berhasil diverifikasi.',
-                'bookings_updated' => $updatedCount,
-                'data' => $guest
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Guest Verify Error: " . $e->getMessage());
-            return response()->json(['message' => 'Gagal memverifikasi tamu.'], 500);
+            $data['ktp_image'] = $request->file('ktp_image')->store('ktp_images', 'public');
+            $data['is_verified'] = false; // Reset verifikasi
         }
+
+        $guest->update($data);
+
+        return response()->json(['data' => $guest, 'message' => 'Data tamu berhasil diupdate']);
     }
 
     /**
-     *Tolak KTP & Hapus Foto
+     * Hapus tamu.
+     */
+    public function destroy($id)
+    {
+        $guest = Guest::find($id);
+        if (!$guest) {
+            return response()->json(['message' => 'Tamu tidak ditemukan'], 404);
+        }
+
+        // Cek jika tamu sedang menginap
+        if ($guest->checkIns()->where('is_active', true)->exists()) {
+            return response()->json(['message' => 'Tidak bisa menghapus tamu yang sedang menginap.'], 400);
+        }
+
+        // Hapus foto KTP
+        if ($guest->ktp_image && Storage::disk('public')->exists($guest->ktp_image)) {
+            Storage::disk('public')->delete($guest->ktp_image);
+        }
+
+        $guest->delete();
+
+        return response()->json(['message' => 'Tamu berhasil dihapus']);
+    }
+
+    /**
+     * Verifikasi KTP Tamu.
+     */
+    public function verifyKtp($id)
+    {
+        $guest = Guest::find($id);
+
+        if (!$guest) {
+            return response()->json(['message' => 'Tamu tidak ditemukan'], 404);
+        }
+
+        $guest->is_verified = true;
+        $guest->save();
+
+        return response()->json([
+            'message' => 'KTP Berhasil Diverifikasi',
+            'data' => $guest
+        ]);
+    }
+
+    /**
+     * [FIXED] Tolak KTP Tamu (SAFE MODE)
+     * - Menghapus update kolom 'notes' untuk mencegah error SQL jika kolom tidak ada.
+     * - Memastikan Booking status berubah jadi 'rejected'.
      */
     public function rejectKtp($id)
     {
-        $guest = Guest::findOrFail($id);
+        $guest = Guest::find($id);
+
+        if (!$guest) {
+            return response()->json(['message' => 'Tamu tidak ditemukan'], 404);
+        }
 
         try {
-            // 1. Hapus file fisik di Guest Profile
-            if ($guest->ktp_image && Storage::disk('public')->exists($guest->ktp_image)) {
-                Storage::disk('public')->delete($guest->ktp_image);
-                Log::info("🗑️ Deleted Guest KTP: {$guest->ktp_image}");
-            }
+            DB::transaction(function () use ($guest) {
 
-            // 2. Update database Guest
-            $guest->update([
-                'ktp_image' => null,
-                'is_verified' => false
-            ]);
+                // 1. CARI & BATALKAN BOOKING AKTIF/MENDATANG
+                Booking::where('guest_id', $guest->id)
+                    ->whereIn('status', ['pending', 'awaiting_payment', 'confirmed', 'paid'])
+                    ->where('check_in_date', '>=', now()->startOfDay())
+                    ->update([
+                        'status' => 'rejected'
+                    ]);
 
-            // 3. ✅ Hapus juga foto di semua booking terkait
-            $bookings = $guest->bookings()
-                ->whereNotNull('ktp_image')
-                ->where('ktp_image', '!=', '')
-                ->get();
-
-            foreach ($bookings as $booking) {
-                // Hapus file fisik
-                if (Storage::disk('public')->exists($booking->ktp_image)) {
-                    Storage::disk('public')->delete($booking->ktp_image);
-                    Log::info("🗑️ Deleted Booking KTP: {$booking->ktp_image}");
+                // 2. Hapus file fisik KTP
+                if ($guest->ktp_image && Storage::disk('public')->exists($guest->ktp_image)) {
+                    Storage::disk('public')->delete($guest->ktp_image);
                 }
 
-                // Update database
-                $booking->update([
-                    'ktp_image' => null,
-                    'verification_status' => 'rejected'
-                ]);
-            }
-
-            Log::info("❌ Guest KTP Rejected: ID {$guest->id} | Bookings affected: {$bookings->count()}");
+                // 3. Reset status tamu di database
+                $guest->ktp_image = null;
+                $guest->is_verified = false;
+                $guest->save();
+            });
 
             return response()->json([
-                'message' => 'Foto KTP ditolak dan dihapus. Tamu harus upload ulang.',
-                'deleted_files' => $bookings->count() + 1
+                'message' => 'KTP ditolak. Booking terkait telah dibatalkan.',
+                'data' => $guest
             ]);
-        } catch (\Exception $e) {
-            Log::error("Guest Reject Error: " . $e->getMessage());
-            return response()->json(['message' => 'Gagal menolak verifikasi.'], 500);
-        }
-    }
-
-    /**
-     * ✅ ADMIN: Blacklist Tamu
-     */
-    public function blacklist(Request $request, $id)
-    {
-        $validated = $request->validate([
-            'reason' => 'required|string|max:500'
-        ]);
-
-        $guest = Guest::findOrFail($id);
-
-        try {
-            $guest->update([
-                'is_blacklisted' => true,
-                'blacklist_reason' => $validated['reason']
-            ]);
-
-            Log::info("🚫 Guest Blacklisted: ID {$guest->id} | Reason: {$validated['reason']}");
+        } catch (\Throwable $e) {
+            // PERBAIKAN DI SINI: Gunakan $guest->id
+            Log::error('Gagal Reject KTP Guest ID ' . $guest->id . ': ' . $e->getMessage());
 
             return response()->json([
-                'message' => 'Tamu berhasil ditambahkan ke blacklist.'
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Blacklist Error: " . $e->getMessage());
-            return response()->json(['message' => 'Gagal memblacklist tamu.'], 500);
+                'message' => 'Gagal memproses penolakan.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-    }
-
-    /**
-     * ✅ ADMIN: Hapus dari Blacklist
-     */
-    public function unblacklist($id)
-    {
-        $guest = Guest::findOrFail($id);
-
-        try {
-            $guest->update([
-                'is_blacklisted' => false,
-                'blacklist_reason' => null
-            ]);
-
-            Log::info("✅ Guest Removed from Blacklist: ID {$guest->id}");
-
-            return response()->json([
-                'message' => 'Tamu berhasil dihapus dari blacklist.'
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Unblacklist Error: " . $e->getMessage());
-            return response()->json(['message' => 'Gagal menghapus dari blacklist.'], 500);
-        }
-    }
-
-    /**
-     * Hapus tamu dari database
-     */
-    public function destroy(Guest $guest)
-    {
-        // Validasi: Cek apakah punya riwayat
-        if ($guest->bookings()->exists() || $guest->checkIns()->exists()) {
-            return response()->json([
-                'message' => 'Tamu ini tidak dapat dihapus karena memiliki riwayat booking atau check-in.'
-            ], 409);
-        }
-
-        try {
-            // Hapus file KTP jika ada
-            if ($guest->ktp_image && Storage::disk('public')->exists($guest->ktp_image)) {
-                Storage::disk('public')->delete($guest->ktp_image);
-            }
-
-            $guest->delete();
-
-            Log::info("🗑️ Guest Deleted: ID {$guest->id}");
-
-            return response()->json(null, 204);
-        } catch (\Exception $e) {
-            Log::error("Guest Delete Error: " . $e->getMessage());
-            return response()->json(['message' => 'Gagal menghapus tamu.'], 500);
-        }
-    }
-
-    /**
-     *Get Statistics
-     */
-    public function statistics()
-    {
-        try {
-            $stats = [
-                'total_guests' => Guest::count(),
-                'verified_guests' => Guest::where('is_verified', true)->count(),
-                'pending_verification' => Guest::where('is_verified', false)
-                    ->whereNotNull('ktp_image')
-                    ->count(),
-                'blacklisted' => Guest::where('is_blacklisted', true)->count(),
-                'active_checkins' => Guest::whereHas('checkIns', function ($q) {
-                    $q->where('is_active', true);
-                })->count(),
-            ];
-
-            return response()->json(['data' => $stats]);
-        } catch (\Exception $e) {
-            Log::error("Guest Stats Error: " . $e->getMessage());
-            return response()->json(['message' => 'Gagal mengambil statistik.'], 500);
-        }
-    }
-}
+    }}
