@@ -13,18 +13,21 @@ return new class extends Migration
     {
         Schema::create('settings', function (Blueprint $table) {
             $table->id();
-            $table->uuid()->unique();
-            $table->string('app');
-            $table->text('description');
-            $table->string('logo');
-            $table->string('banner');
-            $table->string('bg_auth');
+            $table->uuid()->unique(); // Kolom ini otomatis bernama 'uuid'
 
-            $table->string('dinas');
-            $table->string('pemerintah');
-            $table->string('alamat');
-            $table->string('telepon');
-            $table->string('email');
+            $table->string('app');
+            $table->text('description')->nullable(); // Tambahkan nullable jaga-jaga deskripsi kosong
+
+            // Kolom-kolom gambar ini harus nullable karena di Seeder diset NULL
+            $table->string('logo')->nullable();     // ✅ Tambahkan ->nullable()
+            $table->string('banner')->nullable();   // ✅ Tambahkan ->nullable() (Solusi Error Utama)
+            $table->string('bg_auth')->nullable();  // ✅ Tambahkan ->nullable()
+
+            $table->string('dinas')->nullable();
+            $table->string('pemerintah')->nullable();
+            $table->string('alamat')->nullable();
+            $table->string('telepon')->nullable();
+            $table->string('email')->nullable();
 
             $table->timestamps();
         });
