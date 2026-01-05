@@ -3,10 +3,27 @@
 namespace App\Models;
 
 use App\Traits\Uuid;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Setting extends Model
 {
-    use Uuid;
-    protected $guarded = ['id', 'uuid', 'created_at', 'updated_at'];
+    use HasFactory, Uuid;
+
+
+    protected $fillable = [
+        'app',
+        'description',
+        'check_in_time',
+        'check_out_time',
+        'logo',
+        'bg_auth',
+        'bg_landing',
+        'banner',
+        'telepon',
+        'alamat',
+        'dinas',
+        'pemerintah',
+        'email'
+    ];
 }

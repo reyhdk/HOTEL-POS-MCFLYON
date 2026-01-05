@@ -45,7 +45,8 @@ Route::prefix('public')->group(function () {
     Route::get('/menus', [MenuController::class, 'index']);
 });
 
-// Settings Public
+// --- ✅ PENTING: Settings GET ditaruh di sini (Public) ---
+// Agar halaman login bisa ambil Logo tanpa kena Error 401
 Route::get('/settings', [SettingController::class, 'index']);
 
 // Authentication
@@ -61,6 +62,8 @@ Route::post('/midtrans/notification', [MidtransController::class, 'handleNotific
 // ==================================================
 // 2. RUTE TERAUTENTIKASI (PERLU LOGIN)
 // ==================================================
+// Catatan: Pastikan guard 'api' atau 'sanctum' sesuai config Anda. 
+// Jika pakai Sanctum, ganti 'auth:api' menjadi 'auth:sanctum'.
 Route::middleware('auth:api')->group(function () {
 
     // --- User Profile ---
@@ -97,14 +100,15 @@ Route::middleware('auth:api')->group(function () {
     // ==================================================
 
     // --- Dashboard & Settings ---
+    // ✅ Settings UPDATE tetap di sini (Private) agar aman
     Route::post('/settings', [SettingController::class, 'update'])->middleware('can:edit settings');
+
     Route::middleware('can:view dashboard')->group(function () {
         Route::get('/dashboard-stats', [DashboardController::class, 'getStats']);
         Route::get('/sales-chart-data', [DashboardController::class, 'getSalesChartData']);
     });
 
     // --- Manajemen Tamu (Guest) ---
-    // [PERBAIKAN DI SINI] : Mengubah 'verify' menjadi 'verify-ktp' dan method 'verifyKtp'
     Route::post('/guests/{id}/verify-ktp', [GuestController::class, 'verifyKtp'])->middleware('can:view guests');
     Route::post('/guests/{id}/reject-ktp', [GuestController::class, 'rejectKtp'])->middleware('can:view guests');
     Route::apiResource('guests', GuestController::class)->middleware('can:view guests');
@@ -121,6 +125,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/check-in', [CheckInController::class, 'store'])->middleware('can:create pos_orders');
     Route::post('/check-in/process-booking', [CheckInController::class, 'storeFromBooking']);
     Route::post('/check-in/walk-in', [CheckInController::class, 'storeWalkIn']);
+    Route::post('/admin/check-ins/store-direct', [CheckInController::class, 'store']);
     Route::get('/debug-check-in-status', [UserCheckInStatusController::class, 'debugStatus']);
     Route::post('/check-out/{room}', [CheckInController::class, 'checkout'])->middleware('can:create pos_orders');
     Route::get('/admin/checkout-history', [CheckoutHistoryController::class, 'index'])->middleware('can:view checkout_history');

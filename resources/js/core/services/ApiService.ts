@@ -3,75 +3,88 @@ import axios from "axios";
 import VueAxios from "vue-axios";
 import JwtService from "@/core/services/JwtService";
 import { useAuthStore } from "@/stores/auth";
-import router from "@/router"; // ▼▼▼ [DIBENARKAN] TAMBAHKAN IMPORT INI ▼▼▼
+import router from "@/router";
 
 class ApiService {
-  public static vueInstance: App;
+    public static vueInstance: App;
 
-  public static init(app: App<Element>) {
-    ApiService.vueInstance = app;
-    ApiService.vueInstance.use(VueAxios, axios);
-    ApiService.vueInstance.axios.defaults.baseURL = import.meta.env.VITE_APP_API_URL;
+    public static init(app: App<Element>) {
+        ApiService.vueInstance = app;
+        ApiService.vueInstance.use(VueAxios, axios);
+        ApiService.vueInstance.axios.defaults.baseURL =
+            import.meta.env.VITE_APP_API_URL;
 
-    // --- INTERCEPTOR UNTUK REQUEST ---
-    ApiService.vueInstance.axios.interceptors.request.use(
-      (config) => {
-        const token = JwtService.getToken();
+        // --- INTERCEPTOR REQUEST ---
+        ApiService.vueInstance.axios.interceptors.request.use(
+            (config) => {
+                const token = JwtService.getToken();
+                if (
+                    token &&
+                    !config.url?.includes("/auth/login") &&
+                    !config.url?.includes("/auth/register")
+                ) {
+                    config.headers["Authorization"] = `Bearer ${token}`;
+                }
+                return config;
+            },
+            (error) => Promise.reject(error)
+        );
 
-        if (token && !config.url?.includes('/auth/login') && !config.url?.includes('/auth/register')) {
-          config.headers["Authorization"] = `Bearer ${token}`;
-        }
+        // --- INTERCEPTOR RESPONSE ---
+        ApiService.vueInstance.axios.interceptors.response.use(
+            (response) => response,
+            (error) => {
+                if (error.response && error.response.status === 401) {
+                    const authStore = useAuthStore();
+                    if (router.currentRoute.value.name !== "sign-in") {
+                        authStore.logout();
+                    }
+                }
+                return Promise.reject(error);
+            }
+        );
+    }
 
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
+    public static query(resource: string, params: any) {
+        return ApiService.vueInstance.axios.get(resource, { params });
+    }
 
-    // --- INTERCEPTOR UNTUK RESPONSE ---
-    ApiService.vueInstance.axios.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response && error.response.status === 401) {
-          const authStore = useAuthStore();
-          // [FIX] 'router' sekarang sudah dikenali setelah di-import
-          if (router.currentRoute.value.name !== "sign-in") {
-            authStore.logout();
-          }
-        }
-        return Promise.reject(error);
-      }
-    );
-  }
+    public static get(resource: string, slug = "") {
+        const url = slug ? `${resource}/${slug}` : resource;
+        return ApiService.vueInstance.axios.get(url);
+    }
 
-  // ... (sisa metode: query, get, post, dll. tidak berubah) ...
-  public static query(resource: string, params: any) {
-    return ApiService.vueInstance.axios.get(resource, { params });
-  }
+    // ✅ PERBAIKAN: Tambahkan parameter 'config' (AxiosRequestConfig)
+    public static post(resource: string, params: any, config?: any) {
+        return ApiService.vueInstance.axios.post(`${resource}`, params, config);
+    }
 
-  public static get(resource: string, slug = "") {
-    const url = slug ? `${resource}/${slug}` : resource;
-    return ApiService.vueInstance.axios.get(url);
-  }
+    // ✅ PERBAIKAN: Tambahkan parameter 'config'
+    public static update(
+        resource: string,
+        slug: string,
+        params: any,
+        config?: any
+    ) {
+        return ApiService.vueInstance.axios.put(
+            `${resource}/${slug}`,
+            params,
+            config
+        );
+    }
 
-  public static post(resource: string, params: any) {
-    return ApiService.vueInstance.axios.post(`${resource}`, params);
-  }
+    // ✅ PERBAIKAN: Tambahkan parameter 'config'
+    public static put(resource: string, params: any, config?: any) {
+        return ApiService.vueInstance.axios.put(`${resource}`, params, config);
+    }
 
-  public static update(resource: string, slug: string, params: any) {
-    return ApiService.vueInstance.axios.put(`${resource}/${slug}`, params);
-  }
+    public static patch(resource: string, params: any, config?: any) {
+        return ApiService.vueInstance.axios.patch(resource, params, config);
+    }
 
-  public static put(resource: string, params: any) {
-    return ApiService.vueInstance.axios.put(`${resource}`, params);
-  }
-
-  public static patch(resource: string, params: any) {
-    return ApiService.vueInstance.axios.patch(resource, params);
-  }
-
-  public static delete(resource: string) {
-    return ApiService.vueInstance.axios.delete(resource);
-  }
+    public static delete(resource: string) {
+        return ApiService.vueInstance.axios.delete(resource);
+    }
 }
 
 export default ApiService;

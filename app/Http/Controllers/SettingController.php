@@ -2,109 +2,142 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class SettingController extends Controller
 {
+    /**
+     * Mengambil konfigurasi website.
+     * Jika belum ada di database, kembalikan nilai default.
+     */
     public function index()
     {
         $setting = Setting::first();
-        
+
+        // Jika data belum ada, return default values (Hardcoded sementara)
         if (!$setting) {
             return response()->json([
-                'app' => '',
-                'description' => '',
+                'app' => 'Nama Hotel',
+                'description' => 'Deskripsi hotel default...',
                 'logo' => null,
                 'bg_auth' => null,
-                'bg_landing' => null
+                'bg_landing' => null,
+                'check_in_time' => '14:00', // Default Check-in
+                'check_out_time' => '12:00', // Default Check-out
             ]);
         }
 
         return response()->json($setting);
     }
 
+    /**
+     * Memperbarui konfigurasi website (termasuk Waktu Check-in/out & Gambar).
+     */
     public function update(Request $request)
     {
-        $request->validate([
+
+        if (!$request->hasFile('logo') && !$request->hasFile('bg_auth') && !$request->hasFile('bg_landing')) {
+            // Jika tidak ada file sama sekali yang terdeteksi
+            return response()->json([
+                'status' => 'DEBUG_MODE',
+                'message' => 'Controller TIDAK menerima file apapun!',
+                'limit_php_upload' => ini_get('upload_max_filesize'),
+                'limit_php_post' => ini_get('post_max_size'),
+                'data_text_yang_masuk' => $request->all(), // Cek apakah teks app/description masuk
+                'file_yang_masuk' => $request->allFiles() // Cek array file
+            ], 422);
+        }
+
+        // 1. Validasi Input
+        $validator = Validator::make($request->all(), [
             'app' => 'required|string|max:255',
             'description' => 'required|string',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-            'bg_auth' => 'nullable|image|mimes:jpeg,png,jpg|max:8192',
-            'bg_landing' => 'nullable|image|mimes:jpeg,png,jpg|max:8192',
+
+            // Validasi Format Jam (HH:MM) contoh: 14:00
+            'check_in_time' => 'required|date_format:H:i',
+            'check_out_time' => 'required|date_format:H:i',
+
+            // Validasi Gambar
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048', // Max 2MB
+            'bg_auth' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096', // Max 4MB
+            'bg_landing' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
         ]);
 
-        $setting = Setting::first();
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validasi gagal',
+                'errors' => $validator->errors()
+            ], 422);
+        }
 
+        // 2. Ambil atau Buat Data Setting (Single Row)
+        $setting = Setting::first();
         if (!$setting) {
             $setting = new Setting();
         }
 
-        $data = $request->only(['app', 'description']);
+        // 3. Update Data Teks
+        $setting->app = $request->app;
+        $setting->description = $request->description;
+        $setting->check_in_time = $request->check_in_time;
+        $setting->check_out_time = $request->check_out_time;
 
-        // --- UPLOAD LOGO ---
+        // 4. Proses Upload Gambar (Helper Logic)
+
+        // --- LOGO ---
         if ($request->hasFile('logo')) {
-            // Hapus logo lama
+            // Hapus file lama jika ada
             if ($setting->logo) {
                 $oldPath = str_replace('/storage/', '', $setting->logo);
                 if (Storage::disk('public')->exists($oldPath)) {
                     Storage::disk('public')->delete($oldPath);
                 }
             }
-            
-            // Upload logo baru dengan nama unik
-            $logoFile = $request->file('logo');
-            $logoName = 'logo_' . time() . '.' . $logoFile->getClientOriginalExtension();
-            $logoPath = $logoFile->storeAs('setting', $logoName, 'public');
-            $data['logo'] = '/storage/' . $logoPath;
+            // Simpan file baru
+            $file = $request->file('logo');
+            $filename = 'logo_' . time() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('settings', $filename, 'public');
+            $setting->logo = '/storage/' . $path;
         }
 
-        // --- UPLOAD BACKGROUND AUTH ---
+        // --- BACKGROUND AUTH ---
         if ($request->hasFile('bg_auth')) {
-            // Hapus background lama
             if ($setting->bg_auth) {
                 $oldPath = str_replace('/storage/', '', $setting->bg_auth);
                 if (Storage::disk('public')->exists($oldPath)) {
                     Storage::disk('public')->delete($oldPath);
                 }
             }
-            
-            // Upload baru dengan nama unik
-            $bgAuthFile = $request->file('bg_auth');
-            $bgAuthName = 'bg_auth_' . time() . '.' . $bgAuthFile->getClientOriginalExtension();
-            $bgAuthPath = $bgAuthFile->storeAs('setting', $bgAuthName, 'public');
-            $data['bg_auth'] = '/storage/' . $bgAuthPath;
+            $file = $request->file('bg_auth');
+            $filename = 'bg_auth_' . time() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('settings', $filename, 'public');
+            $setting->bg_auth = '/storage/' . $path;
         }
 
-        // --- UPLOAD BACKGROUND LANDING ---
+        // --- BACKGROUND LANDING ---
         if ($request->hasFile('bg_landing')) {
-            // Hapus background lama
             if ($setting->bg_landing) {
                 $oldPath = str_replace('/storage/', '', $setting->bg_landing);
                 if (Storage::disk('public')->exists($oldPath)) {
                     Storage::disk('public')->delete($oldPath);
                 }
             }
-            
-            // Upload baru dengan nama unik
-            $bgLandingFile = $request->file('bg_landing');
-            $bgLandingName = 'bg_landing_' . time() . '.' . $bgLandingFile->getClientOriginalExtension();
-            $bgLandingPath = $bgLandingFile->storeAs('setting', $bgLandingName, 'public');
-            $data['bg_landing'] = '/storage/' . $bgLandingPath;
+            $file = $request->file('bg_landing');
+            $filename = 'bg_landing_' . time() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('settings', $filename, 'public');
+            $setting->bg_landing = '/storage/' . $path;
         }
 
-        // Simpan ke database
-        if (!$setting->exists) {
-            $setting->fill($data);
-            $setting->save();
-        } else {
-            $setting->update($data);
-        }
+        // 5. Simpan ke Database
+        $setting->save();
 
         return response()->json([
-            'message' => 'Berhasil memperbarui konfigurasi website',
-            'data' => $setting->fresh() 
+            'message' => 'Pengaturan berhasil diperbarui!',
+            'data' => $setting
         ]);
     }
 }

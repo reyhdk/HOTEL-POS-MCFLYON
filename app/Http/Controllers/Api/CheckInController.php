@@ -7,7 +7,9 @@ use App\Models\Booking;
 use App\Models\CheckIn;
 use App\Models\Room;
 use App\Models\Guest;
+use App\Models\User;
 use App\Models\Order;
+use App\Models\Setting; // ✅ [BARU] Import Model Setting
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -27,8 +29,8 @@ class CheckInController extends Controller
     }
 
     /**
-     * ✅ FUNGSI UTAMA: CHECK-IN DARI BOOKING (Dipanggil dari CheckInModal mode: booking_existing)
-     * Method ini yang dipanggil oleh route: /check-in/process-booking
+     * ✅ FUNGSI 1: CHECK-IN DARI BOOKING ONLINE
+     * (Dipanggil saat Admin menekan Check-In pada booking yang sudah ada)
      */
     public function storeFromBooking(Request $request)
     {
@@ -40,43 +42,30 @@ class CheckInController extends Controller
 
         $booking = Booking::with(['room', 'guest', 'user'])->findOrFail($request->booking_id);
 
-        // 🔍 DEBUG LOG 1
-        Log::info('🔍 [CHECK-IN] Starting process', [
-            'booking_id' => $booking->id,
-            'user_id' => $booking->user_id,
-            'guest_id' => $booking->guest_id,
-            'guest_name' => $booking->guest->name ?? 'N/A',
-            'current_status' => $booking->status,
-            'room_number' => $booking->room->room_number,
-            'room_status' => $booking->room->status
-        ]);
+        // Link User jika email cocok (Fix dashboard tamu)
+        if (is_null($booking->user_id) && $booking->guest && $booking->guest->email) {
+            $registeredUser = User::where('email', $booking->guest->email)->first();
+            if ($registeredUser) {
+                $booking->update(['user_id' => $registeredUser->id]);
+                $booking->load('user');
+            }
+        }
 
         // 1. Validasi Status Pembayaran
         $validStatuses = ['paid', 'confirmed', 'settlement'];
         if (!in_array(strtolower($booking->status), $validStatuses)) {
-            Log::warning('⚠️ [CHECK-IN] Invalid booking status', [
-                'booking_id' => $booking->id,
-                'status' => $booking->status
-            ]);
             return response()->json([
-                'message' => 'Booking belum lunas atau belum dikonfirmasi. Status: ' . $booking->status
+                'message' => 'Booking belum lunas atau belum dikonfirmasi. Status saat ini: ' . $booking->status
             ], 400);
         }
 
         // 2. Validasi Tanggal
-        $today = Carbon::now()->startOfDay();
         $bookingDate = Carbon::parse($booking->check_in_date)->startOfDay();
-
-        if ($today->lt($bookingDate)) {
-            return response()->json([
-                'message' => 'Check-in terlalu dini. Jadwal: ' . $bookingDate->format('d M Y')
-            ], 400);
-        }
 
         // 3. Validasi Kamar
         if ($booking->room->status === 'occupied') {
             return response()->json([
-                'message' => 'Kamar masih terisi. Lakukan check-out dulu.'
+                'message' => 'Kamar masih terisi. Harap lakukan Check-out pada tamu sebelumnya.'
             ], 409);
         }
 
@@ -86,39 +75,26 @@ class CheckInController extends Controller
             ->first();
 
         if ($existingCheckIn) {
-            Log::warning('⚠️ [CHECK-IN] Already checked in', [
-                'booking_id' => $booking->id,
-                'checkin_id' => $existingCheckIn->id
-            ]);
             return response()->json([
-                'message' => 'Booking ini sudah di-check-in sebelumnya.',
-                'checkin_data' => $existingCheckIn
+                'message' => 'Booking ini sudah status Checked In.',
             ], 400);
         }
 
         try {
             DB::transaction(function () use ($booking, $request) {
-
-                // Update incognito jika ada
+                // Update KTP & Incognito
                 $isIncognito = $request->boolean('is_incognito', false);
 
-                // Handle KTP Image jika ada upload baru
-                $finalKtpPath = $booking->ktp_image;
                 if ($request->hasFile('ktp_image')) {
-                    $finalKtpPath = $request->file('ktp_image')->store('ktp_images', 'public');
-
-                    // Update booking & guest
-                    $booking->update(['ktp_image' => $finalKtpPath]);
+                    $path = $request->file('ktp_image')->store('ktp_images', 'public');
+                    $booking->update(['ktp_image' => $path]);
                     if ($booking->guest) {
-                        $booking->guest->update([
-                            'ktp_image' => $finalKtpPath,
-                            'is_verified' => false
-                        ]);
+                        $booking->guest->update(['ktp_image' => $path]);
                     }
                 }
 
                 // === BUAT CHECK-IN RECORD ===
-                $checkIn = CheckIn::create([
+                CheckIn::create([
                     'booking_id' => $booking->id,
                     'room_id' => $booking->room_id,
                     'guest_id' => $booking->guest_id,
@@ -127,244 +103,156 @@ class CheckInController extends Controller
                     'is_incognito' => $isIncognito,
                 ]);
 
-                Log::info('✅ [CHECK-IN] Record created', [
-                    'checkin_id' => $checkIn->id,
-                    'booking_id' => $checkIn->booking_id,
-                    'guest_id' => $checkIn->guest_id,
-                    'room_id' => $checkIn->room_id,
-                    'is_active' => $checkIn->is_active
-                ]);
-
-                // === UPDATE ROOM STATUS ===
+                // === UPDATE STATUS KAMAR & BOOKING ===
                 $booking->room->update(['status' => 'occupied']);
 
-                Log::info('✅ [CHECK-IN] Room updated', [
-                    'room_id' => $booking->room_id,
-                    'new_status' => 'occupied'
-                ]);
-
-                // === UPDATE BOOKING STATUS ===
                 $booking->update([
                     'status' => 'checked_in',
                     'checked_in_at' => now(),
                     'is_incognito' => $isIncognito
                 ]);
-
-                Log::info('✅ [CHECK-IN] Booking updated', [
-                    'booking_id' => $booking->id,
-                    'new_status' => 'checked_in',
-                    'checked_in_at' => $booking->checked_in_at,
-                    'user_id' => $booking->user_id
-                ]);
             });
 
-            // === VERIFIKASI FINAL ===
-            $verifyCheckIn = CheckIn::where('booking_id', $booking->id)
-                ->where('is_active', true)
-                ->with(['booking.user', 'guest', 'room'])
-                ->first();
-
-            $verifyBooking = Booking::find($booking->id);
-
-            Log::info('🎉 [CHECK-IN] Process completed successfully', [
-                'booking_id' => $booking->id,
-                'checkin_exists' => $verifyCheckIn ? 'YES' : 'NO',
-                'checkin_id' => $verifyCheckIn?->id,
-                'booking_status' => $verifyBooking->status,
-                'user_id' => $verifyBooking->user_id,
-                'guest_id' => $verifyBooking->guest_id
-            ]);
-
-            return response()->json([
-                'message' => 'Check-in berhasil! Selamat datang 🎉',
-                'data' => [
-                    'checkin' => $verifyCheckIn,
-                    'booking' => $verifyBooking
-                ],
-                'debug' => [
-                    'booking_id' => $booking->id,
-                    'user_id' => $verifyBooking->user_id,
-                    'guest_id' => $verifyBooking->guest_id,
-                    'checkin_id' => $verifyCheckIn?->id,
-                    'status' => $verifyBooking->status
-                ]
-            ]);
+            return response()->json(['message' => 'Check-in berhasil!']);
         } catch (\Exception $e) {
-            Log::error('❌ [CHECK-IN] Failed', [
-                'booking_id' => $booking->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'message' => 'Gagal check-in: ' . $e->getMessage()
-            ], 500);
+            Log::error('CheckIn Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal memproses check-in.'], 500);
         }
     }
 
     /**
-     * ✅ FUNGSI 2: CHECK-IN WALK-IN
+     * ✅ FUNGSI 2: WALK-IN (TAMU DATANG LANGSUNG)
+     * (Dipanggil oleh route /admin/check-ins/store-direct)
+     * UPDATE: Mengambil Jam Check-out dari Database Setting
      */
-    public function storeWalkIn(Request $request)
+    public function store(Request $request)
     {
+        // 1. Validasi Input
         $validated = $request->validate([
             'room_id' => 'required|exists:rooms,id',
-            'guest_id' => 'required|exists:guests,id',
-            'check_in_date' => 'required|date|after_or_equal:today',
-            'check_out_date' => 'required|date|after:check_in_date',
-            'payment_method' => 'required|string|in:cash,midtrans',
-            'is_incognito'   => 'nullable|boolean',
-            'ktp_image'      => 'nullable|image|mimes:jpeg,png,jpg|max:4096',
+            'guest_id' => 'nullable|exists:guests,id',
+            'guest_name' => 'required_without:guest_id|string',
+            'name'       => 'nullable|string',
+            'guest_phone' => 'nullable|string',
+            'phone'       => 'nullable|string',
+            'guest_email' => 'nullable|email',
+            'duration'       => 'nullable|integer|min:1',
+            'check_out_date' => 'nullable|date|after:today',
+            'price_per_night' => 'nullable|numeric',
+            'deposit' => 'nullable|numeric',
+            'ktp_image' => 'nullable|image|max:4096',
+            'is_incognito' => 'nullable|boolean'
         ]);
 
-        $room = Room::findOrFail($validated['room_id']);
-        $guest = Guest::findOrFail($validated['guest_id']);
-
-        // Cek Blacklist
-        if ($guest->is_blacklisted) {
-            return response()->json(['message' => 'Tamu Blacklist: ' . ($guest->blacklist_reason ?? '')], 403);
+        if (!$request->filled('duration') && !$request->filled('check_out_date')) {
+            return response()->json(['message' => 'Harap tentukan durasi menginap atau tanggal check-out.'], 422);
         }
 
-        // Cek Kamar
-        if ($room->status === 'occupied') {
-            return response()->json(['message' => 'Kamar sedang terisi.'], 409);
-        }
-
-        // Cek Konflik Booking
-        $checkInDate = Carbon::parse($validated['check_in_date']);
-        $checkOutDate = Carbon::parse($validated['check_out_date']);
-
-        $isBooked = Booking::where('room_id', $room->id)
-            ->whereIn('status', ['confirmed', 'paid', 'checked_in'])
-            ->where(function ($query) use ($checkInDate, $checkOutDate) {
-                $query->where('check_in_date', '<', $checkOutDate)
-                    ->where('check_out_date', '>', $checkInDate);
-            })
-            ->exists();
-
-        if ($isBooked) {
-            return response()->json(['message' => 'Kamar sudah dibooking untuk tanggal tersebut.'], 409);
-        }
-
-        // Upload KTP
-        $ktpPath = null;
-        if ($request->hasFile('ktp_image')) {
-            $ktpPath = $request->file('ktp_image')->store('ktp_images', 'public');
-        }
-
-        // Hitung Harga
-        $durationInNights = max(1, $checkOutDate->diffInDays($checkInDate));
-        $totalPrice = $room->price_per_night * $durationInNights;
-
-        // --- MIDTRANS (QRIS) ---
-        if ($validated['payment_method'] === 'midtrans') {
-            $midtransOrderId = 'WALK-' . time() . '-' . rand(100, 999);
-
-            try {
-                DB::transaction(function () use ($room, $validated, $request, $totalPrice, $midtransOrderId, $ktpPath) {
-                    if ($ktpPath) {
-                        Guest::where('id', $validated['guest_id'])->update([
-                            'ktp_image' => $ktpPath,
-                            'is_verified' => false
-                        ]);
-                    }
-
-                    Booking::create([
-                        'room_id' => $room->id,
-                        'guest_id' => $validated['guest_id'],
-                        'user_id' => $request->user()->id ?? null,
-                        'check_in_date' => $validated['check_in_date'],
-                        'check_out_date' => $validated['check_out_date'],
-                        'total_price' => $totalPrice,
-                        'status' => 'pending',
-                        'is_incognito' => $request->boolean('is_incognito'),
-                        'payment_method' => 'midtrans',
-                        'midtrans_order_id' => $midtransOrderId,
-                        'ktp_image' => $ktpPath,
-                        'verification_status' => 'pending'
-                    ]);
-                });
-
-                $params = [
-                    'transaction_details' => [
-                        'order_id' => $midtransOrderId,
-                        'gross_amount' => (int) $totalPrice,
-                    ],
-                    'customer_details' => [
-                        'first_name' => $guest->name,
-                        'phone' => $guest->phone_number,
-                    ],
-                    'item_details' => [[
-                        'id' => 'ROOM-' . $room->id,
-                        'price' => (int) $room->price_per_night,
-                        'quantity' => $durationInNights,
-                        'name' => 'Sewa Kamar ' . $room->room_number
-                    ]]
-                ];
-
-                $snapToken = Snap::getSnapToken($params);
-
-                return response()->json([
-                    'status' => 'pending_payment',
-                    'message' => 'Booking dibuat. Silakan scan QRIS.',
-                    'snap_token' => $snapToken
-                ]);
-            } catch (\Exception $e) {
-                return response()->json(['message' => 'Gagal koneksi Midtrans: ' . $e->getMessage()], 500);
+        return DB::transaction(function () use ($request) {
+            // A. Cek Status Kamar
+            $room = Room::lockForUpdate()->find($request->room_id);
+            if ($room->status === 'occupied') {
+                throw new \Exception('Kamar sedang terisi! Silakan check-out tamu sebelumnya.');
             }
-        }
 
-        // --- CASH (LANGSUNG) ---
-        try {
-            DB::transaction(function () use ($validated, $room, $request, $checkInDate, $checkOutDate, $totalPrice, $ktpPath) {
+            // B. Handle Data Tamu
+            if ($request->filled('guest_id')) {
+                $guest = Guest::find($request->guest_id);
+            } else {
+                $phone = $request->guest_phone ?? $request->phone;
+                $name  = $request->guest_name ?? $request->name;
 
-                if ($ktpPath) {
-                    Guest::where('id', $validated['guest_id'])->update([
-                        'ktp_image' => $ktpPath,
+                $guest = Guest::updateOrCreate(
+                    ['phone_number' => $phone],
+                    [
+                        'name' => $name,
+                        'email' => $request->guest_email,
                         'is_verified' => false
-                    ]);
+                    ]
+                );
+            }
+
+            if ($request->hasFile('ktp_image')) {
+                $ktpPath = $request->file('ktp_image')->store('ktp_images', 'public');
+                $guest->update(['ktp_image' => $ktpPath]);
+            }
+
+            // --- [LOGIKA WAKTU DINAMIS] ---
+            $checkInTime = Carbon::now();
+
+            // 1. Ambil Setting Jam Checkout dari DB (Default: 12:00)
+            $setting = Setting::first();
+            $checkoutTimeStr = $setting ? $setting->check_out_time : '12:00';
+
+            // 2. Parse Jam dan Menit (Format H:i)
+            $timeParts = explode(':', $checkoutTimeStr);
+            $outHour = isset($timeParts[0]) ? (int)$timeParts[0] : 12;
+            $outMinute = isset($timeParts[1]) ? (int)$timeParts[1] : 0;
+
+            if ($request->filled('check_out_date')) {
+                // Jika input tanggal manual, set jamnya sesuai setting
+                $checkOutTime = Carbon::parse($request->check_out_date)->setTime($outHour, $outMinute, 0);
+
+                $duration = max(1, (int) ceil($checkInTime->diffInDays($checkOutTime, false)));
+                if ($checkOutTime->isPast()) {
+                    $duration = 1;
+                    $checkOutTime = Carbon::now()->addDay()->setTime($outHour, $outMinute, 0);
                 }
+            } else {
+                // Jika input durasi, tambah hari lalu set jam sesuai setting
+                $duration = (int) $request->duration;
+                $checkOutTime = Carbon::now()->addDays($duration)->setTime($outHour, $outMinute, 0);
+            }
+            // -----------------------------
 
-                $booking = Booking::create([
-                    'room_id' => $room->id,
-                    'guest_id' => $validated['guest_id'],
-                    'user_id' => $request->user()->id ?? null,
-                    'check_in_date' => $checkInDate,
-                    'check_out_date' => $checkOutDate,
-                    'total_price' => $totalPrice,
-                    'status' => 'checked_in',
-                    'checked_in_at' => now(),
-                    'is_incognito' => $request->boolean('is_incognito'),
-                    'payment_method' => 'cash',
-                    'midtrans_order_id' => 'CASH-' . time(),
-                    'ktp_image' => $ktpPath,
-                    'verification_status' => 'pending'
-                ]);
+            $pricePerNight = $request->price_per_night ?? $room->price;
+            $totalPrice = $pricePerNight * $duration;
 
-                CheckIn::create([
-                    'booking_id' => $booking->id,
-                    'room_id' => $room->id,
-                    'guest_id' => $validated['guest_id'],
-                    'check_in_time' => now(),
-                    'is_active' => true,
-                    'is_incognito' => $booking->is_incognito,
-                ]);
+            // D. Buat Booking
+            $booking = Booking::create([
+                'guest_id' => $guest->id,
+                'room_id' => $room->id,
+                'check_in_date' => $checkInTime,
+                'check_out_date' => $checkOutTime,
+                'total_price' => $totalPrice,
+                'status' => 'checked_in',
+                'payment_status' => 'paid',
+                'payment_method' => 'cash',
+                'source' => 'walk_in',
+                'is_incognito' => $request->boolean('is_incognito'),
+                'checked_in_at' => now(),
+                'midtrans_order_id' => 'WALKIN-' . time()
+            ]);
 
-                $room->update(['status' => 'occupied']);
-            });
+            // E. Buat Data CheckIn
+            $checkIn = CheckIn::create([
+                'booking_id' => $booking->id,
+                'guest_id' => $guest->id,
+                'room_id' => $room->id,
+                'check_in_time' => $checkInTime,
+                'is_active' => true,
+                'deposit_amount' => $request->deposit ?? 0,
+                'is_incognito' => $request->boolean('is_incognito')
+            ]);
 
-            return response()->json(['message' => 'Check-in Walk-in berhasil (Cash).']);
-        } catch (\Throwable $e) {
-            Log::error('Gagal Walk-in Cash: ' . $e->getMessage());
-            return response()->json(['message' => 'Gagal check-in.'], 500);
-        }
+            // F. Update Kamar
+            $room->update(['status' => 'occupied']);
+
+            return response()->json([
+                'message' => 'Check-in Walk-in berhasil.',
+                'data' => $checkIn
+            ]);
+        });
     }
 
     /**
-     * ✅ CHECK-OUT
+     * CHECK-OUT
      */
-    public function checkout(Request $request, Room $room)
+    public function checkOut(Request $request)
     {
+        $roomId = $request->input('room_id');
+        $room = Room::findOrFail($roomId);
+
         $paymentMethod = $request->input('payment_method', 'cash');
 
         if ($room->status !== 'occupied') {
