@@ -35,8 +35,7 @@ const routes: Array<RouteRecordRaw> = [
             },
             {
                 path: "profile",
-                name: "user-profile", // Nama route beda dengan admin
-                // Kita pakai file yang SAMA dengan admin agar tidak kerja 2x
+                name: "user-profile",
                 component: () => import("@/pages/dashboard/profile/Index.vue"),
                 meta: {
                     pageTitle: "Profil Saya",
@@ -100,7 +99,6 @@ const routes: Array<RouteRecordRaw> = [
                     import("@/pages/user-dashboard/checkout/Index.vue"),
                 meta: { pageTitle: "Tagihan & Checkout" },
             },
-
             {
                 path: "payment/:orderId",
                 name: "user-payment",
@@ -175,7 +173,7 @@ const routes: Array<RouteRecordRaw> = [
                 meta: {
                     pageTitle: "Verifikasi KTP",
                     breadcrumbs: ["Master Data", "Verifikasi KTP"],
-                    role : ["admin", "receptionist"]
+                    role: ["admin", "receptionist"],
                 },
             },
             {
@@ -241,11 +239,10 @@ const routes: Array<RouteRecordRaw> = [
     },
 
     // =======================================================
-    // ▼▼▼ GRUP RUTE AUTENTIKASI (DIPERBAIKI) ▼▼▼
+    // ▼▼▼ GRUP RUTE AUTENTIKASI ▼▼▼
     // =======================================================
     {
         path: "/auth",
-        // Gunakan RouterView agar tidak ada layout tambahan yang membungkus
         component: RouterView,
         meta: { middleware: "guest" },
         children: [
@@ -263,8 +260,9 @@ const routes: Array<RouteRecordRaw> = [
             },
         ],
     },
+
     // =======================================================
-    // ▼▼▼ LANDING PAGE (HALAMAN UTAMA) ▼▼▼
+    // ▼▼▼ LANDING PAGE ▼▼▼
     // =======================================================
     {
         path: "/",
@@ -272,10 +270,6 @@ const routes: Array<RouteRecordRaw> = [
         component: () => import("@/pages/landing-page/index.vue"),
         meta: {
             pageTitle: "Welcome to McFlyon Hotel",
-            // middleware: "guest"
-            // Catatan: Jika Anda ingin user yang SUDAH LOGIN otomatis
-            // dilempar ke Dashboard saat buka halaman ini, aktifkan 'middleware: "guest"'.
-            // Jika ingin semua orang bisa lihat landing page, biarkan kosong.
         },
     },
     {
@@ -295,9 +289,15 @@ const router = createRouter({
 
 NProgress.configure({ showSpinner: false });
 
-// [DIBENARKAN] Logika Navigation Guard yang lebih aman
 router.beforeEach(async (to, from, next) => {
     NProgress.start();
+
+    console.log("🧭 Navigation:", {
+        from: from.name,
+        to: to.name,
+        meta: to.meta,
+    });
+
     document.title = `${to.meta.pageTitle || "Welcome"} - ${
         import.meta.env.VITE_APP_NAME
     }`;
@@ -305,28 +305,59 @@ router.beforeEach(async (to, from, next) => {
     const authStore = useAuthStore();
     const token = JwtService.getToken();
 
+    console.log("🔑 Auth State:", {
+        hasToken: !!token,
+        isAuthenticated: authStore.isAuthenticated,
+        isUserLoaded: authStore.isUserLoaded,
+        userRole: authStore.userRole,
+    });
+
+    // ✅ Verifikasi auth jika ada token tapi user belum loaded
     if (token && !authStore.isUserLoaded) {
-        await authStore.verifyAuth();
+        console.log("🔄 Verifying auth...");
+        try {
+            await authStore.verifyAuth();
+            console.log("✅ Auth verified:", {
+                user: authStore.user?.name,
+                role: authStore.userRole,
+            });
+        } catch (error) {
+            console.error("❌ Auth verification failed:", error);
+        }
     }
 
     const isAuthenticated = authStore.isAuthenticated;
     const userRole = authStore.userRole;
     const staffRoles = ["admin", "receptionist", "chef", "cleaning-service"];
 
-    // 1. Logika untuk halaman tamu (login, register)
+    // 1. Logika untuk halaman guest (login, register)
     if (to.meta.middleware === "guest") {
+        console.log("👤 Guest route detected");
+
         if (isAuthenticated) {
+            console.log(
+                "✅ User is authenticated, redirecting to dashboard..."
+            );
+
             if (staffRoles.includes(userRole)) {
+                console.log("🏢 Redirecting to admin dashboard");
                 return next({ name: "admin-dashboard" });
             }
+
+            console.log("👥 Redirecting to user dashboard");
             return next({ name: "user-dashboard" });
         }
+
+        console.log("➡️ Allowing access to guest route");
         return next();
     }
 
     // 2. Logika untuk halaman yang butuh login
     if (to.meta.middleware === "auth") {
+        console.log("🔒 Protected route detected");
+
         if (!isAuthenticated) {
+            console.warn("🚫 User not authenticated, redirecting to login");
             return next({ name: "sign-in" });
         }
 
@@ -335,13 +366,24 @@ router.beforeEach(async (to, from, next) => {
             const requiredRoles = Array.isArray(to.meta.role)
                 ? to.meta.role
                 : [to.meta.role];
+
+            console.log("🎭 Checking role authorization:", {
+                userRole,
+                requiredRoles,
+                hasAccess: requiredRoles.includes(userRole),
+            });
+
             if (!requiredRoles.includes(userRole)) {
+                console.warn("🚫 User role not authorized, redirecting to 404");
                 return next({ name: "404" });
             }
         }
+
+        console.log("✅ Authorization passed");
     }
 
     // 3. Jika semua kondisi lolos, izinkan akses
+    console.log("✅ Navigation allowed");
     return next();
 });
 

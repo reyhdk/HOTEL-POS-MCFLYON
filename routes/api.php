@@ -4,7 +4,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // --- Controller Imports ---
-use App\Http\Controllers\Api\Admin\CheckoutHistoryController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\MidtransController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SettingController;
+use App\Http\Controllers\UserController;
+// API Controllers
+use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\CheckInController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FacilityController;
@@ -14,19 +20,15 @@ use App\Http\Controllers\Api\MenuController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\RoomController;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\RoleController;
-use App\Http\Controllers\SettingController;
-use App\Http\Controllers\UserController;
 use App\Http\Controllers\Api\UserBookingController;
-use App\Http\Controllers\Api\BookingController;
-use App\Http\Controllers\Api\Guest\ServiceRequestController;
-use App\Http\Controllers\Api\Guest\GuestOrderController;
+use App\Http\Controllers\Api\UserCheckInStatusController;
+// Guest & Admin Namespace Controllers
+use App\Http\Controllers\Api\Admin\CheckoutHistoryController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\ServiceRequestController as AdminServiceRequestController;
-use App\Http\Controllers\MidtransController;
 use App\Http\Controllers\Api\Guest\CheckoutController;
-use App\Http\Controllers\Api\UserCheckInStatusController;
+use App\Http\Controllers\Api\Guest\GuestOrderController;
+use App\Http\Controllers\Api\Guest\ServiceRequestController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,8 +47,6 @@ Route::prefix('public')->group(function () {
     Route::get('/menus', [MenuController::class, 'index']);
 });
 
-// --- ✅ PENTING: Settings GET ditaruh di sini (Public) ---
-// Agar halaman login bisa ambil Logo tanpa kena Error 401
 Route::get('/settings', [SettingController::class, 'index']);
 
 // Authentication
@@ -60,13 +60,14 @@ Route::post('/midtrans/notification', [MidtransController::class, 'handleNotific
 
 
 // ==================================================
-// 2. RUTE TERAUTENTIKASI (PERLU LOGIN)
+// 2. RUTE TERAUTENTIKASI (PERLU LOGIN) - JWT
+// ✅ GANTI auth:sanctum MENJADI auth:api
 // ==================================================
-// Catatan: Pastikan guard 'api' atau 'sanctum' sesuai config Anda. 
-// Jika pakai Sanctum, ganti 'auth:api' menjadi 'auth:sanctum'.
 Route::middleware('auth:api')->group(function () {
 
-    // --- User Profile ---
+    // --- A. USER / TAMU (Aplikasi Sisi User) ---
+
+    // 1. Profile & Auth
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
@@ -77,60 +78,61 @@ Route::middleware('auth:api')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
     });
 
-    // --- Booking & Status Tamu (Sisi User App) ---
+    // 2. Booking & Status
     Route::get('/my-bookings', [UserBookingController::class, 'index']);
-    Route::get('/my-check-in-status', [UserCheckInStatusController::class, 'getStatus']);
+    Route::get('/user/check-in-status', [UserCheckInStatusController::class, 'getStatus']);
     Route::post('/midtrans/create-transaction', [MidtransController::class, 'createTransaction']);
 
-    // --- RUTE GUEST MODE (Saat Tamu Login di Kamar) ---
+    // 3. Guest Mode
     Route::prefix('guest')->name('guest.')->group(function () {
         Route::get('/profile', [GuestOrderController::class, 'getProfile']);
         Route::post('/orders', [GuestOrderController::class, 'store']);
         Route::get('/orders', [GuestOrderController::class, 'getOrderHistory']);
         Route::get('/orders/{order}', [GuestOrderController::class, 'show']);
         Route::post('/orders/{order}/pay', [GuestOrderController::class, 'processPayment']);
+
         Route::post('/service-requests', [ServiceRequestController::class, 'store']);
         Route::get('/service-requests', [ServiceRequestController::class, 'index']);
+
         Route::get('/folio', [CheckoutController::class, 'getFolio']);
         Route::post('/checkout', [CheckoutController::class, 'processCheckout']);
     });
 
-    // ==================================================
-    // 3. RUTE ADMIN / STAFF (Backoffice)
-    // ==================================================
 
-    // --- Dashboard & Settings ---
-    // ✅ Settings UPDATE tetap di sini (Private) agar aman
-    Route::post('/settings', [SettingController::class, 'update'])->middleware('can:edit settings');
+    // --- B. ADMIN / STAFF (Backoffice Dashboard) ---
 
+    // Dashboard Stats
     Route::middleware('can:view dashboard')->group(function () {
         Route::get('/dashboard-stats', [DashboardController::class, 'getStats']);
         Route::get('/sales-chart-data', [DashboardController::class, 'getSalesChartData']);
     });
 
-    // --- Manajemen Tamu (Guest) ---
+    // Settings Update
+    Route::post('/settings', [SettingController::class, 'update'])->middleware('can:edit settings');
+
+    // Manajemen Tamu
     Route::post('/guests/{id}/verify-ktp', [GuestController::class, 'verifyKtp'])->middleware('can:view guests');
     Route::post('/guests/{id}/reject-ktp', [GuestController::class, 'rejectKtp'])->middleware('can:view guests');
     Route::apiResource('guests', GuestController::class)->middleware('can:view guests');
 
-    // --- Manajemen Booking ---
+    // Manajemen Booking
     Route::post('/bookings/{id}/verify', [BookingController::class, 'verifyBooking'])->middleware('can:view guests');
     Route::post('/bookings/{id}/reject', [BookingController::class, 'rejectBooking'])->middleware('can:view guests');
-
-    // Standard booking routes
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::get('/bookings/{id}', [BookingController::class, 'show']);
 
-    // --- Check-In / Check-Out Operasional ---
+    // Operasional Check-In / Check-Out
     Route::post('/check-in', [CheckInController::class, 'store'])->middleware('can:create pos_orders');
     Route::post('/check-in/process-booking', [CheckInController::class, 'storeFromBooking']);
     Route::post('/check-in/walk-in', [CheckInController::class, 'storeWalkIn']);
-    Route::post('/admin/check-ins/store-direct', [CheckInController::class, 'store']);
-    Route::get('/debug-check-in-status', [UserCheckInStatusController::class, 'debugStatus']);
+    Route::post('/admin/check-ins/store-direct', [CheckInController::class, 'storeDirect']);
     Route::post('/check-out/{room}', [CheckInController::class, 'checkout'])->middleware('can:create pos_orders');
     Route::get('/admin/checkout-history', [CheckoutHistoryController::class, 'index'])->middleware('can:view checkout_history');
 
-    // --- POS (Point of Sales) & Transaksi ---
+    // Debugging
+    Route::get('/debug-check-in-status', [UserCheckInStatusController::class, 'debugStatus']);
+
+    // POS & Transaksi
     Route::post('/orders', [OrderController::class, 'store'])->middleware('can:create pos_orders');
     Route::get('/pending-orders', [PaymentController::class, 'getPendingOrders'])->middleware('can:manage payments');
     Route::post('/orders/{order}/pay', [PaymentController::class, 'processPayment'])->middleware('can:manage payments');
@@ -143,26 +145,28 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/folios/{room}/checkout', [FolioController::class, 'processFolioPaymentAndCheckout'])->middleware('can:manage payments');
     Route::get('/pos/occupied-rooms', [RoomController::class, 'getOccupiedRoomsForPos'])->middleware('can:create pos_orders');
 
-    // --- Online Orders ---
+    // Online Orders Management
     Route::get('/online-orders', [AdminOrderController::class, 'index'])->middleware('can:view online_orders');
     Route::get('/online-orders/{order}', [AdminOrderController::class, 'show'])->middleware('can:view online_orders');
     Route::put('/admin/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->middleware('can:view online_orders');
     Route::post('/admin/orders/{order}/pay', [AdminOrderController::class, 'markAsPaid'])->middleware('can:manage payments');
 
-    // --- Service Requests ---
+    // Service Requests Admin
     Route::middleware('can:manage service_requests')->group(function () {
         Route::get('/admin/service-requests', [AdminServiceRequestController::class, 'index']);
         Route::patch('/admin/service-requests/{serviceRequest}/status', [AdminServiceRequestController::class, 'updateStatus']);
     });
 
-    // --- Master Data (CRUD) ---
+    // Master Data
     Route::apiResource('menus', MenuController::class)->middleware('can:view menus');
     Route::apiResource('facilities', FacilityController::class)->middleware('can:view facilities');
-
     Route::apiResource('rooms', RoomController::class)->middleware('can:view rooms');
+
+    // Room Cleaning
     Route::post('/rooms/{room}/request-cleaning', [RoomController::class, 'requestCleaning'])->middleware('can:manage cleaning status');
     Route::post('/rooms/{room}/mark-as-clean', [RoomController::class, 'markAsClean'])->middleware('can:manage cleaning status');
 
+    // User & Role Management
     Route::prefix('master')->group(function () {
         Route::get('/all-roles', [UserController::class, 'getAllRoles'])->middleware('can:view roles');
         Route::apiResource('users', UserController::class)->scoped(['user' => 'uuid'])->middleware('can:view users');
@@ -170,3 +174,4 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/permissions', [RoleController::class, 'getAllPermissions'])->middleware('can:view roles');
     });
 });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Guest;
 use App\Models\Room;
+use App\Models\User; // Tambahan import User
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +20,7 @@ class BookingController extends Controller
 {
     public function __construct()
     {
+        // Konfigurasi Midtrans
         Config::$serverKey = config('services.midtrans.server_key');
         Config::$isProduction = config('services.midtrans.is_production');
         Config::$isSanitized = config('services.midtrans.is_sanitized', true);
@@ -26,13 +28,14 @@ class BookingController extends Controller
     }
 
     /**
-     * ✅ Menampilkan daftar booking dengan Filter Lengkap
+     * Menampilkan daftar booking dengan Filter Lengkap
      */
     public function index(Request $request)
     {
         $query = Booking::with(['guest', 'room'])
             ->orderBy('created_at', 'desc');
 
+        // Filter Room
         if ($request->has('room_id') && $request->filled('room_id')) {
             $query->where('room_id', $request->room_id);
         }
@@ -46,6 +49,7 @@ class BookingController extends Controller
             $query->whereIn('status', $statuses);
         }
 
+        // Filter Single Status
         if ($request->has('status') && !$request->has('status_in')) {
             $query->where('status', $request->status);
         }
@@ -97,7 +101,7 @@ class BookingController extends Controller
     }
 
     /**
-     * Membuat Booking Baru (Upload KTP & Midtrans)
+     * Membuat Booking Baru (Auto-Link User & Midtrans)
      */
     public function store(Request $request)
     {
@@ -116,6 +120,7 @@ class BookingController extends Controller
             $checkInReq = $validated['check_in_date'];
             $checkOutReq = $validated['check_out_date'];
 
+            // Cek Ketersediaan Kamar
             $isAvailable = !Booking::where('room_id', $validated['room_id'])
                 ->whereNotIn('status', ['cancelled', 'rejected'])
                 ->where(function ($query) use ($checkInReq, $checkOutReq) {
@@ -127,6 +132,7 @@ class BookingController extends Controller
                 throw new \Exception('Kamar tidak tersedia pada tanggal yang dipilih (sudah terpesan).');
             }
 
+            // Simpan Data Guest
             $guest = Guest::updateOrCreate(
                 ['email' => $validated['guest_email']],
                 [
@@ -135,11 +141,13 @@ class BookingController extends Controller
                 ]
             );
 
+            // Upload KTP
             $ktpPath = null;
             if ($request->hasFile('ktp_image')) {
                 $ktpPath = $request->file('ktp_image')->store('booking_ktp', 'public');
             }
 
+            // Hitung Harga Total
             $room = Room::findOrFail($validated['room_id']);
             $checkIn = Carbon::parse($validated['check_in_date']);
             $checkOut = Carbon::parse($validated['check_out_date']);
@@ -148,10 +156,24 @@ class BookingController extends Controller
 
             $totalPrice = $room->price_per_night * $durationInNights;
 
+            // --- 🔥 FITUR BARU: AUTO DETECT USER ID ---
+            // 1. Coba ambil dari token login
+            $userId = auth('sanctum')->id();
+
+            // 2. Jika tidak ada token (Guest Mode), cari user berdasarkan email
+            if (!$userId) {
+                $existingUser = User::where('email', $validated['guest_email'])->first();
+                if ($existingUser) {
+                    $userId = $existingUser->id; // Hubungkan booking ke user ini
+                }
+            }
+            // ------------------------------------------
+
+            // Simpan Booking ke Database
             $booking = Booking::create([
                 'room_id' => $room->id,
                 'guest_id' => $guest->id,
-                'user_id' => auth('sanctum')->id() ?? null,
+                'user_id' => $userId, // <-- Sudah otomatis terisi jika email cocok
                 'check_in_date' => $validated['check_in_date'],
                 'check_out_date' => $validated['check_out_date'],
                 'total_price' => $totalPrice,
@@ -161,6 +183,7 @@ class BookingController extends Controller
                 'is_incognito' => false,
             ]);
 
+            // Generate Midtrans Token
             $midtransOrderId = 'BOOK-' . $booking->id . '-' . time();
             $booking->midtrans_order_id = $midtransOrderId;
             $booking->save();
@@ -216,7 +239,7 @@ class BookingController extends Controller
     }
 
     /**
-     * ✅ ADMIN: Verifikasi KTP (Terima)
+     * ADMIN: Verifikasi KTP (Terima)
      */
     public function verifyBooking($id)
     {
@@ -263,7 +286,7 @@ class BookingController extends Controller
     }
 
     /**
-     * ✅ FIX UTAMA: Tolak KTP & Batalkan Booking dengan Refund
+     *  ADMIN: Tolak KTP & Batalkan Booking dengan Refund
      */
     public function rejectBooking(Request $request, $id)
     {
@@ -300,18 +323,18 @@ class BookingController extends Controller
                 ]);
             }
 
-            // 🔥 PERBAIKAN UTAMA: Update status SEBELUM cek refund
+            // Update status ke Cancelled/Rejected
             $booking->update([
                 'ktp_image' => null,
                 'verification_status' => 'rejected',
                 'status' => 'cancelled',
                 'rejection_reason' => $request->reason,
-                'rejected_at' => now() // Opsional: tambahkan timestamp
+                'rejected_at' => now()
             ]);
 
             Log::info("❌ Booking {$booking->id} status updated to cancelled/rejected");
 
-            // Coba Refund jika sudah bayar
+            // Coba Refund jika status sudah dibayar
             $paidStatuses = ['paid', 'settlement', 'confirmed'];
             if (in_array($booking->status, $paidStatuses) && $booking->midtrans_order_id) {
                 try {
@@ -352,7 +375,7 @@ class BookingController extends Controller
                 'success' => true,
                 'needs_manual_refund' => $needsManualRefund,
                 'refund_info' => $needsManualRefund ? $refundInfo : null,
-                'booking' => $booking->fresh() // ✅ Return data terbaru
+                'booking' => $booking->fresh()
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

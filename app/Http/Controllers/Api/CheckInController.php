@@ -9,7 +9,7 @@ use App\Models\Room;
 use App\Models\Guest;
 use App\Models\User;
 use App\Models\Order;
-use App\Models\Setting; // ✅ [BARU] Import Model Setting
+use App\Models\Setting; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -120,6 +120,98 @@ class CheckInController extends Controller
         }
     }
 
+    /**
+     * Handle Check-In Langsung (Bisa Walk-In atau dari Booking Existing)
+     * Endpoint: POST /api/admin/check-ins/store-direct
+     */
+    public function storeDirect(Request $request)
+    {
+       
+        if ($request->filled('booking_id')) {
+            $booking = Booking::with('guest')->find($request->booking_id);
+
+            if ($booking) {
+                // Masukkan guest_id dan check_out_date dari booking ke request
+                $request->merge([
+                    'guest_id' => $booking->guest_id,
+                    'check_out_date' => $request->check_out_date ?? $booking->check_out_date,
+                    // Pastikan duration null agar tidak bentrok logika
+                    'duration' => null
+                ]);
+            }
+        }
+
+        // 2. Validasi Input
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'room_id'        => 'required|exists:rooms,id',
+            // guest_id wajib ada KECUALI jika guest_name diisi (untuk tamu baru walk-in)
+            'guest_id'       => 'required_without:guest_name|nullable|exists:guests,id',
+            'guest_name'     => 'required_without:guest_id|nullable|string',
+            'guest_phone'    => 'nullable|string',
+            'check_out_date' => 'required|date',
+            'payment_method' => 'nullable|string',
+            'booking_id'     => 'nullable|exists:bookings,id',
+            'notes'          => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        try {
+            return DB::transaction(function () use ($request) {
+                // A. Cek Status Kamar
+                $room = Room::findOrFail($request->room_id);
+                if ($room->status === 'occupied') {
+                    throw new \Exception("Kamar ini sedang terisi.");
+                }
+
+                // B. Tentukan Guest (Ambil lama atau Buat baru)
+                $guestId = $request->guest_id;
+
+                // Jika Tamu Baru (Walk-In New)
+                if (!$guestId && $request->guest_name) {
+                    $newGuest = Guest::create([
+                        'name'  => $request->guest_name,
+                        'phone' => $request->guest_phone,
+                        'email' => $request->guest_email,
+                    ]);
+                    $guestId = $newGuest->id;
+                }
+
+                // C. Buat Data CheckIn
+                $checkIn = CheckIn::create([
+                    'room_id'        => $room->id,
+                    'guest_id'       => $guestId,
+                    'booking_id'     => $request->booking_id, // Bisa null jika walk-in
+                    'check_in_time'  => now(),
+                    'check_out_time' => null, // Karena baru masuk
+                    'is_active'      => true,
+                    'notes'          => $request->notes,
+                    'is_incognito'   => $request->is_incognito ?? false,
+                ]);
+
+                // D. Update Status Booking (Jika ada)
+                if ($request->booking_id) {
+                    Booking::where('id', $request->booking_id)->update([
+                        'status' => 'checked_in',
+                        'checked_in_at' => now()
+                    ]);
+                }
+
+                // E. Update Status Kamar
+                $room->update(['status' => 'occupied']);
+
+                return response()->json([
+                    'message' => 'Check-in berhasil!',
+                    'data' => $checkIn
+                ]);
+            });
+        } catch (\Exception $e) {
+            Log::error("CheckIn Direct Error: " . $e->getMessage());
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
     /**
      * ✅ FUNGSI 2: WALK-IN (TAMU DATANG LANGSUNG)
      * (Dipanggil oleh route /admin/check-ins/store-direct)
