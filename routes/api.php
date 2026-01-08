@@ -165,6 +165,7 @@ Route::middleware('auth:api')->group(function () {
     // Room Cleaning
     Route::post('/rooms/{room}/request-cleaning', [RoomController::class, 'requestCleaning'])->middleware('can:manage cleaning status');
     Route::post('/rooms/{room}/mark-as-clean', [RoomController::class, 'markAsClean'])->middleware('can:manage cleaning status');
+    Route::post('/rooms/{room}/checkout', [RoomController::class, 'checkout'])->middleware('can:view rooms');
 
     // User & Role Management
     Route::prefix('master')->group(function () {

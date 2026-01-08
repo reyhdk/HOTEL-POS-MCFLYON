@@ -11,19 +11,6 @@ use Illuminate\Support\Facades\DB;
 
 class RoomController extends Controller
 {
-    /**
-     * ⚠️ PENTING: Bagian __construct ini SAYA KOMENTAR (NONAKTIFKAN).
-     * Penyebab tombol tidak muncul/gagal adalah karena baris ini memblokir akses
-     * jika Anda belum membuat file Policy yang lengkap.
-     */
-    // public function __construct()
-    // {
-    //     $this->authorizeResource(Room::class, 'room');
-    // }
-
-    /**
-     * Menampilkan daftar kamar untuk Admin (Dashboard).
-     */
     public function index()
     {
         return Room::with([
@@ -39,60 +26,46 @@ class RoomController extends Controller
         ])->latest()->get();
     }
 
-    /**
-     * Menyimpan kamar baru ke database.
-     */
     public function store(Request $request)
     {
-        // 1. Validasi Input
         $request->validate([
             'room_number' => 'required|string|unique:rooms,room_number',
             'type' => 'required|string',
-            'status' => 'required|string', // available, occupied, dirty, maintenance
+            'status' => 'required|string',
             'price_per_night' => 'required|numeric|min:0',
             'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:4096', // Max 4MB
+            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:4096',
             'facility_ids' => 'nullable|array',
         ]);
 
         try {
-            DB::beginTransaction(); // Mulai Transaksi Database
+            DB::beginTransaction();
 
             $data = $request->only(['room_number', 'type', 'status', 'price_per_night', 'description', 'tersedia_mulai', 'tersedia_sampai']);
 
-            // 2. Handle Upload Gambar
             if ($request->hasFile('image')) {
-                // Simpan ke folder: storage/app/public/rooms
-                // Hasil path: "rooms/namafile.jpg"
                 $path = $request->file('image')->store('rooms', 'public');
                 $data['image'] = $path;
             }
 
-            // 3. Simpan Data Kamar
             $room = Room::create($data);
 
-            // 4. Simpan Fasilitas (Jika ada)
             if ($request->has('facility_ids')) {
-                // Pastikan facility_ids tidak null atau string kosong
                 $facilities = is_string($request->facility_ids) ? explode(',', $request->facility_ids) : $request->facility_ids;
                 $room->facilities()->attach($facilities);
             }
 
-            DB::commit(); // Simpan permanen
+            DB::commit();
             return response()->json(['message' => 'Kamar berhasil ditambahkan', 'data' => $room->load('facilities')], 201);
         } catch (\Throwable $e) {
-            DB::rollBack(); // Batalkan jika error
+            DB::rollBack();
             Log::error('Error Add Room: ' . $e->getMessage());
             return response()->json(['message' => 'Gagal menyimpan kamar: ' . $e->getMessage()], 500);
         }
     }
 
-    /**
-     * Memperbarui data kamar.
-     */
     public function update(Request $request, Room $room)
     {
-        // Validasi
         $request->validate([
             'room_number' => 'required|string|unique:rooms,room_number,' . $room->id,
             'type' => 'required|string',
@@ -106,21 +79,16 @@ class RoomController extends Controller
 
             $data = $request->only(['room_number', 'type', 'status', 'price_per_night', 'description', 'tersedia_mulai', 'tersedia_sampai']);
 
-            // 1. Handle Ganti Gambar
             if ($request->hasFile('image')) {
-                // Hapus gambar lama jika ada
                 if ($room->image && Storage::disk('public')->exists($room->image)) {
                     Storage::disk('public')->delete($room->image);
                 }
-                // Upload gambar baru
                 $path = $request->file('image')->store('rooms', 'public');
                 $data['image'] = $path;
             }
 
-            // 2. Update Data
             $room->update($data);
 
-            // 3. Update Fasilitas
             if ($request->has('facility_ids')) {
                 $facilities = is_string($request->facility_ids) ? explode(',', $request->facility_ids) : $request->facility_ids;
                 $room->facilities()->sync($facilities);
@@ -135,9 +103,6 @@ class RoomController extends Controller
         }
     }
 
-    /**
-     * Menghapus kamar.
-     */
     public function destroy(Room $room)
     {
         if ($room->status === 'occupied') {
@@ -145,7 +110,6 @@ class RoomController extends Controller
         }
 
         try {
-            // Hapus gambar fisik
             if ($room->image && Storage::disk('public')->exists($room->image)) {
                 Storage::disk('public')->delete($room->image);
             }
@@ -157,11 +121,8 @@ class RoomController extends Controller
         }
     }
 
-    // --- FITUR TAMBAHAN (PUBLIC / POS) ---
-
     public function getAvailableRooms(Request $request)
     {
-        // Validasi
         $request->validate([
             'check_in_date' => 'required|date|after_or_equal:today',
             'check_out_date' => 'required|date|after:check_in_date',
@@ -173,7 +134,6 @@ class RoomController extends Controller
 
         $query = Room::query();
 
-        // Logika Periode Ketersediaan
         $query->where(function ($q) use ($checkIn, $checkOut) {
             $q->where(function ($sub) use ($checkIn, $checkOut) {
                 $sub->whereNotNull('tersedia_mulai')
@@ -186,7 +146,6 @@ class RoomController extends Controller
                 });
         });
 
-        // Logika Anti Bentrok Booking
         $query->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
             $q->whereIn('status', ['confirmed', 'paid', 'checked_in'])
                 ->where(function ($subQ) use ($checkIn, $checkOut) {
@@ -206,9 +165,6 @@ class RoomController extends Controller
 
     public function getOccupiedRoomsForPos()
     {
-        // Pastikan Anda sudah login atau hapus baris ini jika test di Postman tanpa auth
-        // $this->authorize('create', \App\Models\Order::class); 
-
         $occupiedRooms = Room::where('status', 'occupied')
             ->with(['checkIns' => function ($query) {
                 $query->where('is_active', true)->with(['guest', 'booking']);
@@ -239,10 +195,42 @@ class RoomController extends Controller
     public function requestCleaning(Request $request, Room $room)
     {
         if ($room->status !== 'occupied') return response()->json(['message' => 'Kamar harus terisi'], 409);
-
         $room->update(['status' => 'request cleaning']);
-        // Tambahkan logika ServiceRequest disini jika diperlukan (sesuai kode lama Anda)
-
         return response()->json(['message' => 'Request cleaning terkirim']);
+    }
+
+
+    public function checkout(Room $room)
+    {
+        if ($room->status !== 'occupied') {
+            return response()->json(['message' => 'Kamar tidak sedang terisi'], 400);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $activeCheckIn = $room->checkIns()->where('is_active', true)->latest()->first();
+
+            if ($activeCheckIn) {
+                $activeCheckIn->update([
+                    'is_active' => false,
+                    'check_out_time' => now(),
+                ]);
+            }
+
+            // Ubah status kamar jadi kotor agar dibersihkan dulu
+            $room->update(['status' => 'dirty']);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Check-out berhasil. Status kamar kini Kotor.',
+                'room_status' => $room->status
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Checkout Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal memproses check-out: ' . $e->getMessage()], 500);
+        }
     }
 }
