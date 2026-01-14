@@ -18,7 +18,7 @@ class SettingController extends Controller
     {
         $setting = Setting::first();
 
-        // Jika data belum ada, return default values (Hardcoded sementara)
+        // Jika data belum ada, return default values
         if (!$setting) {
             return response()->json([
                 'app' => 'Nama Hotel',
@@ -28,6 +28,7 @@ class SettingController extends Controller
                 'bg_landing' => null,
                 'check_in_time' => '14:00', // Default Check-in
                 'check_out_time' => '12:00', // Default Check-out
+                'early_check_in_fee' => 0,   // Default Fee
             ]);
         }
 
@@ -35,23 +36,10 @@ class SettingController extends Controller
     }
 
     /**
-     * Memperbarui konfigurasi website (termasuk Waktu Check-in/out & Gambar).
+     * Memperbarui konfigurasi website (termasuk Waktu Check-in/out, Fee & Gambar).
      */
     public function update(Request $request)
     {
-
-        if (!$request->hasFile('logo') && !$request->hasFile('bg_auth') && !$request->hasFile('bg_landing')) {
-            // Jika tidak ada file sama sekali yang terdeteksi
-            return response()->json([
-                'status' => 'DEBUG_MODE',
-                'message' => 'Controller TIDAK menerima file apapun!',
-                'limit_php_upload' => ini_get('upload_max_filesize'),
-                'limit_php_post' => ini_get('post_max_size'),
-                'data_text_yang_masuk' => $request->all(), // Cek apakah teks app/description masuk
-                'file_yang_masuk' => $request->allFiles() // Cek array file
-            ], 422);
-        }
-
         // 1. Validasi Input
         $validator = Validator::make($request->all(), [
             'app' => 'required|string|max:255',
@@ -60,6 +48,9 @@ class SettingController extends Controller
             // Validasi Format Jam (HH:MM) contoh: 14:00
             'check_in_time' => 'required|date_format:H:i',
             'check_out_time' => 'required|date_format:H:i',
+
+            // [BARU] Validasi Fee Early Check-in (Boleh kosong, harus angka, minimal 0)
+            'early_check_in_fee' => 'nullable|integer|min:0',
 
             // Validasi Gambar
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048', // Max 2MB
@@ -85,6 +76,10 @@ class SettingController extends Controller
         $setting->description = $request->description;
         $setting->check_in_time = $request->check_in_time;
         $setting->check_out_time = $request->check_out_time;
+
+        // [BARU] Simpan Fee
+        // Jika user tidak mengisi (kosong), kita set jadi 0 agar aman
+        $setting->early_check_in_fee = $request->filled('early_check_in_fee') ? $request->early_check_in_fee : 0;
 
         // 4. Proses Upload Gambar (Helper Logic)
 

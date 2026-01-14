@@ -19,12 +19,15 @@ class SettingSeeder extends Seeder
                 'logo' => null,
                 'bg_auth' => null,
                 'bg_landing' => null,
-                'banner' => null, 
+                'banner' => null,
                 'pemerintah' => 'McFlyon Hotel',
                 'dinas' => 'Hospitality Services',
                 'alamat' => 'Jl. Bungkal Gg. II No. 25B Kec/Kel. Sambikerep Kota Surabaya',
                 'telepon' => '085174323674',
                 'email' => 'admin@mcflyon.co.id',
+                'check_in_time' => '14:00',
+                'check_out_time' => '12:00',
+                'early_check_in_fee' => 10000,
             ]);
         }
     }

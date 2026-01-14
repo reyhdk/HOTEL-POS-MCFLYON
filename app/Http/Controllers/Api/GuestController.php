@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Guest;
-use App\Models\Booking; // Import Model Booking
-use App\Models\CheckIn; // ✅ [BARU] Import Model CheckIn (untuk Walk-in)
+use App\Models\Booking;
+use App\Models\CheckIn;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -21,10 +21,19 @@ class GuestController extends Controller
     {
         $query = Guest::query();
 
-        $query->with(['checkIns' => function ($q) {
-            $q->where('is_active', true)->with('room');
-        }]);
+        // [PERBAIKAN UTAMA DI SINI]
+        // Kita harus meload relasi 'bookings' agar frontend bisa baca ID Booking
+        $query->with([
+            'checkIns' => function ($q) {
+                $q->where('is_active', true)->with('room');
+            },
+            'bookings' => function ($q) {
+                // Urutkan dari yg terbaru, agar bookings[0] di frontend adalah yg terkini
+                $q->orderBy('created_at', 'desc');
+            }
+        ]);
 
+        // Filter Pencarian
         if ($request->has('search') && $request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -34,9 +43,15 @@ class GuestController extends Controller
             });
         }
 
+        // Filter Status Verifikasi
         if ($request->has('verification_status')) {
             if ($request->verification_status === 'pending') {
-                $query->where('is_verified', false)->whereNotNull('ktp_image');
+                // Pending = Belum Verified DAN Punya KTP (atau Punya Booking Paid)
+                $query->where('is_verified', false)
+                    ->where(function ($q) {
+                        $q->whereNotNull('ktp_image')
+                            ->orWhereHas('bookings', fn($b) => $b->where('status', 'paid'));
+                    });
             } elseif ($request->verification_status === 'verified') {
                 $query->where('is_verified', true);
             } elseif ($request->verification_status === 'unverified') {
@@ -125,6 +140,7 @@ class GuestController extends Controller
                 Storage::disk('public')->delete($guest->ktp_image);
             }
             $data['ktp_image'] = $request->file('ktp_image')->store('ktp_images', 'public');
+            // Reset verifikasi jika upload KTP baru
             $data['is_verified'] = false;
         }
 
@@ -190,7 +206,7 @@ class GuestController extends Controller
         try {
             DB::transaction(function () use ($guest) {
 
-
+                // Reject semua booking aktif milik tamu ini
                 Booking::where('guest_id', $guest->id)
                     ->whereIn('status', ['pending', 'awaiting_payment', 'confirmed', 'paid'])
                     ->where('check_in_date', '>=', now()->startOfDay())
@@ -198,10 +214,10 @@ class GuestController extends Controller
                         'status' => 'rejected'
                     ]);
 
-
+                // Force checkout jika sedang menginap
                 $activeCheckIns = CheckIn::where('guest_id', $guest->id)
                     ->where('is_active', true)
-                    ->with(['room', 'booking']) // Load booking terkait
+                    ->with(['room', 'booking'])
                     ->get();
 
                 foreach ($activeCheckIns as $checkIn) {
@@ -214,15 +230,15 @@ class GuestController extends Controller
                         $checkIn->room->update(['status' => 'dirty']);
                     }
 
-                  
                     if ($checkIn->booking) {
                         $checkIn->booking->update([
-                            'status' => 'rejected', 
-                            'notes'  => 'Force Checkout: KTP Ditolak' 
+                            'status' => 'rejected',
+                            'notes'  => 'Force Checkout: KTP Ditolak'
                         ]);
                     }
                 }
 
+                // Hapus foto KTP
                 if ($guest->ktp_image && Storage::disk('public')->exists($guest->ktp_image)) {
                     Storage::disk('public')->delete($guest->ktp_image);
                 }

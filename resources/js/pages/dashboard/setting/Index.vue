@@ -36,10 +36,10 @@
                             <i class="ki-duotone ki-time fs-2 me-2 text-primary">
                                 <span class="path1"></span><span class="path2"></span>
                             </i>
-                            Kebijakan Waktu Hotel
+                            Kebijakan Waktu & Biaya
                         </h4>
                         
-                        <div class="row">
+                        <div class="row mb-4">
                             <div class="col-6">
                                 <label class="form-label fw-bold fs-6 required">Jam Check-In</label>
                                 <Field name="check_in_time" v-model="formData.check_in_time" 
@@ -55,6 +55,22 @@
                                 <ErrorMessage name="check_out_time" class="text-danger" />
                             </div>
                         </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <label class="form-label fw-bold fs-6">Biaya Early Check-In (Per Jam)</label>
+                                <div class="input-group input-group-solid">
+                                    <span class="input-group-text">Rp</span>
+                                    <Field name="early_check_in_fee" v-model="formData.early_check_in_fee" 
+                                        class="form-control form-control-solid" type="number" min="0" placeholder="0" />
+                                </div>
+                                <div class="text-muted fs-7 mt-2">
+                                    Biaya tambahan jika tamu check-in lebih awal dari jam standar. Isi 0 jika gratis.
+                                </div>
+                                <ErrorMessage name="early_check_in_fee" class="text-danger" />
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -126,6 +142,8 @@ export default defineComponent({
             description: Yup.string().required("Deskripsi harus diisi"),
             check_in_time: Yup.string().required("Jam Check-in wajib diisi"),
             check_out_time: Yup.string().required("Jam Check-out wajib diisi"),
+            // Validasi Fee: Harus angka, minimal 0
+            early_check_in_fee: Yup.number().typeError("Harus berupa angka").min(0, "Tidak boleh kurang dari 0").nullable(),
         });
 
         return {
@@ -140,6 +158,7 @@ export default defineComponent({
                 description: "",
                 check_in_time: "14:00",
                 check_out_time: "12:00",
+                early_check_in_fee: 0, // Default 0
                 logo: [],
                 bg_auth: [],
                 bg_landing: []
@@ -163,6 +182,9 @@ export default defineComponent({
                     this.formData.description = val.description || "";
                     this.formData.check_in_time = val.check_in_time || "14:00";
                     this.formData.check_out_time = val.check_out_time || "12:00";
+                    
+                    // Ambil Fee, jika null/kosong set ke 0
+                    this.formData.early_check_in_fee = val.early_check_in_fee || 0;
 
                     // Handle Preview Gambar
                     const timestamp = new Date().getTime();
@@ -182,86 +204,80 @@ export default defineComponent({
                 });
         },
 
-submit() {
-    this.loading = true;
-    
-    const formData = new FormData();
-    formData.append("app", this.formData.app);
-    formData.append("description", this.formData.description);
-    formData.append("check_in_time", this.formData.check_in_time);
-    formData.append("check_out_time", this.formData.check_out_time);
-
-    // --- FUNGSI BANTUAN UNTUK EKSTRAK FILEPOND ---
-    const appendFile = (key, fileArray) => {
-        if (fileArray && fileArray.length > 0) {
-            const item = fileArray[0];
+        submit() {
+            this.loading = true;
             
-            // Logika Deteksi: Apakah ini FilePond Wrapper?
-            // FilePond object biasanya punya properti '.file' yang berisi native File
-            if (item.file instanceof File) {
-                console.log(`[${key}] FilePond Wrapper dideteksi, mengambil .file asli...`);
-                formData.append(key, item.file);
-            } 
-            // Atau apakah ini sudah native File (jarang terjadi di FilePond tapi mungkin)?
-            else if (item instanceof File) {
-                console.log(`[${key}] Native File dideteksi...`);
-                formData.append(key, item);
-            }
-            // Jika tidak, abaikan (mungkin URL string gambar lama)
-            else {
-                console.log(`[${key}] Bukan file baru (String/URL), diabaikan.`);
-            }
-        }
-    };
+            const formData = new FormData();
+            formData.append("app", this.formData.app);
+            formData.append("description", this.formData.description);
+            formData.append("check_in_time", this.formData.check_in_time);
+            formData.append("check_out_time", this.formData.check_out_time);
+            
+            // Kirim Fee ke Backend
+            formData.append("early_check_in_fee", this.formData.early_check_in_fee);
 
-    // Terapkan ke 3 file gambar
-    appendFile("logo", this.formData.logo);
-    appendFile("bg_auth", this.formData.bg_auth);
-    appendFile("bg_landing", this.formData.bg_landing);
+            // --- FUNGSI BANTUAN UNTUK EKSTRAK FILEPOND ---
+            const appendFile = (key, fileArray) => {
+                if (fileArray && fileArray.length > 0) {
+                    const item = fileArray[0];
+                    
+                    // Logika Deteksi: Apakah ini FilePond Wrapper?
+                    if (item.file instanceof File) {
+                        formData.append(key, item.file);
+                    } 
+                    // Atau apakah ini sudah native File?
+                    else if (item instanceof File) {
+                        formData.append(key, item);
+                    }
+                    // Jika string URL lama, diabaikan
+                }
+            };
 
-    // Method Spoofing
-    formData.append("_method", "POST");
+            // Terapkan ke 3 file gambar
+            appendFile("logo", this.formData.logo);
+            appendFile("bg_auth", this.formData.bg_auth);
+            appendFile("bg_landing", this.formData.bg_landing);
 
-    // Kirim Request
-    ApiService.post("/settings", formData, {
-        headers: {
-            "Content-Type": "multipart/form-data" 
-        }
-    })
-    .then(({ data }) => {
-        // Hapus debug log jika sukses
-        // console.log("Response Sukses:", data); 
-        Swal.fire({
-            text: "Pengaturan berhasil diperbarui!",
-            icon: "success",
-            buttonsStyling: false,
-            confirmButtonText: "Ok, mengerti!",
-            customClass: { confirmButton: "btn btn-primary" }
-        });
-        this.getSetting();
-    })
-    .catch((err) => {
-        console.error("Error Response:", err);
-        // Tampilkan pesan error debug dari controller jika ada
-        const pesan = err.response?.data?.message || "Terjadi kesalahan.";
-        
-        // Cek jika ini error debug controller
-        if (err.response?.data?.status === "DEBUG_MODE") {
-             console.log("DEBUG BACKEND:", err.response.data);
-        }
+            // Method Spoofing
+            formData.append("_method", "POST");
 
-        Swal.fire({
-            text: pesan, 
-            icon: "error",
-            buttonsStyling: false,
-            confirmButtonText: "Ok",
-            customClass: { confirmButton: "btn btn-danger" }
-        });
-    })
-    .finally(() => {
-        this.loading = false;
-    });
-}   
+            // Kirim Request
+            ApiService.post("/settings", formData, {
+                headers: {
+                    "Content-Type": "multipart/form-data" 
+                }
+            })
+            .then(({ data }) => {
+                Swal.fire({
+                    text: "Pengaturan berhasil diperbarui!",
+                    icon: "success",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok, mengerti!",
+                    customClass: { confirmButton: "btn btn-primary" }
+                });
+                this.getSetting();
+            })
+            .catch((err) => {
+                console.error("Error Response:", err);
+                const pesan = err.response?.data?.message || "Terjadi kesalahan.";
+                
+                // Debug log backend errors
+                if (err.response?.data?.errors) {
+                    console.log("Validation Errors:", err.response.data.errors);
+                }
+
+                Swal.fire({
+                    text: pesan, 
+                    icon: "error",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: { confirmButton: "btn btn-danger" }
+                });
+            })
+            .finally(() => {
+                this.loading = false;
+            });
+        }   
     },
     mounted() {
         // Panggil fungsi getSetting saat komponen selesai dimuat

@@ -10,12 +10,12 @@ class Setting extends Model
 {
     use HasFactory, Uuid;
 
-
     protected $fillable = [
         'app',
         'description',
-        'check_in_time',
-        'check_out_time',
+        'check_in_time',     
+        'check_out_time',    
+        'early_check_in_fee', 
         'logo',
         'bg_auth',
         'bg_landing',

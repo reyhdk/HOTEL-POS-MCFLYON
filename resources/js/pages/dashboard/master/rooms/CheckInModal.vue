@@ -432,21 +432,23 @@
                                 <div
                                     v-else
                                     key="booking"
-                                    class="py-5 text-center"
+                                    class="d-flex flex-column gap-3"
                                 >
-                                    <div
-                                        class="symbol symbol-60px symbol-circle bg-light-orange mb-4 animate-bounce"
-                                    >
-                                        <i
-                                            class="ki-duotone ki-calendar-search fs-2x text-orange-600"
-                                            ><span class="path1"></span
-                                            ><span class="path2"></span
-                                        ></i>
-                                        h
+                                    <div class="text-center mb-3">
+                                        <div
+                                            class="symbol symbol-60px symbol-circle bg-light-orange mb-3 animate-bounce"
+                                        >
+                                            <i
+                                                class="ki-duotone ki-calendar-search fs-2x text-orange-600"
+                                                ><span class="path1"></span
+                                                ><span class="path2"></span
+                                            ></i>
+                                        </div>
+                                        <h6 class="fw-bold text-adaptive mb-2">
+                                            Pilih Booking Terkonfirmasi
+                                        </h6>
                                     </div>
-                                    <h6 class="fw-bold text-adaptive mb-3">
-                                        Pilih Booking Terkonfirmasi
-                                    </h6>
+
                                     <el-form-item
                                         prop="booking_id"
                                         class="mb-4"
@@ -458,6 +460,7 @@
                                             class="w-100"
                                             size="large"
                                             popper-class="adaptive-popper"
+                                            @change="onBookingSelected"
                                         >
                                             <el-option
                                                 v-for="book in availableBookings"
@@ -479,9 +482,126 @@
                                             </el-option>
                                         </el-select>
                                     </el-form-item>
+
+                                    <!-- Info Booking yang Dipilih -->
+                                    <div
+                                        v-if="selectedBooking"
+                                        class="booking-info-box p-3 rounded-3 border border-dashed bg-light-primary"
+                                    >
+                                        <div
+                                            class="d-flex justify-content-between align-items-start mb-2"
+                                        >
+                                            <div>
+                                                <div
+                                                    class="fs-7 fw-bold text-adaptive"
+                                                >
+                                                    {{
+                                                        selectedBooking.guest
+                                                            .name
+                                                    }}
+                                                </div>
+                                                <div class="fs-9 text-muted">
+                                                    {{
+                                                        selectedBooking.guest
+                                                            .phone_number
+                                                    }}
+                                                </div>
+                                            </div>
+                                            <span
+                                                class="badge badge-light-success"
+                                                >{{
+                                                    selectedBooking.status
+                                                }}</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="separator separator-dashed my-2"
+                                        ></div>
+                                        <div class="fs-8 text-muted">
+                                            <div class="mb-1">
+                                                <i
+                                                    class="ki-duotone ki-calendar fs-6 me-1"
+                                                    ><span class="path1"></span
+                                                    ><span class="path2"></span
+                                                ></i>
+                                                Check-In:
+                                                {{
+                                                    formatDate(
+                                                        selectedBooking.check_in_date
+                                                    )
+                                                }}
+                                            </div>
+                                            <div>
+                                                <i
+                                                    class="ki-duotone ki-calendar-tick fs-6 me-1"
+                                                    ><span class="path1"></span
+                                                    ><span class="path2"></span
+                                                ></i>
+                                                Check-Out:
+                                                {{
+                                                    formatDate(
+                                                        selectedBooking.check_out_date
+                                                    )
+                                                }}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Metode Pembayaran Early Check-In (jika ada) -->
+                                    <div
+                                        v-if="isEarlyCheckIn && selectedBooking"
+                                        class="payment-method-box"
+                                    >
+                                        <label
+                                            class="form-label fs-8 fw-bold text-muted mb-2"
+                                            >Metode Pembayaran Early
+                                            Check-In</label
+                                        >
+                                        <div class="d-flex gap-2">
+                                            <div
+                                                v-for="method in [
+                                                    'cash',
+                                                    'midtrans',
+                                                ]"
+                                                :key="method"
+                                                class="card-option flex-grow-1 p-2 rounded-3 border cursor-pointer transition-all d-flex align-items-center justify-content-center gap-2"
+                                                :class="
+                                                    formData.early_payment_method ===
+                                                    method
+                                                        ? 'active border-orange'
+                                                        : 'border-dashed'
+                                                "
+                                                @click="
+                                                    formData.early_payment_method =
+                                                        method
+                                                "
+                                            >
+                                                <i
+                                                    class="ki-duotone fs-2"
+                                                    :class="
+                                                        method === 'cash'
+                                                            ? 'ki-bill'
+                                                            : 'ki-scan-barcode'
+                                                    "
+                                                    ><span class="path1"></span
+                                                    ><span class="path2"></span
+                                                ></i>
+                                                <span
+                                                    class="fs-8 fw-bold text-adaptive-inverse"
+                                                >
+                                                    {{
+                                                        method === "cash"
+                                                            ? "Tunai"
+                                                            : "QRIS/Online"
+                                                    }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div
                                         v-if="!availableBookings.length"
-                                        class="text-muted fs-8 fst-italic"
+                                        class="text-center text-muted fs-8 fst-italic py-3"
                                     >
                                         Belum ada booking siap check-in.
                                     </div>
@@ -496,6 +616,63 @@
                         v-if="checkInMode === 'walk_in'"
                         class="w-100 border-top border-dashed p-4 shadow-top"
                     >
+                        <!-- Alert Early Check-in -->
+                        <div
+                            v-if="isEarlyCheckIn"
+                            class="alert alert-warning d-flex align-items-center gap-2 mb-3 py-2 px-3"
+                        >
+                            <i
+                                class="ki-duotone ki-information-5 fs-2 text-warning"
+                            >
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <div class="flex-grow-1">
+                                <div class="fs-9 fw-bold">Early Check-In</div>
+                                <div class="fs-10 text-muted">
+                                    Check-in sebelum
+                                    {{
+                                        settings?.check_in_time?.substring(
+                                            0,
+                                            5
+                                        ) || "14:00"
+                                    }}
+                                    dikenakan biaya tambahan
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fs-8 fw-bold text-warning">
+                                    + {{ formatRupiah(earlyCheckInFee) }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="d-flex justify-content-between align-items-center mb-2"
+                        >
+                            <span class="text-muted fs-8 fw-bold"
+                                >Biaya Kamar</span
+                            >
+                            <span class="fs-7 fw-bold text-adaptive">{{
+                                formatRupiah(totalHarga)
+                            }}</span>
+                        </div>
+
+                        <div
+                            v-if="isEarlyCheckIn"
+                            class="d-flex justify-content-between align-items-center mb-2"
+                        >
+                            <span class="text-muted fs-8 fw-bold"
+                                >Early Check-In</span
+                            >
+                            <span class="fs-7 fw-bold text-warning">{{
+                                formatRupiah(earlyCheckInFee)
+                            }}</span>
+                        </div>
+
+                        <div class="separator separator-dashed my-3"></div>
+
                         <div
                             class="d-flex justify-content-between align-items-center mb-4"
                         >
@@ -507,7 +684,7 @@
                             >
                                 <span class="fs-8 fw-bold me-1">Rp</span>
                                 <span class="fs-2 fw-bolder ls-n1">{{
-                                    formatRupiahSimple(totalHarga)
+                                    formatRupiahSimple(grandTotal)
                                 }}</span>
                             </div>
                         </div>
@@ -551,13 +728,57 @@
                         </div>
                     </div>
                     <div v-else class="w-100 p-4 border-top border-dashed">
+                        <!-- Alert Early Check-in untuk Booking -->
+                        <div
+                            v-if="isEarlyCheckIn && selectedBooking"
+                            class="alert alert-warning d-flex align-items-center gap-2 mb-3 py-2 px-3"
+                        >
+                            <i
+                                class="ki-duotone ki-information-5 fs-2 text-warning"
+                            >
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <div class="flex-grow-1">
+                                <div class="fs-9 fw-bold">Early Check-In</div>
+                                <div class="fs-10 text-muted">
+                                    Check-in sebelum
+                                    {{
+                                        settings?.check_in_time?.substring(
+                                            0,
+                                            5
+                                        ) || "14:00"
+                                    }}
+                                    dikenakan biaya tambahan
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fs-8 fw-bold text-warning">
+                                    {{ formatRupiah(earlyCheckInFee) }}
+                                </div>
+                            </div>
+                        </div>
+
                         <button
                             type="button"
                             @click="submit"
                             class="btn btn-orange w-100 fw-bold hover-scale"
-                            :disabled="loading"
+                            :disabled="loading || !formData.booking_id"
                         >
-                            Verifikasi & Masuk
+                            <span v-if="!loading">
+                                {{
+                                    isEarlyCheckIn && selectedBooking
+                                        ? "Bayar & Check-In"
+                                        : "Verifikasi & Masuk"
+                                }}
+                            </span>
+                            <span v-else>
+                                Proses...
+                                <span
+                                    class="spinner-border spinner-border-sm ms-1"
+                                ></span>
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -573,6 +794,7 @@ import moment from "moment";
 import { ElMessage } from "element-plus";
 import debounce from "lodash/debounce";
 import Swal from "sweetalert2";
+import axios from "axios"; // Pastikan axios diimport jika tidak menggunakan ApiService secara global
 
 export default {
     name: "CheckInModalUltimate",
@@ -587,9 +809,11 @@ export default {
             guestType: "existing",
             guestOptions: [],
             availableBookings: [],
+            selectedBooking: null,
             existingBookingToday: null,
             ktpFile: null,
             ktpPreview: null,
+            settings: null,
 
             formData: {
                 room_id: null,
@@ -597,12 +821,15 @@ export default {
                 booking_id: null,
                 check_in_date: moment().format("YYYY-MM-DD"),
                 check_out_date: moment().add(1, "days").format("YYYY-MM-DD"),
+
+                // Default method
                 payment_method: "cash",
+
                 is_incognito: false,
-                // Field Tamu Baru
                 new_name: "",
                 new_phone: "",
                 new_email: "",
+                notes: "", // Tambahkan notes
             },
         };
     },
@@ -619,7 +846,35 @@ export default {
         totalHarga() {
             return this.durasi * (this.roomData?.price_per_night || 0);
         },
+        earlyCheckInFee() {
+            if (!this.settings || !this.settings.check_in_time) return 0;
+
+            const feePerHour = parseInt(this.settings.early_check_in_fee) || 0;
+            if (feePerHour === 0) return 0;
+
+            const now = moment();
+            let checkInTime = this.settings.check_in_time;
+            const timeOnly = checkInTime.substring(0, 5);
+            const standardCheckIn = moment(timeOnly, "HH:mm");
+
+            if (now.isSameOrAfter(standardCheckIn)) return 0;
+
+            const hoursEarly = standardCheckIn.diff(now, "hours");
+            const minutesResidue = standardCheckIn.diff(now, "minutes") % 60;
+
+            // Bulatkan ke atas
+            const totalHours = minutesResidue > 0 ? hoursEarly + 1 : hoursEarly;
+
+            return totalHours * feePerHour;
+        },
+        grandTotal() {
+            return this.totalHarga + this.earlyCheckInFee;
+        },
+        isEarlyCheckIn() {
+            return this.earlyCheckInFee > 0;
+        },
         rules() {
+            // Rules validasi tetap sama seperti sebelumnya
             if (this.checkInMode === "walk_in") {
                 const r = {
                     check_out_date: [
@@ -668,7 +923,6 @@ export default {
         },
     },
     methods: {
-        // --- 1. FUNGSI HELPER (YANG HILANG SEBELUMNYA) ---
         formatRupiah(value) {
             if (!value) return "Rp 0";
             return new Intl.NumberFormat("id-ID", {
@@ -681,16 +935,19 @@ export default {
             if (!value) return "0";
             return new Intl.NumberFormat("id-ID").format(value);
         },
+        formatDate(dateString) {
+            if (!dateString) return "-";
+            return moment(dateString).format("DD MMM YYYY");
+        },
         disabledDate(time) {
-            // Disable tanggal sebelum hari ini
             return time.getTime() < Date.now() - 8.64e7;
         },
 
-        // --- 2. LOGIKA UTAMA ---
         openModal(room) {
             this.roomData = room;
             this.resetForm();
             this.formData.room_id = room.id;
+            this.fetchSettings();
             this.fetchBookings(room.id);
             if (!this.modal) this.modal = new Modal(this.$refs.modalRef);
             this.modal.show();
@@ -705,21 +962,21 @@ export default {
             this.ktpPreview = null;
             this.guestOptions = [];
             this.existingBookingToday = null;
+            this.selectedBooking = null;
 
-            // Reset formData Values
             this.formData.guest_id = null;
             this.formData.booking_id = null;
             this.formData.check_in_date = moment().format("YYYY-MM-DD");
             this.formData.check_out_date = moment()
                 .add(1, "days")
                 .format("YYYY-MM-DD");
-            this.formData.payment_method = "cash";
-            this.formData.is_incognito = false;
 
-            // Reset New Guest Fields
+            this.formData.payment_method = "cash"; // Reset ke cash
+            this.formData.is_incognito = false;
             this.formData.new_name = "";
             this.formData.new_phone = "";
             this.formData.new_email = "";
+            this.formData.notes = "";
 
             this.resetValidasi();
         },
@@ -739,6 +996,7 @@ export default {
                 axios
                     .get("guests", { params: { search: query } })
                     .then((res) => (this.guestOptions = res.data.data))
+                    .catch((err) => ElMessage.error("Gagal mencari data tamu"))
                     .finally(() => (this.loadingGuests = false));
             }
         }, 500),
@@ -756,12 +1014,11 @@ export default {
         hapusKtp() {
             this.ktpFile = null;
             this.ktpPreview = null;
-            this.$refs.ktpRef.value = "";
+            if (this.$refs.ktpRef) this.$refs.ktpRef.value = "";
         },
 
         async fetchBookings(roomId) {
             try {
-                // Mengambil booking yang PAID/CONFIRMED untuk hari ini ke depan
                 const res = await axios.get("bookings", {
                     params: {
                         room_id: roomId,
@@ -770,12 +1027,26 @@ export default {
                     },
                 });
                 this.availableBookings = res.data.data || [];
-                // Cek apakah ada booking hari ini
                 this.existingBookingToday = this.availableBookings.find((b) =>
                     b.check_in_date.startsWith(moment().format("YYYY-MM-DD"))
                 );
             } catch (e) {
-                console.error(e);
+                console.error("Error fetching bookings:", e);
+            }
+        },
+
+        async fetchSettings() {
+            try {
+                const res = await axios.get("settings");
+                const data = res.data.data || res.data;
+                this.settings = Array.isArray(data) ? data[0] : data;
+            } catch (e) {
+                console.error("Error settings:", e);
+                // Fallback default
+                this.settings = {
+                    check_in_time: "14:00",
+                    early_check_in_fee: 0,
+                };
             }
         },
 
@@ -783,118 +1054,31 @@ export default {
             this.checkInMode = "booking_existing";
             this.$nextTick(() => {
                 this.formData.booking_id = book.id;
-                // Opsional: Set durasi sesuai booking asli
+                this.selectedBooking = book;
                 this.formData.check_in_date = book.check_in_date.split("T")[0];
                 this.formData.check_out_date =
                     book.check_out_date.split("T")[0];
             });
         },
 
+        onBookingSelected() {
+            const booking = this.availableBookings.find(
+                (b) => b.id === this.formData.booking_id
+            );
+            if (booking) {
+                this.selectedBooking = booking;
+            }
+        },
+
+        // --- CORE LOGIC SUBMIT (DIPERBAIKI) ---
         async submit() {
-            // 1. Validasi Form (Gunakan this.$refs)
-            if (!this.$refs.formRef) return;
+            if (!this.$refs.formRef) {
+                console.error("Form reference not found");
+                return;
+            }
 
-            await this.$refs.formRef.validate(async (valid) => {
-                if (valid) {
-                    this.loading = true; // Gunakan this.loading
-                    try {
-                        // 2. Siapkan Payload Dasar
-                        const payload = {
-                            room_id: this.roomData.id, // Gunakan this.roomData
-                            notes: this.formData.notes || "-", // Gunakan this.formData
-                            is_incognito: this.formData.is_incognito ? 1 : 0,
-                        };
-
-                        // 3. Logika Berdasarkan Mode (Walk-In vs Booking Existing)
-                        if (this.checkInMode === "walk_in") {
-                            // A. Handle Data Tamu (Baru vs Lama)
-                            if (this.guestType === "existing") {
-                                if (!this.formData.guest_id) {
-                                    this.loading = false;
-                                    return; // Validasi sudah dihandle rules
-                                }
-                                payload.guest_id = this.formData.guest_id;
-                            } else {
-                                // Kirim data tamu baru ke backend
-                                // Pastikan backend mendukung penerimaan data tamu baru via endpoint ini
-                                payload.guest_name = this.formData.new_name;
-                                payload.guest_phone = this.formData.new_phone;
-                                payload.guest_email = this.formData.new_email;
-                                payload.is_new_guest = true;
-                            }
-
-                            // B. Handle Tanggal Check-Out
-                            // Karena di template Anda menggunakan Date Picker, kita kirim check_out_date
-                            if (!this.formData.check_out_date) {
-                                Swal.fire(
-                                    "Error",
-                                    "Tanggal check-out wajib dipilih.",
-                                    "warning"
-                                );
-                                this.loading = false;
-                                return;
-                            }
-
-                            // Format Tanggal: Tambahkan jam 12:00:00 agar backend menerimanya
-                            payload.check_out_date =
-                                this.formData.check_out_date + " 12:00:00";
-                            payload.duration = null; // Set null agar backend membaca tanggal
-
-                            // C. Handle Pembayaran
-                            payload.payment_method =
-                                this.formData.payment_method;
-                        } else {
-                            // MODE: DARI BOOKING EXISTING
-                            if (!this.formData.booking_id) {
-                                Swal.fire(
-                                    "Error",
-                                    "Pilih data booking terlebih dahulu.",
-                                    "warning"
-                                );
-                                this.loading = false;
-                                return;
-                            }
-                            // Jika check-in dari booking, biasanya kita panggil endpoint berbeda
-                            // Tapi jika pakai endpoint store-direct, kirim booking_id
-                            payload.booking_id = this.formData.booking_id;
-                        }
-
-                        // Debugging di Console
-                        console.log("Payload CheckIn:", payload);
-
-                        // 4. Kirim ke Backend
-                        // Pastikan path API sesuai dengan route Anda
-                        await axios.post(
-                            "admin/check-ins/store-direct",
-                            payload
-                        );
-
-                        Swal.fire({
-                            text: "Check-in berhasil!",
-                            icon: "success",
-                            buttonsStyling: false,
-                            confirmButtonText: "Ok",
-                            customClass: { confirmButton: "btn btn-primary" },
-                        }).then(() => {
-                            this.$emit("success"); // Gunakan this.$emit
-                            this.closeModal(); // Gunakan this.closeModal
-                        });
-                    } catch (error) {
-                        // HAPUS ': any' karena ini Javascript biasa
-                        console.error("Check-in error:", error);
-                        Swal.fire({
-                            text:
-                                error.response?.data?.message ||
-                                "Terjadi kesalahan saat check-in.",
-                            icon: "error",
-                            buttonsStyling: false,
-                            confirmButtonText: "Ok",
-                            customClass: { confirmButton: "btn btn-danger" },
-                        });
-                    } finally {
-                        this.loading = false;
-                    }
-                } else {
+            this.$refs.formRef.validate(async (valid) => {
+                if (!valid) {
                     Swal.fire({
                         text: "Mohon lengkapi formulir dengan benar.",
                         icon: "warning",
@@ -902,8 +1086,189 @@ export default {
                         confirmButtonText: "Ok",
                         customClass: { confirmButton: "btn btn-primary" },
                     });
-                    return false;
+                    return;
                 }
+
+                // 1. Konfirmasi Early Check-In (Tampilan Popup)
+                if (this.isEarlyCheckIn) {
+                    // Tentukan metode bayar untuk ditampilkan di konfirmasi
+                    // Jika mode booking, ambil dari early_payment_method, jika walkin ambil payment_method
+                    const displayPayment = this.checkInMode === 'booking_existing' 
+                        ? (this.formData.early_payment_method || 'cash')
+                        : (this.formData.payment_method || 'cash');
+
+                    const result = await Swal.fire({
+                        title: 'Konfirmasi Early Check-In',
+                        html: `
+                            <div class="text-start">
+                                <p class="mb-2">Check-in lebih awal dari jam <strong>${this.settings?.check_in_time?.substring(0, 5) || '14:00'}</strong></p>
+                                <div class="alert alert-warning py-2">
+                                    <div class="d-flex justify-content-between">
+                                        <span>Biaya Tambahan:</span>
+                                        <strong>${this.formatRupiah(this.earlyCheckInFee)}</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <span>Metode Bayar:</span>
+                                        <span class="badge badge-light-primary">${displayPayment.toUpperCase()}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `,
+                        icon: 'info',
+                        showCancelButton: true,
+                        confirmButtonText: 'Ya, Lanjutkan',
+                        cancelButtonText: 'Batal',
+                        customClass: {
+                            confirmButton: 'btn btn-primary',
+                            cancelButton: 'btn btn-light'
+                        },
+                        buttonsStyling: false
+                    });
+
+                    if (!result.isConfirmed) return;
+                }
+
+                this.loading = true;
+
+                try {
+                    // 2. MENYIAPKAN PAYLOAD (PERBAIKAN UTAMA DISINI)
+                    const payload = {
+                        room_id: this.roomData.id,
+                        notes: this.formData.notes || "-",
+                        is_incognito: this.formData.is_incognito ? 1 : 0,
+                        // KITA PAKSA AGAR SELALU MENGIRIM KEY 'payment_method'
+                        payment_method: this.checkInMode === 'booking_existing' 
+                            ? this.formData.early_payment_method // Ambil dari dropdown booking
+                            : this.formData.payment_method       // Ambil dari dropdown walkin
+                    };
+
+                    if (this.checkInMode === "walk_in") {
+                        // --- Mode Walk-In ---
+                        if (this.guestType === "existing") {
+                            if (!this.formData.guest_id) {
+                                this.loading = false;
+                                Swal.fire("Error", "Pilih tamu terlebih dahulu.", "warning");
+                                return;
+                            }
+                            payload.guest_id = this.formData.guest_id;
+                        } else {
+                            // Tamu Baru
+                            payload.guest_name = this.formData.new_name;
+                            payload.guest_phone = this.formData.new_phone;
+                            payload.guest_email = this.formData.new_email || null;
+                        }
+
+                        if (!this.formData.check_out_date) {
+                            Swal.fire("Error", "Tanggal check-out wajib dipilih.", "warning");
+                            this.loading = false;
+                            return;
+                        }
+                        payload.check_out_date = this.formData.check_out_date + " 12:00:00";
+                        
+                    } else {
+                        // --- Mode Booking Existing ---
+                        if (!this.formData.booking_id) {
+                            Swal.fire("Error", "Pilih data booking terlebih dahulu.", "warning");
+                            this.loading = false;
+                            return;
+                        }
+                        payload.booking_id = this.formData.booking_id;
+                    }
+
+                    console.log("Payload CheckIn Dikirim:", payload); // Debugging
+
+                    // Kirim ke Backend (store-direct menghandle kedua logika)
+                    const response = await axios.post("admin/check-ins/store-direct", payload);
+
+                    const data = response.data;
+                    const earlyFee = data.early_check_in_fee || 0;
+                    const snapToken = data.snap_token;
+                    let successMessage = data.message || "Check-in berhasil!";
+
+                    // 3. LOGIKA POPUP MIDTRANS / SUCCESS
+                    if (snapToken) {
+                        this.loading = false; // Matikan loading agar popup bisa diklik
+                        
+                        // @ts-ignore
+                        window.snap.pay(snapToken, {
+                            onSuccess: (result) => {
+                                Swal.fire({
+                                    title: 'Pembayaran Berhasil!',
+                                    text: 'Transaksi Early Check-in lunas.',
+                                    icon: 'success'
+                                }).then(() => {
+                                    this.$emit("success");
+                                    this.closeModal();
+                                });
+                            },
+                            onPending: (result) => {
+                                Swal.fire({
+                                    title: 'Menunggu Pembayaran',
+                                    text: 'Silakan selesaikan pembayaran QRIS/Transfer Anda.',
+                                    icon: 'info'
+                                }).then(() => {
+                                    this.$emit("success");
+                                    this.closeModal();
+                                });
+                            },
+                            onError: (result) => {
+                                Swal.fire('Gagal', 'Pembayaran gagal/dibatalkan.', 'error');
+                            },
+                            onClose: () => {
+                                Swal.fire('Info', 'Jendela pembayaran ditutup. Cek status di menu Orders.', 'info')
+                                    .then(() => {
+                                        this.$emit("success");
+                                        this.closeModal();
+                                    });
+                            }
+                        });
+                        return; // Stop disini, biarkan callback Midtrans yang handle penutupan
+                    }
+
+                    // Jika Cash atau tidak ada fee
+                    if (earlyFee > 0 && !snapToken) {
+                        successMessage += `<br><small class='text-muted'>Tagihan Rp ${this.formatRupiahSimple(earlyFee)} (Cash) dicatat.</small>`;
+                    }
+
+                    Swal.fire({
+                        title: 'Berhasil!',
+                        html: successMessage,
+                        icon: "success",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: { confirmButton: "btn btn-primary" },
+                    }).then(() => {
+                        this.$emit("success");
+                        this.closeModal();
+                    });
+
+                } catch (error) {
+                    console.error("Check-in error:", error);
+                    const errorMessage = error.response?.data?.message || "Terjadi kesalahan saat check-in.";
+                    
+                    Swal.fire({
+                        text: errorMessage,
+                        icon: "error",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: { confirmButton: "btn btn-danger" },
+                    });
+                } finally {
+                    this.loading = false;
+                }
+            });
+        },
+
+        handleSuccess(title, text) {
+            Swal.fire({
+                title: title,
+                text: text,
+                icon: "success",
+                confirmButtonText: "Oke, Siap!",
+                customClass: { confirmButton: "btn btn-primary" },
+            }).then(() => {
+                this.$emit("success");
+                this.closeModal();
             });
         },
     },
@@ -1037,15 +1402,14 @@ export default {
 
 /* Validasi Error Styling */
 :deep(.el-form-item__error) {
-    position: relative; /* Supaya mengambil ruang, bukan melayang */
+    position: relative;
     top: 0;
     margin-top: 4px;
     font-size: 11px;
     line-height: 1.2;
 }
-/* Tambahan untuk memastikan layout tidak hancur */
 :deep(.el-form-item) {
-    margin-bottom: 0; /* Kita atur manual margin di template */
+    margin-bottom: 0;
 }
 
 /* ANIMATIONS */

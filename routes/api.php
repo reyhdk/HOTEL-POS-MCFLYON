@@ -42,11 +42,12 @@ use App\Http\Controllers\Api\Guest\ServiceRequestController;
 Route::prefix('public')->group(function () {
     Route::get('/available-rooms', [RoomController::class, 'getAvailableRooms']);
     Route::get('/room-details/{room}', [RoomController::class, 'showPublic']);
-    Route::post('/bookings', [BookingController::class, 'store']);
+    Route::post('/bookings', [BookingController::class, 'store']); // Booking Online Tamu
     Route::get('/facilities', [FacilityController::class, 'index']);
     Route::get('/menus', [MenuController::class, 'index']);
 });
 
+// Settings Public (Hati-hati, pastikan controller memfilter data sensitif)
 Route::get('/settings', [SettingController::class, 'index']);
 
 // Authentication
@@ -55,13 +56,12 @@ Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
 });
 
-// Midtrans Webhook
+// Midtrans Webhook (Wajib Public)
 Route::post('/midtrans/notification', [MidtransController::class, 'handleNotification']);
 
 
 // ==================================================
 // 2. RUTE TERAUTENTIKASI (PERLU LOGIN) - JWT
-// ✅ GANTI auth:sanctum MENJADI auth:api
 // ==================================================
 Route::middleware('auth:api')->group(function () {
 
@@ -78,12 +78,14 @@ Route::middleware('auth:api')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
     });
 
-    // 2. Booking & Status
+    // 2. Booking & Status (Sisi Tamu)
     Route::get('/my-bookings', [UserBookingController::class, 'index']);
     Route::get('/user/check-in-status', [UserCheckInStatusController::class, 'getStatus']);
+
+    // Create Transaction (Jika user ingin bayar manual via button di aplikasi)
     Route::post('/midtrans/create-transaction', [MidtransController::class, 'createTransaction']);
 
-    // 3. Guest Mode
+    // 3. Guest Mode (Saat Tamu Menginap)
     Route::prefix('guest')->name('guest.')->group(function () {
         Route::get('/profile', [GuestOrderController::class, 'getProfile']);
         Route::post('/orders', [GuestOrderController::class, 'store']);
@@ -111,22 +113,33 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/settings', [SettingController::class, 'update'])->middleware('can:edit settings');
 
     // Manajemen Tamu
-    Route::post('/guests/{id}/verify-ktp', [GuestController::class, 'verifyKtp'])->middleware('can:view guests');
-    Route::post('/guests/{id}/reject-ktp', [GuestController::class, 'rejectKtp'])->middleware('can:view guests');
-    Route::apiResource('guests', GuestController::class)->middleware('can:view guests');
+    Route::middleware('can:view guests')->group(function () {
+        Route::post('/guests/{id}/verify-ktp', [GuestController::class, 'verifyKtp']);
+        Route::post('/guests/{id}/reject-ktp', [GuestController::class, 'rejectKtp']);
+        Route::apiResource('guests', GuestController::class);
 
-    // Manajemen Booking
-    Route::post('/bookings/{id}/verify', [BookingController::class, 'verifyBooking'])->middleware('can:view guests');
-    Route::post('/bookings/{id}/reject', [BookingController::class, 'rejectBooking'])->middleware('can:view guests');
+        // Verifikasi Booking (Fitur Baru)
+        Route::post('/bookings/{id}/verify', [BookingController::class, 'verifyBooking']);
+        Route::post('/bookings/{id}/reject', [BookingController::class, 'rejectBooking']);
+    });
+
+    // Manajemen Booking (General)
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::get('/bookings/{id}', [BookingController::class, 'show']);
 
     // Operasional Check-In / Check-Out
-    Route::post('/check-in', [CheckInController::class, 'store'])->middleware('can:create pos_orders');
-    Route::post('/check-in/process-booking', [CheckInController::class, 'storeFromBooking']);
-    Route::post('/check-in/walk-in', [CheckInController::class, 'storeWalkIn']);
-    Route::post('/admin/check-ins/store-direct', [CheckInController::class, 'storeDirect']);
-    Route::post('/check-out/{room}', [CheckInController::class, 'checkout'])->middleware('can:create pos_orders');
+    // [PENTING] Saya bungkus middleware permission agar user biasa tidak bisa akses
+    Route::middleware('can:create pos_orders')->group(function () {
+        Route::post('/check-in', [CheckInController::class, 'store']);
+        Route::post('/check-in/process-booking', [CheckInController::class, 'storeFromBooking']);
+
+        // Koreksi: Menggunakan storeDirect (karena storeWalkIn tidak ada di controller)
+        Route::post('/check-in/walk-in', [CheckInController::class, 'storeDirect']);
+        Route::post('/admin/check-ins/store-direct', [CheckInController::class, 'storeDirect']);
+
+        Route::post('/check-out/{room}', [CheckInController::class, 'checkout']);
+    });
+
     Route::get('/admin/checkout-history', [CheckoutHistoryController::class, 'index'])->middleware('can:view checkout_history');
 
     // Debugging
@@ -134,22 +147,31 @@ Route::middleware('auth:api')->group(function () {
 
     // POS & Transaksi
     Route::post('/orders', [OrderController::class, 'store'])->middleware('can:create pos_orders');
-    Route::get('/pending-orders', [PaymentController::class, 'getPendingOrders'])->middleware('can:manage payments');
-    Route::post('/orders/{order}/pay', [PaymentController::class, 'processPayment'])->middleware('can:manage payments');
-    Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancelOrder'])->middleware('can:manage payments');
 
-    Route::get('/transaction-history', [PaymentController::class, 'getTransactionHistory'])->middleware('can:view transaction_history');
-    Route::get('/transaction-history/export', [PaymentController::class, 'exportReport'])->middleware('can:view transaction_history');
+    Route::middleware('can:manage payments')->group(function () {
+        Route::get('/pending-orders', [PaymentController::class, 'getPendingOrders']);
+        Route::post('/orders/{order}/pay', [PaymentController::class, 'processPayment']);
+        Route::post('/orders/{order}/cancel', [PaymentController::class, 'cancelOrder']);
+        Route::post('/folios/{room}/checkout', [FolioController::class, 'processFolioPaymentAndCheckout']);
+
+        // Admin Online Orders Payment
+        Route::post('/admin/orders/{order}/pay', [AdminOrderController::class, 'markAsPaid']);
+    });
+
+    Route::middleware('can:view transaction_history')->group(function () {
+        Route::get('/transaction-history', [PaymentController::class, 'getTransactionHistory']);
+        Route::get('/transaction-history/export', [PaymentController::class, 'exportReport']);
+    });
 
     Route::get('/folios', [FolioController::class, 'index'])->middleware('can:view folios');
-    Route::post('/folios/{room}/checkout', [FolioController::class, 'processFolioPaymentAndCheckout'])->middleware('can:manage payments');
     Route::get('/pos/occupied-rooms', [RoomController::class, 'getOccupiedRoomsForPos'])->middleware('can:create pos_orders');
 
     // Online Orders Management
-    Route::get('/online-orders', [AdminOrderController::class, 'index'])->middleware('can:view online_orders');
-    Route::get('/online-orders/{order}', [AdminOrderController::class, 'show'])->middleware('can:view online_orders');
-    Route::put('/admin/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->middleware('can:view online_orders');
-    Route::post('/admin/orders/{order}/pay', [AdminOrderController::class, 'markAsPaid'])->middleware('can:manage payments');
+    Route::middleware('can:view online_orders')->group(function () {
+        Route::get('/online-orders', [AdminOrderController::class, 'index']);
+        Route::get('/online-orders/{order}', [AdminOrderController::class, 'show']);
+        Route::put('/admin/orders/{order}/status', [AdminOrderController::class, 'updateStatus']);
+    });
 
     // Service Requests Admin
     Route::middleware('can:manage service_requests')->group(function () {
@@ -163,8 +185,12 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('rooms', RoomController::class)->middleware('can:view rooms');
 
     // Room Cleaning
-    Route::post('/rooms/{room}/request-cleaning', [RoomController::class, 'requestCleaning'])->middleware('can:manage cleaning status');
-    Route::post('/rooms/{room}/mark-as-clean', [RoomController::class, 'markAsClean'])->middleware('can:manage cleaning status');
+    Route::middleware('can:manage cleaning status')->group(function () {
+        Route::post('/rooms/{room}/request-cleaning', [RoomController::class, 'requestCleaning']);
+        Route::post('/rooms/{room}/mark-as-clean', [RoomController::class, 'markAsClean']);
+    });
+
+    // [Info] Checkout juga butuh permission view rooms atau permission khusus
     Route::post('/rooms/{room}/checkout', [RoomController::class, 'checkout'])->middleware('can:view rooms');
 
     // User & Role Management
@@ -175,4 +201,3 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/permissions', [RoleController::class, 'getAllPermissions'])->middleware('can:view roles');
     });
 });
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
