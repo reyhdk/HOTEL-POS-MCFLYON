@@ -18,6 +18,7 @@
             format="DD-MM-YYYY" 
             value-format="YYYY-MM-DD"
             :disabled-date="disabledDate" 
+            clearable
           />
         </div>
         <div class="col-lg-3 col-md-6">
@@ -30,6 +31,7 @@
             format="DD-MM-YYYY" 
             value-format="YYYY-MM-DD"
             :disabled-date="disabledDateCheckout"
+            clearable
           />
         </div>
 
@@ -51,7 +53,9 @@
 
         <div class="col-lg-1 col-md-12">
           <button @click="searchRooms" class="btn btn-primary w-100" :disabled="isSearchDisabled">
-            <i class="ki-duotone ki-magnifier fs-2" v-if="!isLoading"></i>
+            <span v-if="!isLoading">
+               <i class="ki-outline ki-magnifier fs-2 p-0"></i>
+            </span>
             <span v-if="isLoading" class="spinner-border spinner-border-sm"></span>
           </button>
         </div>
@@ -70,13 +74,13 @@
       </div>
 
       <div v-else-if="!availableRooms.length && hasSearched" class="text-center py-10">
-        <i class="ki-duotone ki-magnifier-r fs-3x text-muted mb-4"></i>
+        <i class="ki-outline ki-calendar-remove fs-3x text-muted mb-4"></i>
         <p class="fw-bold fs-4">Maaf, Kamar Tidak Ditemukan</p>
         <p class="text-muted">Tidak ada kamar tersedia untuk tanggal atau kriteria tersebut. <br>Kemungkinan kamar sudah dibooking tamu lain.</p>
       </div>
 
       <div v-else-if="!hasSearched" class="text-center py-10">
-        <i class="ki-duotone ki-calendar-8 fs-3x text-muted mb-4"></i>
+        <i class="ki-outline ki-calendar-8 fs-3x text-muted mb-4"></i>
         <p class="fw-bold fs-4">Silakan Pilih Tanggal Menginap</p>
         <p class="text-muted">Tentukan tanggal check-in dan check-out untuk melihat ketersediaan.</p>
       </div>
@@ -98,7 +102,7 @@
                 <h6 class="fw-semibold text-gray-700 fs-7 mb-3">Fasilitas:</h6>
                 <div v-if="room.facilities && room.facilities.length > 0" class="d-flex flex-wrap gap-2">
                   <div v-for="facility in room.facilities" :key="facility.id" class="symbol symbol-30px" v-tooltip :title="facility.name">
-                    <img v-if="facility.icon_url" :src="facility.icon_url" :alt="facility.name" />
+                    <img v-if="facility.icon_url" :src="facility.icon_url" :alt="facility.name" class="rounded" />
                     <span v-else class="symbol-label bg-light-primary text-primary fs-7 fw-bold">{{ facility.name.charAt(0) }}</span>
                   </div>
                 </div>
@@ -131,7 +135,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import axios from '@/libs/axios';
 import { toast } from 'vue3-toastify';
 import BookingModal from './BookingModal.vue';
@@ -157,6 +161,13 @@ const hasSearched = ref(false);
 
 const isSearchDisabled = computed(() => {
   return isLoading.value || !searchParams.value.check_in_date || !searchParams.value.check_out_date;
+});
+
+// Watcher untuk menghapus check-out jika check-in dihapus
+watch(() => searchParams.value.check_in_date, (newVal) => {
+  if (!newVal) {
+    searchParams.value.check_out_date = '';
+  }
 });
 
 // Helpers
@@ -195,7 +206,6 @@ const searchRooms = async () => {
     return;
   }
   
-  // Validasi tambahan: Check-out harus > Check-in
   if (searchParams.value.check_out_date <= searchParams.value.check_in_date) {
       toast.error("Tanggal Check-out harus setelah tanggal Check-in.");
       return;
@@ -206,7 +216,6 @@ const searchRooms = async () => {
   availableRooms.value = [];
 
   try {
-    // API ini sekarang sudah menggunakan logika "Anti-Bentrok" di backend
     const response = await axios.get('/public/available-rooms', {
       params: searchParams.value
     });
@@ -223,7 +232,6 @@ const searchRooms = async () => {
 };
 
 const openBookingModal = (room: any) => {
-  // Double check dates
   if (!searchParams.value.check_in_date || !searchParams.value.check_out_date) {
       toast.warn("Sesi pencarian kadaluarsa. Silakan cari ulang.");
       return;
@@ -237,7 +245,6 @@ const openBookingModal = (room: any) => {
 };
 
 const handleBookingSuccess = () => {
-  // Jika booking sukses, kita refresh pencarian agar kamar yg baru dibooking hilang dari list
   searchRooms();
 };
 

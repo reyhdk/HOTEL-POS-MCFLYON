@@ -13,12 +13,23 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Midtrans\Snap;
 use Midtrans\Config;
-use Midtrans\Transaction;
 
+/**
+ * Class CheckInController
+ * * Menangani operasional Check-In, Check-Out, dan integrasi pembayaran Midtrans 
+ * untuk tamu Walk-In maupun Reservasi.
+ * * Controller ini memastikan integritas data antara status kamar, status booking,
+ * dan pembayaran tambahan seperti Early Check-In.
+ */
 class CheckInController extends Controller
 {
+    /**
+     * Inisialisasi konfigurasi Midtrans dari environment.
+     * Konfigurasi ini diperlukan untuk generate Snap Token saat pembayaran online.
+     */
     public function __construct()
     {
         Config::$serverKey = config('services.midtrans.server_key');
@@ -28,13 +39,13 @@ class CheckInController extends Controller
     }
 
     /**
-     * Hitung Biaya Early Check-In (Timezone Asia/Jakarta)
+     * Menghitung biaya Early Check-In berdasarkan jam operasional hotel.
+     * Biaya dihitung per jam awal dari waktu check-in standar.
+     * * @return int Total biaya early check-in
      */
     private function calculateEarlyCheckInFee()
     {
         $setting = Setting::first();
-
-        // Cek apakah fitur aktif dan ada nominal biayanya
         if (!$setting || !$setting->early_check_in_fee || $setting->early_check_in_fee == 0) {
             return 0;
         }
@@ -43,317 +54,287 @@ class CheckInController extends Controller
         $checkInTimeSetting = $setting->check_in_time ?? '14:00';
         $feePerHour = $setting->early_check_in_fee;
 
-        // Buat waktu standar check-in hari ini
+        // Tentukan batas waktu check-in standar hari ini
         $standardCheckIn = Carbon::createFromFormat('H:i', substr($checkInTimeSetting, 0, 5), 'Asia/Jakarta')
             ->setDate($now->year, $now->month, $now->day);
 
-        // Jika sekarang sudah lewat jam check-in, gratis
+        // Jika tamu check-in setelah waktu standar, tidak ada biaya tambahan
         if ($now->gte($standardCheckIn)) {
             return 0;
         }
 
-        // Hitung selisih jam
+        // Hitung selisih jam dan lakukan pembulatan ke atas jika ada menit tersisa
         $hoursEarly = $now->diffInHours($standardCheckIn);
         $minutesResidue = $now->diffInMinutes($standardCheckIn) % 60;
 
-        // Bulatkan ke atas (contoh: 1 jam 5 menit = bayar 2 jam)
         if ($minutesResidue > 0) {
             $hoursEarly++;
         }
 
-        return $hoursEarly * $feePerHour;
+        return (int) ($hoursEarly * $feePerHour);
     }
 
     /**
-     * [BARU] Proses Logic Early Check-in Tanpa Membuat Order
-     * Mengupdate tabel Booking secara langsung & Generate Midtrans Token
+     * Memproses integrasi pembayaran Midtrans.
+     * Logika ini menggabungkan Harga Kamar (untuk Walk-In) dan Biaya Early Check-In.
+     * * @param Booking $booking
+     * @param string $paymentMethod ('cash' atau 'midtrans')
+     * @param bool $isWalkIn
+     * @return array ['fee' => int, 'snap_token' => string|null]
      */
-    private function processEarlyCheckInFee(Booking $booking, string $paymentMethod)
+    private function processCheckInPayment(Booking $booking, string $paymentMethod, bool $isWalkIn)
     {
-        $fee = $this->calculateEarlyCheckInFee();
+        $earlyFee = $this->calculateEarlyCheckInFee();
+        $roomPrice = $isWalkIn ? $booking->total_price : 0;
+        $totalToPay = $roomPrice + $earlyFee;
+
         $snapToken = null;
 
-        if ($fee > 0) {
-            // Tentukan status bayar early check-in
-            // Cash -> Paid, QRIS -> Unpaid (tunggu bayar)
+        if ($totalToPay > 0) {
             $paymentStatus = ($paymentMethod === 'cash') ? 'paid' : 'unpaid';
-
-            // 1. Update Tabel Booking (Menyimpan tagihan)
+            
+            // Simpan status pembayaran awal ke database
             $booking->update([
-                'early_check_in_fee' => $fee,
-                'early_payment_status' => $paymentStatus
+                'early_check_in_fee' => $earlyFee,
+                'early_payment_status' => $paymentStatus,
+                'payment_status' => $isWalkIn ? $paymentStatus : $booking->payment_status
             ]);
 
-            Log::info("Early Check-In Fee Recorded for Booking #{$booking->id}: Rp $fee ($paymentStatus)");
-
-            // 2. Generate Midtrans Token jika bukan Cash
+            // Buat transaksi Midtrans jika metode pembayaran adalah non-tunai
             if ($paymentStatus === 'unpaid') {
                 try {
-                    // ID Transaksi Unik: EARLY-{booking_id}-{timestamp}
-                    $midtransOrderId = 'EARLY-' . $booking->id . '-' . time();
+                    $prefix = $isWalkIn ? 'WALKIN-' : 'EARLY-';
+                    $midtransOrderId = $prefix . $booking->id . '-' . time();
+                    
+                    $itemDetails = [];
+                    if ($isWalkIn) {
+                        $itemDetails[] = [
+                            'id' => 'ROOM-PAY',
+                            'price' => (int) $roomPrice,
+                            'quantity' => 1,
+                            'name' => 'Pembayaran Kamar Walk-In'
+                        ];
+                    }
+                    if ($earlyFee > 0) {
+                        $itemDetails[] = [
+                            'id' => 'EARLY-FEE',
+                            'price' => (int) $earlyFee,
+                            'quantity' => 1,
+                            'name' => 'Biaya Early Check-In'
+                        ];
+                    }
 
                     $params = [
                         'transaction_details' => [
                             'order_id' => $midtransOrderId,
-                            'gross_amount' => (int) $fee,
+                            'gross_amount' => (int) $totalToPay,
                         ],
                         'customer_details' => [
                             'first_name' => $booking->guest->name ?? 'Guest',
                             'email' => $booking->guest->email ?? 'guest@example.com',
-                            'phone' => $booking->guest->phone_number ?? '',
                         ],
-                        'item_details' => [
-                            [
-                                'id' => 'EARLY-FEE',
-                                'price' => (int) $fee,
-                                'quantity' => 1,
-                                'name' => 'Biaya Early Check-In'
-                            ]
-                        ]
+                        'item_details' => $itemDetails
                     ];
-
+                    
                     $snapToken = Snap::getSnapToken($params);
+                    $booking->update(['midtrans_order_id' => $midtransOrderId]);
                 } catch (\Exception $e) {
-                    Log::error("Midtrans Snap Error: " . $e->getMessage());
+                    Log::error("Midtrans Snap Error pada Check-In: " . $e->getMessage());
                 }
             }
         }
 
-        return [
-            'fee' => $fee,
-            'snap_token' => $snapToken
-        ];
+        return ['fee' => $earlyFee, 'snap_token' => $snapToken];
     }
 
     /**
-     * Check-in dari Booking yang sudah ada (Early Check-in Mode)
-     */
-    public function storeFromBooking(Request $request)
-    {
-        $request->validate([
-            'booking_id' => 'required|exists:bookings,id',
-            'is_incognito' => 'nullable|boolean',
-            'ktp_image'  => 'nullable|image|mimes:jpeg,png,jpg|max:4096',
-            'payment_method' => 'nullable|string'
-        ]);
-
-        $booking = Booking::with(['room', 'guest'])->findOrFail($request->booking_id);
-
-        // Ambil payment method, default cash jika null
-        $paymentMethod = $request->payment_method ?? 'cash';
-
-        if ($booking->status === 'checked_in') {
-            return response()->json(['message' => 'Booking ini sudah check-in sebelumnya.'], 409);
-        }
-
-        if ($booking->room->status === 'occupied') {
-            return response()->json(['message' => 'Kamar masih terisi.'], 409);
-        }
-
-        try {
-            // Variable untuk menampung hasil proses fee
-            $feeResult = ['fee' => 0, 'snap_token' => null];
-
-            DB::transaction(function () use ($booking, $request, $paymentMethod, &$feeResult) {
-
-                // Upload KTP
-                if ($request->hasFile('ktp_image')) {
-                    if ($booking->guest->ktp_image) {
-                        Storage::disk('public')->delete($booking->guest->ktp_image);
-                    }
-                    $path = $request->file('ktp_image')->store('ktp_images', 'public');
-                    $booking->guest->update(['ktp_image' => $path]);
-                }
-
-                // [LOGIC BARU] Proses Fee Early Check-in (Update Booking)
-                $feeResult = $this->processEarlyCheckInFee($booking, $paymentMethod);
-
-                // Update Status Booking Utama
-                $booking->update([
-                    'status' => 'checked_in',
-                    'check_in_time' => now()
-                ]);
-
-                // Update Kamar
-                $booking->room->update(['status' => 'occupied']);
-
-                // Buat History CheckIn
-                CheckIn::create([
-                    'booking_id' => $booking->id,
-                    'room_id' => $booking->room_id,
-                    'guest_id' => $booking->guest_id,
-                    'check_in_time' => now(),
-                    'is_active' => true,
-                    'is_incognito' => $request->boolean('is_incognito', false),
-                ]);
-            });
-
-            // Siapkan Response
-            $responseData = [
-                'message' => 'Check-in berhasil!',
-                'status' => 'success',
-                'early_check_in_fee' => $feeResult['fee']
-            ];
-
-            // Jika ada token QRIS
-            if ($feeResult['snap_token']) {
-                $responseData['snap_token'] = $feeResult['snap_token'];
-                $responseData['message'] = 'Check-in berhasil. Silakan selesaikan pembayaran Early Check-in.';
-            }
-
-            return response()->json($responseData);
-        } catch (\Throwable $e) {
-            Log::error("Check-in Error: " . $e->getMessage());
-            return response()->json(['message' => 'Gagal memproses check-in: ' . $e->getMessage()], 500);
-        }
-    }
-
-    /**
-     * Direct Check-in (Walk-in atau Select Booking via Walk-in Menu)
+     * Endpoint untuk memproses Check-In langsung.
+     * Bisa digunakan untuk Walk-In baru maupun memproses booking yang sudah ada.
      */
     public function storeDirect(Request $request)
     {
-        // Logic existing: jika ada booking_id, ambil data tamu dari booking tsb
-        if ($request->filled('booking_id')) {
-            $booking = Booking::with('guest')->find($request->booking_id);
-            if ($booking) {
-                $request->merge([
-                    'guest_id' => $booking->guest_id,
-                    'check_out_date' => $request->check_out_date ?? $booking->check_out_date,
-                    'duration' => null
-                ]);
-            }
-        }
-
-        $paymentMethod = $request->payment_method ?? 'cash';
-
-        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+        // Validasi input dasar
+        $validator = Validator::make($request->all(), [
             'room_id'        => 'required|exists:rooms,id',
-            'guest_id'       => 'required_without:guest_name|nullable|exists:guests,id',
-            'guest_name'     => 'required_without:guest_id|nullable|string',
-            'guest_phone'    => 'nullable|string',
-            'check_out_date' => 'required|date',
-            'payment_method' => 'nullable|string',
             'booking_id'     => 'nullable|exists:bookings,id',
-            'notes'          => 'nullable|string',
+            'guest_id'       => 'required_without_all:guest_name,booking_id|nullable|exists:guests,id',
+            'guest_name'     => 'required_without_all:guest_id,booking_id|nullable|string',
+            'check_out_date' => 'required_without:booking_id|nullable|date',
+            'ktp_image'      => 'nullable|image|mimes:jpeg,png,jpg|max:4096',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'message' => 'Validasi gagal', 
+                'errors' => $validator->errors()
+            ], 422);
         }
 
+        $bookingId = $request->booking_id;
+        $isWalkIn = empty($bookingId);
+        $paymentMethod = $request->payment_method ?? 'cash';
+
         try {
-            $feeResult = ['fee' => 0, 'snap_token' => null];
-            $checkIn = null;
-
-            DB::transaction(function () use ($request, $paymentMethod, &$feeResult, &$checkIn) {
-                $room = Room::findOrFail($request->room_id);
-                if ($room->status === 'occupied') {
-                    throw new \Exception("Kamar ini sedang terisi.");
+            // --- VALIDASI TANGGAL (Pencegahan check-in awal) ---
+            if (!$isWalkIn) {
+                $bookingCheck = Booking::findOrFail($bookingId);
+                $todayStr = Carbon::today('Asia/Jakarta')->format('Y-m-d');
+                
+                if ($bookingCheck->check_in_date > $todayStr) {
+                    return response()->json([
+                        'message' => "Booking ini dijadwalkan untuk tanggal " . Carbon::parse($bookingCheck->check_in_date)->format('d M Y') . ". Belum bisa check-in hari ini."
+                    ], 422);
                 }
-
-                // Handle Tamu Baru vs Lama
-                $guestId = $request->guest_id;
-                if (!$guestId && $request->guest_name) {
-                    $newGuest = Guest::create([
-                        'name'  => $request->guest_name,
-                        'phone_number' => $request->guest_phone,
-                        'email' => $request->guest_email,
-                    ]);
-                    $guestId = $newGuest->id;
-                }
-
-                // [LOGIC BARU] Proses Fee HANYA jika ini dari Booking yang sudah ada
-                if ($request->booking_id) {
-                    $booking = Booking::with('guest')->find($request->booking_id);
-                    if ($booking) {
-                        $feeResult = $this->processEarlyCheckInFee($booking, $paymentMethod);
-
-                        // Update status booking
-                        $booking->update([
-                            'status' => 'checked_in',
-                            'checked_in_at' => now()
-                        ]);
-                    }
-                }
-
-                // Buat data CheckIn
-                $checkIn = CheckIn::create([
-                    'room_id'        => $room->id,
-                    'guest_id'       => $guestId,
-                    'booking_id'     => $request->booking_id,
-                    'check_in_time'  => now(),
-                    'check_out_time' => null,
-                    'is_active'      => true,
-                    'notes'          => $request->notes,
-                    'is_incognito'   => $request->is_incognito ?? false,
-                ]);
-
-                $room->update(['status' => 'occupied']);
-            });
-
-            // Siapkan Response
-            $responseData = [
-                'message' => 'Check-in berhasil!',
-                'data' => $checkIn,
-                'early_check_in_fee' => $feeResult['fee']
-            ];
-
-            if ($feeResult['snap_token']) {
-                $responseData['snap_token'] = $feeResult['snap_token'];
-                $responseData['message'] = 'Check-in berhasil. Lakukan pembayaran Early Check-in sekarang.';
             }
 
-            return response()->json($responseData);
+            $feeResult = ['fee' => 0, 'snap_token' => null];
+
+            DB::transaction(function () use ($request, $bookingId, $isWalkIn, $paymentMethod, &$feeResult) {
+                $room = Room::findOrFail($request->room_id);
+                
+                // Ambil atau Buat Data Booking
+                if (!$isWalkIn) {
+                    $booking = Booking::with('guest')->findOrFail($bookingId);
+                } else {
+                    $checkInDate = Carbon::today('Asia/Jakarta');
+                    $checkOutDate = Carbon::parse($request->check_out_date);
+                    $nights = $checkInDate->diffInDays($checkOutDate);
+                    
+                    if ($nights < 1) $nights = 1;
+
+                    // Buat Guest jika tidak ada ID yang dipilih
+                    if (!$request->guest_id && $request->guest_name) {
+                        $guest = Guest::create([
+                            'name' => $request->guest_name,
+                            'phone_number' => $request->guest_phone,
+                            'email' => $request->guest_email
+                        ]);
+                    } else {
+                        $guest = Guest::findOrFail($request->guest_id);
+                    }
+
+                    $totalRoomPrice = $room->price_per_night * $nights;
+
+                    $booking = Booking::create([
+                        'room_id' => $room->id,
+                        'guest_id' => $guest->id,
+                        'check_in_date' => $checkInDate->format('Y-m-d'),
+                        'check_out_date' => $checkOutDate->format('Y-m-d'),
+                        'status' => 'pending', 
+                        'total_price' => $totalRoomPrice,
+                        'verification_status' => 'verified',
+                        'payment_status' => 'unpaid' 
+                    ]);
+                }
+
+                // Pengelolaan Foto KTP
+                if ($request->hasFile('ktp_image')) {
+                    $guest = $booking->guest;
+                    if ($guest && $guest->ktp_image) {
+                        Storage::disk('public')->delete($guest->ktp_image);
+                    }
+                    $path = $request->file('ktp_image')->store('ktp_images', 'public');
+                    $guest->update(['ktp_image' => $path]);
+                }
+
+                // Hitung Pembayaran & Generate Token
+                $feeResult = $this->processCheckInPayment($booking, $paymentMethod, $isWalkIn);
+                
+                // --- LOGIKA ALUR CHECK-IN ---
+                // Jika pembayaran tunai, langsung check-in. Jika Midtrans, tunggu webhook.
+                if ($paymentMethod === 'cash') {
+                    $booking->update([
+                        'status' => 'checked_in', 
+                        'check_in_time' => now()
+                    ]);
+
+                    CheckIn::create([
+                        'room_id'        => $room->id,
+                        'guest_id'       => $booking->guest_id,
+                        'booking_id'     => $booking->id,
+                        'check_in_time'  => now(),
+                        'is_active'      => true,
+                        'is_incognito'   => $request->boolean('is_incognito', false),
+                    ]);
+
+                    $room->update(['status' => 'occupied']);
+                } else {
+                    // Simpan preferensi incognito di notes agar dibaca oleh MidtransController nanti
+                    $booking->update([
+                        'notes' => $request->boolean('is_incognito', false) ? 'INCOGNITO' : 'NORMAL'
+                    ]);
+                }
+            });
+
+            return response()->json([
+                'message' => $paymentMethod === 'cash' ? 'Check-in berhasil diproses!' : 'Menunggu pembayaran via QRIS/Midtrans.',
+                'early_check_in_fee' => $feeResult['fee'],
+                'snap_token' => $feeResult['snap_token']
+            ]);
+
         } catch (\Exception $e) {
-            Log::error("CheckIn Direct Error: " . $e->getMessage());
-            return response()->json(['message' => $e->getMessage()], 500);
+            Log::error("Gagal storeDirect: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Gagal memproses check-in: ' . $e->getMessage()
+            ], 500);
         }
     }
 
+    /**
+     * Alias untuk konsistensi routing jika diperlukan.
+     */
+    public function storeFromBooking(Request $request)
+    {
+        return $this->storeDirect($request);
+    }
+
+    /**
+     * Menangani proses Check-Out Kamar.
+     */
     public function checkOut(Request $request)
     {
         $roomId = $request->input('room_id');
         $room = Room::findOrFail($roomId);
-        $paymentMethod = $request->input('payment_method', 'cash');
 
+        // Validasi apakah kamar memang sedang ditempati
         if ($room->status !== 'occupied') {
-            return response()->json(['message' => 'Kamar tidak sedang ditempati.'], 409);
+            return response()->json([
+                'message' => 'Kamar tidak sedang dalam status Terisi.'
+            ], 409);
         }
 
         try {
-            DB::transaction(function () use ($room, $paymentMethod) {
-                $activeCheckIn = CheckIn::where('room_id', $room->id)
+            DB::transaction(function () use ($room) {
+                // Cari record Check-In yang masih aktif
+                $active = CheckIn::where('room_id', $room->id)
                     ->where('is_active', true)
+                    ->latest()
                     ->first();
 
-                if ($activeCheckIn) {
-                    $activeCheckIn->update([
-                        'is_active' => false,
-                        'check_out_time' => now(),
+                if ($active) {
+                    $active->update([
+                        'is_active' => false, 
+                        'check_out_time' => now()
                     ]);
 
-                    if ($activeCheckIn->booking) {
-                        // Update status booking selesai
-                        $activeCheckIn->booking->update(['status' => 'completed']);
-
-                        // Jika ada early check in fee yg belum lunas (kasus jarang), lunaskan saat checkout?
-                        // Optional: $activeCheckIn->booking->update(['early_payment_status' => 'paid']);
+                    // Ubah status booking terkait menjadi completed
+                    if ($active->booking_id) {
+                        Booking::where('id', $active->booking_id)->update(['status' => 'completed']);
                     }
                 }
 
+                // Setelah check-out, status kamar otomatis menjadi kotor
                 $room->update(['status' => 'dirty']);
             });
 
-            return response()->json(['message' => 'Check-out berhasil.']);
+            return response()->json([
+                'message' => 'Check-out berhasil. Kamar kini berstatus Kotor (Perlu Pembersihan).'
+            ]);
         } catch (\Throwable $e) {
-            Log::error('Gagal checkout: ' . $e->getMessage());
-            return response()->json(['message' => 'Terjadi kesalahan saat checkout.'], 500);
+            Log::error("Gagal checkOut: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Terjadi kesalahan saat check-out.'
+            ], 500);
         }
-    }
-
-    public function store(Request $request)
-    {
-        return response()->json(['message' => 'Gunakan storeDirect atau storeFromBooking'], 501);
     }
 }

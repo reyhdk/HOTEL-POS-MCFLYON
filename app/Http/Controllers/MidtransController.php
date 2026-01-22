@@ -9,146 +9,282 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Midtrans\Notification;
-use Midtrans\Snap;
+use Midtrans\Config;
 use Throwable;
 
+/**
+ * Class MidtransController
+ * * Menangani Webhook/Notifikasi dari Midtrans untuk berbagai jenis transaksi:
+ * 1. Reservasi Kamar (BOOK-)
+ * 2. Biaya Masuk Awal (EARLY-)
+ * 3. Walk-In Langsung (WALKIN-)
+ * 4. Pesanan POS/Makanan (ORDER-)
+ * 5. Pelunasan saat Checkout (CHECKOUT-)
+ */
 class MidtransController extends Controller
 {
-    // ... method createTransaction tetap sama ...
+    /**
+     * Inisialisasi konfigurasi Midtrans.
+     */
+    public function __construct()
+    {
+        Config::$serverKey = config('services.midtrans.server_key');
+        Config::$isProduction = config('services.midtrans.is_production');
+        Config::$isSanitized = config('services.midtrans.is_sanitized', true);
+        Config::$is3ds = config('services.midtrans.is_3ds', true);
+    }
 
+    /**
+     * Entry point utama untuk menerima notifikasi dari Midtrans.
+     * * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function handleNotification(Request $request)
     {
         try {
+            Log::info('===== MIDTRANS WEBHOOK: MULAI PROSES =====');
+            
+            // Inisialisasi notifikasi (Midtrans akan memvalidasi signature secara otomatis)
             $notification = new Notification();
+            
             $orderId = $notification->order_id;
+            $transactionStatus = $notification->transaction_status;
+            $paymentType = $notification->payment_type;
 
-            Log::info('Midtrans Notification Received', [
-                'order_id' => $orderId,
-                'status' => $notification->transaction_status,
-                'type' => $notification->payment_type
-            ]);
+            Log::info("Notifikasi Diterima - Order ID: $orderId");
+            Log::info("Status Transaksi: $transactionStatus | Metode: $paymentType");
 
-            // 1. Handle Booking (BOOK-...)
+            // Routing berdasarkan Prefix Order ID
             if (str_starts_with($orderId, 'BOOK-')) {
-                $this->handleBookingNotification($notification);
+                return $this->handleBookingNotification($notification);
             }
-            // 2. Handle Early Check-In (EARLY-...)
-            else if (str_starts_with($orderId, 'EARLY-')) {
-                $this->handleEarlyCheckInNotification($notification);
+            
+            if (str_starts_with($orderId, 'EARLY-')) {
+                return $this->handleEarlyCheckInNotification($notification);
             }
-            // 3. Handle Order Makanan (ORDER-...)
-            else if (str_starts_with($orderId, 'ORDER-')) {
-                $this->handleOrderNotification($notification);
+            
+            if (str_starts_with($orderId, 'WALKIN-')) {
+                return $this->handleWalkInNotification($notification);
             }
-            // 4. Handle Checkout (CHECKOUT-...)
-            else if (str_starts_with($orderId, 'CHECKOUT-')) {
-                $this->handleCheckoutNotification($notification);
+            
+            if (str_starts_with($orderId, 'ORDER-')) {
+                return $this->handleOrderNotification($notification);
+            }
+            
+            if (str_starts_with($orderId, 'CHECKOUT-')) {
+                return $this->handleCheckoutNotification($notification);
             }
 
-            return response()->json(['message' => 'Notifikasi berhasil diproses.']);
+            Log::warning("Webhook diterima tapi tipe transaksi tidak dikenali: $orderId");
+            return response()->json(['message' => 'Tipe transaksi tidak dikenali.'], 200);
+            
         } catch (Throwable $e) {
-            Log::error('Midtrans Notification Error: ' . $e->getMessage());
-            return response()->json(['message' => 'Gagal memproses notifikasi.'], 500);
+            Log::error('===== MIDTRANS WEBHOOK: GAGAL =====');
+            Log::error('Pesan Error: ' . $e->getMessage());
+            Log::error('File: ' . $e->getFile() . ' baris ' . $e->getLine());
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Internal Server Error saat memproses notifikasi.'
+            ], 500);
         }
     }
 
     /**
-     * ✅ FIX: Handler Booking
-     * HANYA update status Booking. JANGAN update status Room jadi Occupied disini.
+     * Menangani Notifikasi untuk Booking/Reservasi Online.
      */
     private function handleBookingNotification(Notification $notification)
     {
-        $booking = Booking::with('guest')->where('midtrans_order_id', $notification->order_id)->first();
+        Log::info("Memproses Booking Notification: " . $notification->order_id);
+        
+        $booking = Booking::where('midtrans_order_id', $notification->order_id)->first();
 
-        if (!$booking) return;
-        if ($booking->payment_status === 'paid') return; // Idempotency
-
-        $transactionStatus = $notification->transaction_status;
-        $fraudStatus = $notification->fraud_status;
-        $isPaid = false;
-
-        if ($transactionStatus == 'capture') {
-            if ($fraudStatus == 'accept') $isPaid = true;
-        } else if ($transactionStatus == 'settlement') {
-            $isPaid = true;
-        } else if (in_array($transactionStatus, ['cancel', 'deny', 'expire'])) {
-            $booking->update(['status' => 'cancelled', 'payment_status' => 'failed']);
+        if (!$booking) {
+            Log::error("Data Booking tidak ditemukan untuk Order ID: " . $notification->order_id);
+            return response()->json(['message' => 'Booking not found'], 404);
         }
 
-        if ($isPaid) {
-            // Update Status Booking jadi PAID
-            // Kamar tetap AVAILABLE sampai nanti Check-In fisik dilakukan
-            $booking->update([
-                'payment_status' => 'paid',
-                'status' => 'paid', // Menunggu Verifikasi Admin
-                'payment_method' => $notification->payment_type ?? 'online'
-            ]);
-
-            Log::info("Booking Paid: {$booking->id}. Status set to PAID. Room status untouched.");
-
-            // Sync KTP ke Guest (Unverified)
-            if ($booking->guest && !empty($booking->ktp_image)) {
-                try {
-                    $booking->guest->update([
-                        'ktp_image' => $booking->ktp_image,
-                        'is_verified' => false
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error("Failed to sync KTP: " . $e->getMessage());
-                }
-            }
-        }
+        if ($this->determineIfPaid($notification)) {
+            DB::transaction(function () use ($booking, $notification) {
+                $booking->update([
+                    'payment_status' => 'paid',
+                    'status' => 'paid',
+                    'payment_method' => $notification->payment_type ?? 'online'
+                ]);
+            });
+            Log::info("✅ Booking #{$booking->id} lunas.");
+        } 
+        
+        return response()->json(['message' => 'Success']);
     }
 
-    // ... method handleEarlyCheckInNotification, handleOrderNotification, handleCheckoutNotification tetap sama ...
-    // Pastikan method-method lain juga TIDAK mengubah status room sembarangan.
-
+    /**
+     * Menangani Biaya Early Check-In (Hanya biaya tambahan saja).
+     */
     private function handleEarlyCheckInNotification(Notification $notification)
     {
+        Log::info("Memproses Early Fee Notification: " . $notification->order_id);
+        
         $parts = explode('-', $notification->order_id);
-        if (count($parts) < 3) return;
-        $booking = Booking::find($parts[1]);
-        if (!$booking) return;
-
-        if ($notification->transaction_status == 'settlement' || ($notification->transaction_status == 'capture' && $notification->fraud_status == 'accept')) {
-            $booking->update(['early_payment_status' => 'paid']);
+        if (count($parts) < 2) {
+            return response()->json(['message' => 'Invalid ID format'], 400);
         }
+        
+        $bookingId = $parts[1];
+        $booking = Booking::find($bookingId);
+
+        if ($booking && $this->determineIfPaid($notification)) {
+            $booking->update(['early_payment_status' => 'paid']);
+            Log::info("✅ Biaya Early Check-In untuk Booking #{$bookingId} telah dibayar.");
+        }
+
+        return response()->json(['message' => 'Success']);
     }
 
+    /**
+     * Menangani Pembayaran Walk-In (Harga Kamar + Biaya Early Fee).
+     * Disinilah proses Check-In diselesaikan secara otomatis setelah bayar lunas.
+     */
+    private function handleWalkInNotification(Notification $notification)
+    {
+        Log::info("Memproses Walk-In Payment Notification: " . $notification->order_id);
+        
+        $parts = explode('-', $notification->order_id);
+        if (count($parts) < 2) {
+            return response()->json(['message' => 'Invalid ID format'], 400);
+        }
+        
+        $bookingId = $parts[1];
+        $booking = Booking::with('room')->find($bookingId);
+
+        if (!$booking) {
+            Log::error("Booking Walk-In tidak ditemukan: " . $bookingId);
+            return response()->json(['message' => 'Booking not found'], 404);
+        }
+
+        if ($this->determineIfPaid($notification)) {
+            DB::transaction(function () use ($booking, $notification) {
+                // 1. Update status booking & pembayaran utama
+                $booking->update([
+                    'payment_status'       => 'paid',
+                    'early_payment_status' => 'paid',
+                    'status'               => 'checked_in',
+                    'check_in_time'        => now(),
+                    'payment_method'       => $notification->payment_type ?? 'qris'
+                ]);
+
+                // 2. Buat record Check-In Aktif di sistem
+                CheckIn::create([
+                    'room_id'        => $booking->room_id,
+                    'guest_id'       => $booking->guest_id,
+                    'booking_id'     => $booking->id,
+                    'check_in_time'  => now(),
+                    'is_active'      => true,
+                    // Kita baca preferensi incognito dari field 'notes' yang diset di CheckInController
+                    'is_incognito'   => $booking->notes === 'INCOGNITO',
+                ]);
+
+                // 3. Ubah status fisik kamar menjadi Terisi (Occupied)
+                if ($booking->room) {
+                    $booking->room->update(['status' => 'occupied']);
+                }
+            });
+            Log::info("✅ Walk-In Lunas & Check-In Selesai: Booking #{$booking->id}");
+        }
+
+        return response()->json(['message' => 'Success']);
+    }
+
+    /**
+     * Menangani Notifikasi untuk Pesanan POS / Food & Beverage.
+     */
     private function handleOrderNotification(Notification $notification)
     {
+        Log::info("Memproses POS Order Notification: " . $notification->order_id);
+        
         $order = Order::where('midtrans_order_id', $notification->order_id)->first();
-        if (!$order || $order->status === 'paid') return;
 
-        if ($notification->transaction_status == 'settlement' || ($notification->transaction_status == 'capture' && $notification->fraud_status == 'accept')) {
-            $order->update(['status' => 'paid', 'payment_status' => 'paid', 'payment_method' => $notification->payment_type ?? 'qris']);
+        if (!$order) {
+            Log::error("Order POS tidak ditemukan: " . $notification->order_id);
+            return response()->json(['message' => 'Order not found'], 404);
         }
+
+        if ($this->determineIfPaid($notification)) {
+            $order->update([
+                'status'         => 'paid',
+                'payment_status' => 'paid',
+                'payment_method' => $notification->payment_type ?? 'qris'
+            ]);
+            Log::info("✅ Pesanan POS #{$order->id} lunas.");
+        }
+
+        return response()->json(['message' => 'Success']);
     }
 
+    /**
+     * Menangani Pelunasan Seluruh Tagihan saat tamu Checkout.
+     */
     private function handleCheckoutNotification(Notification $notification)
     {
-        // Logic checkout tetap sama seperti sebelumnya (Update room jadi dirty, checkin active jadi false)
+        Log::info("Memproses Checkout Payment Notification: " . $notification->order_id);
+        
         $parts = explode('-', $notification->order_id);
-        if (count($parts) < 3) return;
-        $booking = Booking::find($parts[1]);
-        if (!$booking) return;
-
-        if ($notification->transaction_status == 'settlement' || ($notification->transaction_status == 'capture' && $notification->fraud_status == 'accept')) {
-            try {
-                DB::transaction(function () use ($booking) {
-                    Order::where('user_id', $booking->user_id)
-                        ->whereIn('status', ['pending', 'processing', 'delivering', 'completed'])
-                        ->update(['status' => 'paid']);
-
-                    $booking->update(['status' => 'completed']);
-                    if ($booking->room) $booking->room->update(['status' => 'dirty']);
-
-                    CheckIn::where('booking_id', $booking->id)->where('is_active', true)
-                        ->update(['is_active' => false, 'check_out_time' => now()]);
-                });
-            } catch (Throwable $e) {
-                Log::error('Checkout Midtrans Error: ' . $e->getMessage());
-            }
+        if (count($parts) < 2) {
+            return response()->json(['message' => 'Invalid ID'], 400);
         }
+        
+        $bookingId = $parts[1];
+        $booking = Booking::with('room')->find($bookingId);
+        
+        if (!$booking) {
+            return response()->json(['message' => 'Booking not found'], 404);
+        }
+
+        if ($this->determineIfPaid($notification)) {
+            DB::transaction(function () use ($booking) {
+                // Tandai semua pesanan makanan yang masih gantung menjadi lunas
+                Order::where('user_id', $booking->user_id)
+                    ->whereIn('status', ['pending', 'processing', 'delivering', 'completed'])
+                    ->update(['status' => 'paid']);
+
+                // Selesaikan status booking
+                $booking->update(['status' => 'completed']);
+
+                // Set kamar menjadi kotor (dirty)
+                if ($booking->room) {
+                    $booking->room->update(['status' => 'dirty']);
+                }
+
+                // Tutup sesi Check-In
+                CheckIn::where('booking_id', $booking->id)
+                    ->where('is_active', true)
+                    ->update([
+                        'is_active'      => false, 
+                        'check_out_time' => now()
+                    ]);
+            });
+            Log::info("✅ Proses Checkout Selesai untuk Booking #{$bookingId}");
+        }
+
+        return response()->json(['message' => 'Success']);
+    }
+
+    /**
+     * Helper: Menentukan apakah transaksi dianggap berhasil berdasarkan status dari Midtrans.
+     * * @param Notification $notification
+     * @return bool
+     */
+    private function determineIfPaid(Notification $notification)
+    {
+        $status = $notification->transaction_status;
+        $fraud = $notification->fraud_status;
+
+        // Untuk kartu kredit (capture)
+        if ($status == 'capture') {
+            return ($fraud == 'accept');
+        }
+        
+        // Untuk QRIS, GoPay, Transfer Bank, dll (settlement)
+        return ($status == 'settlement');
     }
 }
