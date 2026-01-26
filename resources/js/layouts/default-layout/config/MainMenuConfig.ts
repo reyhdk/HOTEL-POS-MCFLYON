@@ -61,6 +61,10 @@ const MainMenuConfig: MenuItem[] = [
                         route: "/user/request-history",
                         roles: ["user"],
                     },
+                    {   heading: "Ktp",
+                        route: "/user/ktp", 
+                        roles: ["user"] 
+                    },
                 ],
             },
             {

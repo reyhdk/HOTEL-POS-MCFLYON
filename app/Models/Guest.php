@@ -20,6 +20,7 @@ class Guest extends Model
         'is_verified',
         'address',
         'ktp_image',
+        'rejection_reason',
         'is_blacklisted',   
         'blacklist_reason'  
     ];

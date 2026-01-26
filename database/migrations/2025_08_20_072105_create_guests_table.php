@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('email')->unique(); 
             $table->string('phone_number')->nullable();
             $table->text('address')->nullable();
+            $table->string('ktp_image')->nullable();    
+            $table->text('rejection_reason')->nullable();
             $table->timestamps();
         });
     }

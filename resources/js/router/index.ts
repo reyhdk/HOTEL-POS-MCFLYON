@@ -109,6 +109,16 @@ const routes: Array<RouteRecordRaw> = [
                     breadcrumbs: ["Dashboard", "Pesan Makanan", "Pembayaran"],
                 },
             },
+            {
+                path: "ktp",
+                name: "user-ktp",
+                component: () =>
+                    import("@/pages/user-dashboard/ktp/Index.vue"),
+                meta: { 
+                    pageTitle: "Ktp",
+                    breadcrumbs: ["Dashboard", "Ktp"],
+                },
+            },      
         ],
     },
 

@@ -19,16 +19,13 @@ use Midtrans\Config;
 
 /**
  * Class CheckInController
- * * Menangani operasional Check-In, Check-Out, dan integrasi pembayaran Midtrans 
- * untuk tamu Walk-In maupun Reservasi.
- * * Controller ini memastikan integritas data antara status kamar, status booking,
- * dan pembayaran tambahan seperti Early Check-In.
+ * Menangani operasional Check-In, Check-Out, dan integrasi pembayaran Midtrans 
+ * untuk tamu Walk-In maupun Reservasi (Booking Online).
  */
 class CheckInController extends Controller
 {
     /**
-     * Inisialisasi konfigurasi Midtrans dari environment.
-     * Konfigurasi ini diperlukan untuk generate Snap Token saat pembayaran online.
+     * Inisialisasi konfigurasi Midtrans.
      */
     public function __construct()
     {
@@ -39,9 +36,8 @@ class CheckInController extends Controller
     }
 
     /**
-     * Menghitung biaya Early Check-In berdasarkan jam operasional hotel.
-     * Biaya dihitung per jam awal dari waktu check-in standar.
-     * * @return int Total biaya early check-in
+     * Menghitung biaya Early Check-In berdasarkan pengaturan hotel.
+     * @return int Total biaya early check-in.
      */
     private function calculateEarlyCheckInFee()
     {
@@ -75,9 +71,8 @@ class CheckInController extends Controller
     }
 
     /**
-     * Memproses integrasi pembayaran Midtrans.
-     * Logika ini menggabungkan Harga Kamar (untuk Walk-In) dan Biaya Early Check-In.
-     * * @param Booking $booking
+     * Memproses integrasi pembayaran Midtrans untuk Check-In.
+     * @param Booking $booking
      * @param string $paymentMethod ('cash' atau 'midtrans')
      * @param bool $isWalkIn
      * @return array ['fee' => int, 'snap_token' => string|null]
@@ -148,8 +143,7 @@ class CheckInController extends Controller
     }
 
     /**
-     * Endpoint untuk memproses Check-In langsung.
-     * Bisa digunakan untuk Walk-In baru maupun memproses booking yang sudah ada.
+     * Endpoint untuk memproses Check-In langsung (Walk-In atau Booking).
      */
     public function storeDirect(Request $request)
     {
@@ -175,7 +169,7 @@ class CheckInController extends Controller
         $paymentMethod = $request->payment_method ?? 'cash';
 
         try {
-            // --- VALIDASI TANGGAL (Pencegahan check-in awal) ---
+            // Validasi tanggal untuk booking (mencegah check-in terlalu awal dari jadwal)
             if (!$isWalkIn) {
                 $bookingCheck = Booking::findOrFail($bookingId);
                 $todayStr = Carbon::today('Asia/Jakarta')->format('Y-m-d');
@@ -192,22 +186,21 @@ class CheckInController extends Controller
             DB::transaction(function () use ($request, $bookingId, $isWalkIn, $paymentMethod, &$feeResult) {
                 $room = Room::findOrFail($request->room_id);
                 
-                // Ambil atau Buat Data Booking
+                // 1. Ambil atau Buat Data Booking
                 if (!$isWalkIn) {
                     $booking = Booking::with('guest')->findOrFail($bookingId);
                 } else {
                     $checkInDate = Carbon::today('Asia/Jakarta');
                     $checkOutDate = Carbon::parse($request->check_out_date);
-                    $nights = $checkInDate->diffInDays($checkOutDate);
-                    
-                    if ($nights < 1) $nights = 1;
+                    $nights = $checkInDate->diffInDays($checkOutDate) ?: 1;
 
-                    // Buat Guest jika tidak ada ID yang dipilih
+                    // Buat Guest jika data baru dimasukkan
                     if (!$request->guest_id && $request->guest_name) {
                         $guest = Guest::create([
                             'name' => $request->guest_name,
                             'phone_number' => $request->guest_phone,
-                            'email' => $request->guest_email
+                            'email' => $request->guest_email,
+                            'is_verified' => false
                         ]);
                     } else {
                         $guest = Guest::findOrFail($request->guest_id);
@@ -222,26 +215,29 @@ class CheckInController extends Controller
                         'check_out_date' => $checkOutDate->format('Y-m-d'),
                         'status' => 'pending', 
                         'total_price' => $totalRoomPrice,
-                        'verification_status' => 'verified',
                         'payment_status' => 'unpaid' 
                     ]);
                 }
 
-                // Pengelolaan Foto KTP
+                // 2. Pengelolaan Foto KTP (Admin Input = Auto Verified)
                 if ($request->hasFile('ktp_image')) {
                     $guest = $booking->guest;
                     if ($guest && $guest->ktp_image) {
                         Storage::disk('public')->delete($guest->ktp_image);
                     }
                     $path = $request->file('ktp_image')->store('ktp_images', 'public');
-                    $guest->update(['ktp_image' => $path]);
+                    
+                    // Tandai tamu sebagai verified karena admin yang memproses KTP-nya secara langsung
+                    $guest->update([
+                        'ktp_image' => $path,
+                        'is_verified' => true
+                    ]);
                 }
 
-                // Hitung Pembayaran & Generate Token
+                // 3. Hitung Pembayaran & Generate Token
                 $feeResult = $this->processCheckInPayment($booking, $paymentMethod, $isWalkIn);
                 
-                // --- LOGIKA ALUR CHECK-IN ---
-                // Jika pembayaran tunai, langsung check-in. Jika Midtrans, tunggu webhook.
+                // 4. Alur Check-In Berdasarkan Metode Pembayaran
                 if ($paymentMethod === 'cash') {
                     $booking->update([
                         'status' => 'checked_in', 
@@ -259,7 +255,7 @@ class CheckInController extends Controller
 
                     $room->update(['status' => 'occupied']);
                 } else {
-                    // Simpan preferensi incognito di notes agar dibaca oleh MidtransController nanti
+                    // Simpan preferensi incognito di notes untuk diproses MidtransController nanti
                     $booking->update([
                         'notes' => $request->boolean('is_incognito', false) ? 'INCOGNITO' : 'NORMAL'
                     ]);
@@ -267,7 +263,7 @@ class CheckInController extends Controller
             });
 
             return response()->json([
-                'message' => $paymentMethod === 'cash' ? 'Check-in berhasil diproses!' : 'Menunggu pembayaran via QRIS/Midtrans.',
+                'message' => $paymentMethod === 'cash' ? 'Check-in berhasil diproses!' : 'Menunggu pembayaran melalui QRIS/Transfer.',
                 'early_check_in_fee' => $feeResult['fee'],
                 'snap_token' => $feeResult['snap_token']
             ]);
@@ -281,7 +277,7 @@ class CheckInController extends Controller
     }
 
     /**
-     * Alias untuk konsistensi routing jika diperlukan.
+     * Alias untuk konsistensi routing.
      */
     public function storeFromBooking(Request $request)
     {
@@ -296,7 +292,6 @@ class CheckInController extends Controller
         $roomId = $request->input('room_id');
         $room = Room::findOrFail($roomId);
 
-        // Validasi apakah kamar memang sedang ditempati
         if ($room->status !== 'occupied') {
             return response()->json([
                 'message' => 'Kamar tidak sedang dalam status Terisi.'
@@ -323,17 +318,17 @@ class CheckInController extends Controller
                     }
                 }
 
-                // Setelah check-out, status kamar otomatis menjadi kotor
+                // Setelah check-out, status kamar otomatis menjadi kotor (perlu pembersihan)
                 $room->update(['status' => 'dirty']);
             });
 
             return response()->json([
-                'message' => 'Check-out berhasil. Kamar kini berstatus Kotor (Perlu Pembersihan).'
+                'message' => 'Check-out berhasil. Kamar kini berstatus Kotor.'
             ]);
         } catch (\Throwable $e) {
             Log::error("Gagal checkOut: " . $e->getMessage());
             return response()->json([
-                'message' => 'Terjadi kesalahan saat check-out.'
+                'message' => 'Terjadi kesalahan saat memproses check-out.'
             ], 500);
         }
     }

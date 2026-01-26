@@ -78,6 +78,10 @@ Route::middleware('auth:api')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
     });
 
+    Route::get('/user/profile-ktp', [GuestController::class, 'getMyProfile']);
+    Route::post('/user/update-ktp', [GuestController::class, 'selfUpdateKtp']);
+    
+
     // 2. Booking & Status (Sisi Tamu)
     Route::get('/my-bookings', [UserBookingController::class, 'index']);
     Route::get('/user/check-in-status', [UserCheckInStatusController::class, 'getStatus']);

@@ -25,7 +25,7 @@
                                 <span class="fs-9 fw-bold text-uppercase ls-1 text-white">Check-In</span>
                                 <span class="bullet bullet-dot bg-white h-4px w-4px"></span>
                                 <span class="fs-9 fw-bold text-white">
-                                    {{ formatRupiah(roomData?.price_per_night) }}/malam
+                                    {{ formatRupiah(roomData?.price_per_night) }}/wengi
                                 </span>
                             </div>
                         </div>
@@ -43,14 +43,14 @@
 
                 <div class="modal-body p-0 bg-body-adaptive">
                     <div class="row g-0">
-                        <!-- SISI KIRI: Form Utama (7/12) -->
+                        <!-- SISI KIWA: Form Utama -->
                         <div class="col-lg-7 border-end border-gray-200 bg-white">
-                            <!-- Alert Booking Hari Ini -->
+                            <!-- Alert Booking Dinten Niki -->
                             <transition name="slide-down">
                                 <div v-if="existingBookingToday" class="alert-booking p-3 px-5 d-flex align-items-center gap-3 border-bottom border-warning border-opacity-25 bg-light-warning bg-opacity-50">
                                     <i class="ki-duotone ki-calendar-tick fs-2 text-warning"><span class="path1"></span><span class="path2"></span></i>
                                     <div class="flex-grow-1 lh-1">
-                                        <div class="fs-8 fw-bold text-gray-800">Tamu ini memiliki booking hari ini</div>
+                                        <div class="fs-8 fw-bold text-gray-800">Tamu niki gadhah booking dinten niki</div>
                                     </div>
                                     <button class="btn btn-xs btn-warning fw-bold text-dark shadow-sm" @click="pilihBooking(existingBookingToday)">Proses</button>
                                 </div>
@@ -77,7 +77,7 @@
                                                         <i class="ki-duotone fs-2" :class="[type === 'existing' ? 'ki-profile-user' : 'ki-user-edit', guestType === type ? 'text-orange-600' : 'text-gray-400']">
                                                             <span class="path1"></span><span class="path2"></span>
                                                         </i>
-                                                        <span class="fs-8 fw-bold" :class="guestType === type ? 'text-orange-600' : 'text-gray-500'">{{ type === "existing" ? "Tamu Lama" : "Tamu Baru" }}</span>
+                                                        <span class="fs-8 fw-bold" :class="guestType === type ? 'text-orange-600' : 'text-gray-500'">{{ type === "existing" ? "Tamu Lawas" : "Tamu Anyar" }}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -85,7 +85,7 @@
                                             <div class="min-h-60px">
                                                 <div v-if="guestType === 'existing'" class="animate-fade-in">
                                                     <el-form-item prop="guest_id" class="mb-0">
-                                                        <el-select v-model="formData.guest_id" filterable remote reserve-keyword placeholder="Cari Nama / No HP..." :remote-method="searchGuests" :loading="loadingGuests" class="w-100" size="large" @change="onExistingGuestSelected">
+                                                        <el-select v-model="formData.guest_id" filterable remote reserve-keyword placeholder="Pados Nama / No HP..." :remote-method="searchGuests" :loading="loadingGuests" class="w-100" size="large" @change="onExistingGuestSelected">
                                                             <template #prefix><i class="ki-duotone ki-magnifier fs-3 text-gray-500"><span class="path1"></span><span class="path2"></span></i></template>
                                                             <el-option v-for="item in guestOptions" :key="item.id" :label="item.name" :value="item.id">
                                                                 <div class="d-flex justify-content-between"><span class="fw-bold">{{ item.name }}</span><span class="text-muted fs-9">{{ item.phone_number }}</span></div>
@@ -94,7 +94,7 @@
                                                     </el-form-item>
                                                 </div>
                                                 <div v-else class="new-guest-box p-4 rounded-3 border border-orange-dashed animate-fade-in bg-light-orange bg-opacity-10">
-                                                    <el-form-item prop="new_name" class="mb-3"><el-input v-model="formData.new_name" placeholder="Nama Lengkap" class="input-adaptive" /></el-form-item>
+                                                    <el-form-item prop="new_name" class="mb-3"><el-input v-model="formData.new_name" placeholder="Nama Jangkep" class="input-adaptive" /></el-form-item>
                                                     <div class="d-flex gap-3">
                                                         <el-form-item prop="new_phone" class="mb-0 w-50"><el-input v-model="formData.new_phone" placeholder="No WhatsApp" class="input-adaptive" /></el-form-item>
                                                         <el-form-item class="mb-0 w-50"><el-input v-model="formData.new_email" placeholder="Email" class="input-adaptive" /></el-form-item>
@@ -112,17 +112,13 @@
                                                         </div>
                                                         <img v-else :src="ktpPreview" class="w-100 h-100 object-fit-cover" />
                                                         <input type="file" ref="ktpRef" class="d-none" accept="image/*" @change="handleUpload" />
-                                                        
-                                                        <div v-if="ktpPreview && !ktpFile && guestType === 'existing'" class="position-absolute bottom-0 start-0 w-100 bg-dark bg-opacity-50 text-white fs-10 text-center py-1">
-                                                            Data DB (Klik ganti)
-                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div class="col-7">
                                                     <div class="date-box p-3 rounded-3 border border-dashed border-gray-400 bg-light h-100 d-flex flex-column justify-content-center">
                                                         <div class="d-flex justify-content-between align-items-center mb-1">
                                                             <label class="form-label fs-9 fw-bold text-gray-600 mb-0">RENCANA CHECK-OUT</label>
-                                                            <span class="badge badge-light-orange text-orange-600 fw-bold fs-10 px-2 py-1">{{ durasi }} Malam</span>
+                                                            <span class="badge badge-light-orange text-orange-600 fw-bold fs-10 px-2 py-1">{{ durasi }} Sewengi</span>
                                                         </div>
                                                         <el-form-item prop="check_out_date" class="mb-0">
                                                             <el-date-picker v-model="formData.check_out_date" type="date" class="w-100" format="DD MMM YYYY" value-format="YYYY-MM-DD" :disabled-date="disabledDate" />
@@ -137,7 +133,7 @@
                                                     <div v-for="method in ['cash', 'midtrans']" :key="method" class="card-option flex-grow-1 p-3 rounded-3 border cursor-pointer transition-all d-flex align-items-center justify-content-center gap-2"
                                                         :class="formData.payment_method === method ? 'active-selection' : 'border-dashed border-gray-300'" @click="formData.payment_method = method">
                                                         <i class="ki-duotone fs-2" :class="[method === 'cash' ? 'ki-bill' : 'ki-scan-barcode', formData.payment_method === method ? 'text-orange-600' : 'text-gray-500']"><span class="path1"></span><span class="path2"></span></i>
-                                                        <span class="fs-8 fw-bold" :class="formData.payment_method === method ? 'text-orange-600' : 'text-gray-600'">{{ method === "cash" ? "Tunai / Cash" : "QRIS / Transfer" }}</span>
+                                                        <span class="fs-8 fw-bold" :class="formData.payment_method === method ? 'text-orange-600' : 'text-gray-600'">{{ method === "cash" ? "Tunai / Kontan" : "QRIS / Transfer" }}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -148,7 +144,7 @@
                                             <div class="text-center py-2">
                                                 <i class="ki-duotone ki-calendar-search fs-3x text-orange-600 animate-bounce mb-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
                                                 <h6 class="fw-bold text-gray-800 mb-1">Cari Data Booking</h6>
-                                                <p class="text-muted fs-9">Hanya booking yang berstatus lunas/terkonfirmasi</p>
+                                                <p class="text-muted fs-9">Namung booking ingkang statusipun lunas</p>
                                             </div>
                                             <el-form-item prop="booking_id" class="mb-2">
                                                 <el-select v-model="formData.booking_id" filterable placeholder="Ketik nama tamu booking..." class="w-100" size="large" @change="onBookingSelected">
@@ -170,7 +166,16 @@
                                                         <div class="fs-7 fw-bolder text-primary mb-1">{{ selectedBooking.guest.name }}</div>
                                                         <div class="fs-9 text-muted fw-bold">{{ selectedBooking.guest.phone_number }}</div>
                                                     </div>
-                                                    <span class="badge badge-primary fw-bolder text-uppercase fs-10">Confirmed</span>
+                                                    <div class="d-flex flex-column align-items-end gap-1">
+                                                        <span class="badge badge-primary fw-bolder text-uppercase fs-10">Confirmed</span>
+                                                        <!-- STATUS VERIFIKASI -->
+                                                        <span v-if="selectedBooking.guest?.is_verified" class="badge badge-light-success fs-10 border border-success border-opacity-25">
+                                                            <i class="ki-duotone ki-shield-tick fs-9 me-1"><span class="path1"></span><span class="path2"></span></i> Terverifikasi
+                                                        </span>
+                                                        <span v-else class="badge badge-light-danger fs-10 border border-danger border-opacity-25">
+                                                            <i class="ki-duotone ki-shield-cross fs-9 me-1"><span class="path1"></span><span class="path2"></span></i> Perlu KTP Ulang
+                                                        </span>
+                                                    </div>
                                                 </div>
                                                 <div class="separator separator-dashed my-2 border-primary opacity-25"></div>
                                                 <div class="row g-2">
@@ -184,11 +189,24 @@
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            <!-- UPLOAD KTP RE-VERIFY (Mung muncul yen tamu dereng terverifikasi) -->
+                                            <div v-if="selectedBooking && !selectedBooking.guest?.is_verified" class="p-4 rounded-3 border border-dashed border-danger bg-light-danger bg-opacity-10 animate-fade-in mb-2">
+                                                <div class="d-flex align-items-center gap-2 mb-3">
+                                                    <i class="ki-duotone ki-information-5 fs-3 text-danger"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                                    <span class="fs-9 fw-bold text-danger">KTP ditolak sadurunge. Admin wajib upload KTP ingkang cetha dinten niki.</span>
+                                                </div>
+                                                <div class="upload-box-mini rounded-3 border border-dashed border-gray-400 bg-white p-3 text-center cursor-pointer hover-border-orange transition-all" @click="triggerUpload">
+                                                    <div v-if="!ktpPreview" class="text-muted fs-10 fw-bold">Klik kagem Scan/Upload KTP</div>
+                                                    <img v-else :src="ktpPreview" class="img-fluid rounded shadow-sm" style="max-height: 120px" />
+                                                    <input type="file" ref="ktpRef" class="d-none" accept="image/*" @change="handleUpload" />
+                                                </div>
+                                            </div>
                                             
-                                            <div v-if="isEarlyCheckIn && selectedBooking" class="payment-method-box mt-2">
+                                            <div v-if="isEarlyCheckIn && selectedBooking" class="payment-method-box mt-1">
                                                 <div class="alert alert-warning border border-warning border-opacity-20 d-flex align-items-center gap-3 p-3 rounded-3 mb-3">
                                                     <i class="ki-duotone ki-information-5 fs-2 text-warning"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-                                                    <span class="fs-9 fw-bold text-gray-800 lh-1">Terdapat biaya Early Check-In. Silakan pilih metode pembayaran tambahan.</span>
+                                                    <span class="fs-9 fw-bold text-gray-800 lh-1">Wonten biaya Early Check-In. Mangga pilih metode pembayaran tambahan.</span>
                                                 </div>
                                                 <div class="d-flex gap-2">
                                                     <div v-for="method in ['cash', 'midtrans']" :key="method" class="card-option flex-grow-1 p-3 rounded-3 border cursor-pointer transition-all d-flex align-items-center justify-content-center gap-2"
@@ -201,7 +219,7 @@
                                         </div>
                                     </transition>
 
-                                    <!-- AREA ACTION: TOTAL & SUBMIT (LOWER LEFT) -->
+                                    <!-- AREA ACTION: TOTAL & SUBMIT -->
                                     <div class="mt-auto pt-6 border-top border-dashed">
                                         <div class="d-flex align-items-center justify-content-between mb-4">
                                             <div class="privacy-card d-flex align-items-center gap-3 px-4 py-2 rounded-3 border bg-light-subtle transition-all cursor-pointer"
@@ -214,7 +232,7 @@
                                                 </div>
                                                 <div class="d-flex flex-column">
                                                     <span class="fs-10 fw-bold text-uppercase ls-1 mb-0" :class="formData.is_incognito ? 'text-white' : 'text-gray-500'">Privasi Tamu</span>
-                                                    <span class="fs-9 fw-bolder" :class="formData.is_incognito ? 'text-white' : 'text-gray-900'">{{ formData.is_incognito ? 'Sembunyikan' : 'Tampilkan' }}</span>
+                                                    <span class="fs-9 fw-bolder" :class="formData.is_incognito ? 'text-white' : 'text-gray-900'">{{ formData.is_incognito ? 'Sembunyi' : 'Tampil' }}</span>
                                                 </div>
                                                 <div class="form-check form-switch form-check-custom form-check-solid form-check-sm ms-2">
                                                     <input class="form-check-input h-15px w-25px" type="checkbox" v-model="formData.is_incognito" @click.stop />
@@ -223,7 +241,7 @@
 
                                             <div class="text-end">
                                                 <div v-if="checkInMode === 'booking_existing'" class="fs-10 fw-bold text-success text-uppercase ls-1 mb-1">
-                                                    <i class="ki-duotone ki-check-circle fs-8 text-success me-1"><span class="path1"></span><span class="path2"></span></i>Kamar Sudah Lunas
+                                                    <i class="ki-duotone ki-check-circle fs-8 text-success me-1"><span class="path1"></span><span class="path2"></span></i>Kamar Sampun Lunas
                                                 </div>
                                                 <div class="fs-9 fw-bold text-gray-500 text-uppercase ls-1">{{ currentPaymentLabel }}</div>
                                                 <div class="text-orange-600 d-flex align-items-baseline justify-content-end">
@@ -236,7 +254,7 @@
                                         <button type="submit" class="btn btn-orange w-100 fw-bold hover-scale shadow-sm py-4 fs-6" :disabled="loading">
                                             <span v-if="!loading" class="d-flex align-items-center justify-content-center gap-2">
                                                 <i class="ki-duotone ki-entrance-right fs-3"><span class="path1"></span><span class="path2"></span></i>
-                                                {{ checkInMode === 'walk_in' ? 'Check-In Sekarang' : (computedTotalBayar > 0 ? 'Bayar Tambahan & Check-In' : 'Verifikasi & Check-In') }}
+                                                {{ checkInMode === 'walk_in' ? 'Check-In Saiki' : (computedTotalBayar > 0 ? 'Bayar Tambahan & Check-In' : 'Verifikasi & Check-In') }}
                                             </span>
                                             <span v-else>Memproses... <span class="spinner-border spinner-border-sm ms-1"></span></span>
                                         </button>
@@ -245,11 +263,11 @@
                             </div>
                         </div>
 
-                        <!-- SISI KANAN: Jadwal & Kalender (5/12) -->
+                        <!-- SISI TENGEN: Jadwal & Kalender -->
                         <div class="col-lg-5 bg-light-subtle d-flex flex-column border-start border-gray-200">
                             <div class="p-5 flex-grow-1 overflow-auto">
                                 <div class="d-flex align-items-center justify-content-between mb-4 px-1">
-                                    <span class="fw-bolder fs-8 text-gray-800">Cek Ketersediaan</span>
+                                    <span class="fw-bolder fs-8 text-gray-800">Cek Kasedhiyan</span>
                                     <span class="badge badge-light-primary fw-bold fs-10 px-3 py-1 rounded-pill">{{ currentMonthName }}</span>
                                 </div>
                                 
@@ -288,7 +306,7 @@
                                         <div v-else class="h-100 d-flex align-items-center justify-content-center py-8">
                                             <div class="text-center opacity-50">
                                                 <i class="ki-duotone ki-hand fs-2x mb-2 text-gray-400"><span class="path1"></span><span class="path2"></span></i>
-                                                <div class="fs-10 fw-bold text-gray-400 text-center lh-sm">Ketuk tanggal kalender<br>untuk cek tamu</div>
+                                                <div class="fs-10 fw-bold text-gray-400 text-center lh-sm">Ketuk tanggal kalender<br>kangge cek tamu</div>
                                             </div>
                                         </div>
                                     </transition>
@@ -311,7 +329,7 @@
                                         </div>
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="bullet bullet-dot border border-success h-8px w-8px bg-white"></span>
-                                            <span class="fs-10 fw-bold text-gray-700">Hari Ini</span>
+                                            <span class="fs-10 fw-bold text-gray-700">Dinten Niki</span>
                                         </div>
                                     </div>
                                 </div>
@@ -381,9 +399,14 @@ export default {
             return now.isBefore(standardCheckIn);
         },
         isKtpRequired() {
-            if (this.checkInMode === 'booking_existing') return false;
-            if (this.guestType === 'new') return true;
-            if (this.guestType === 'existing' && !this.isKtpInDb && !this.ktpFile) return true;
+            // Logika Verifikasi KTP (Permintaan User):
+            // 1. Yen walk-in tamu anyar, wajib.
+            if (this.checkInMode === 'walk_in' && this.guestType === 'new') return true;
+            // 2. Yen walk-in tamu lawas nanging dereng wonten KTP ing DB, wajib.
+            if (this.checkInMode === 'walk_in' && this.guestType === 'existing' && !this.isKtpInDb && !this.ktpFile) return true;
+            // 3. Yen booking online nanging tamu dereng verified (reject-an admin), wajib upload dinten niki.
+            if (this.checkInMode === 'booking_existing' && this.selectedBooking && !this.selectedBooking.guest?.is_verified && !this.ktpFile) return true;
+            
             return false;
         },
         currentMonthName() { return moment(this.currentDate).format('MMMM YYYY'); },
@@ -482,12 +505,8 @@ export default {
             try {
                 const res = await axios.get("bookings", { params: { room_id: roomId, status_in: "paid,confirmed,verified", date_gte: moment().format("YYYY-MM-DD") } });
                 this.availableBookings = res.data.data || [];
-                
-                // --- PERBAIKAN LOGIKA: Deteksi Booking Hari Ini Tepat pada Tanggalnya ---
                 const today = moment().startOf('day');
-                this.existingBookingToday = this.availableBookings.find(b => {
-                    return moment(b.check_in_date).isSame(today, 'day');
-                });
+                this.existingBookingToday = this.availableBookings.find(b => moment(b.check_in_date).isSame(today, 'day'));
             } catch (e) { console.error(e); }
         },
         async fetchFullSchedule(roomId) {
@@ -521,6 +540,7 @@ export default {
             this.ktpPreview = null;
             this.isKtpInDb = false;
             this.resetValidasi(); 
+            if (m === 'booking_existing' && this.formData.booking_id) this.onBookingSelected();
         },
         resetValidasi() { this.$nextTick(() => { if (this.$refs.formRef) this.$refs.formRef.clearValidate(); }); },
         searchGuests: debounce(function (query) {
@@ -532,13 +552,17 @@ export default {
         onExistingGuestSelected(val) {
             const guest = this.guestOptions.find(g => g.id === val);
             if (guest && guest.ktp_image) {
-                this.ktpPreview = guest.ktp_image.startsWith('http') ? guest.ktp_image : `/storage/${guest.ktp_image}`;
-                this.isKtpInDb = true;
-                this.ktpFile = null;
+                // Yen tamu sampun verified, tampilaken preview saking DB.
+                if (guest.is_verified) {
+                    this.ktpPreview = guest.ktp_image.startsWith('http') ? guest.ktp_image : `/storage/${guest.ktp_image}`;
+                    this.isKtpInDb = true;
+                } else {
+                    this.ktpPreview = null;
+                    this.isKtpInDb = false;
+                }
             } else {
                 this.ktpPreview = null;
                 this.isKtpInDb = false;
-                this.ktpFile = null;
             }
         },
         triggerUpload() { this.$refs.ktpRef.click(); },
@@ -560,31 +584,33 @@ export default {
             this.selectedBooking = this.availableBookings.find(b => b.id === this.formData.booking_id);
             if (this.selectedBooking && this.selectedBooking.guest) {
                 const g = this.selectedBooking.guest;
-                this.ktpPreview = g.ktp_image ? (g.ktp_image.startsWith('http') ? g.ktp_image : `/storage/${g.ktp_image}`) : null;
-                this.isKtpInDb = !!g.ktp_image;
+                // Logika: Yen sampun verified, tampilaken. Yen dereng, biarkan admin upload.
+                if (g.is_verified) {
+                    this.ktpPreview = g.ktp_image ? (g.ktp_image.startsWith('http') ? g.ktp_image : `/storage/${g.ktp_image}`) : null;
+                    this.isKtpInDb = !!g.ktp_image;
+                } else {
+                    this.ktpPreview = null;
+                    this.isKtpInDb = false;
+                    this.ktpFile = null;
+                }
             }
         },
         async submit() {
             this.$refs.formRef.validate(async (valid) => {
                 if (!valid) return;
                 
-                // --- VALIDASI CEGAH CHECK-IN AWAL DI FRONTEND ---
+                // Cegah check-in awal
                 if (this.checkInMode === 'booking_existing' && this.selectedBooking) {
                     const today = moment().startOf('day');
                     const bookDate = moment(this.selectedBooking.check_in_date).startOf('day');
-                    
                     if (bookDate.isAfter(today)) {
-                        Swal.fire({
-                            title: "Terlalu Cepat",
-                            text: `Tamu ini dijadwalkan Check-in pada tanggal ${bookDate.format('DD MMM YYYY')}. Anda belum bisa memproses check-in hari ini.`,
-                            icon: "warning"
-                        });
+                        Swal.fire({ title: "Terlalu Cepat", text: `Tamu punika dijadwalaken Check-in tgl ${bookDate.format('DD MMM YYYY')}.`, icon: "warning" });
                         return;
                     }
                 }
 
                 if (this.isKtpRequired) {
-                    Swal.fire("Info", "Wajib melampirkan foto KTP untuk tamu ini.", "warning");
+                    Swal.fire("Info", "Wajib lampiraken foto KTP kagem tamu punika.", "warning");
                     return;
                 }
 
@@ -593,7 +619,6 @@ export default {
                     const payload = new FormData();
                     payload.append("room_id", this.roomData.id);
                     payload.append("is_incognito", this.formData.is_incognito ? 1 : 0);
-                    
                     if (this.ktpFile) payload.append("ktp_image", this.ktpFile);
 
                     if (this.checkInMode === "walk_in") {
@@ -616,37 +641,15 @@ export default {
 
                     if (data.snap_token) {
                         window.snap.pay(data.snap_token, {
-                            onSuccess: (result) => { 
-                                // --- PERBAIKAN: Cek status transaksi yang sebenarnya ---
-                                if (result.transaction_status === 'settlement' || result.transaction_status === 'capture') {
-                                    Swal.fire("Berhasil", "Pembayaran sukses dan check-in berhasil diproses.", "success");
-                                    this.$emit("success"); 
-                                    this.modal.hide(); 
-                                } else if (result.transaction_status === 'cancel' || result.transaction_status === 'deny' || result.transaction_status === 'expire') {
-                                    Swal.fire("Gagal", "Pembayaran dibatalkan atau ditolak.", "error");
-                                } else {
-                                    Swal.fire("Info", "Status pembayaran: " + result.transaction_status, "info");
-                                }
+                            onSuccess: () => { 
+                                Swal.fire("Berhasil", "Pembayaran sukses lan check-in diproses.", "success");
+                                this.$emit("success"); this.modal.hide(); 
                             },
-                            onPending: (result) => {
-                                Swal.fire("Menunggu Pembayaran", "Silakan selesaikan pembayaran QRIS Anda. Check-in akan otomatis diproses setelah pembayaran lunas.", "info");
-                                this.$emit("success"); 
-                                this.modal.hide();
+                            onPending: () => {
+                                Swal.fire("Menunggu Pembayaran", "Mangga rampungaken pembayaran QRIS panjenengan.", "info");
+                                this.$emit("success"); this.modal.hide();
                             },
-                            onError: (result) => {
-                                Swal.fire("Gagal", "Terjadi kesalahan saat memproses pembayaran.", "error");
-                            },
-                            onClose: () => { 
-                                // --- PERBAIKAN: Jika user menutup Snap (Cancel/Close), jangan beri notif berhasil ---
-                                Swal.fire({
-                                    title: "Pembayaran Dibatalkan",
-                                    text: "Proses check-in tidak dilanjutkan karena pembayaran belum diselesaikan.",
-                                    icon: "warning",
-                                    confirmButtonText: "Tutup"
-                                });
-                                // Jangan emit success atau sembunyikan modal agar user bisa mencoba lagi jika mau
-                                // atau sembunyikan tanpa refresh data jika memang ingin menutup form
-                            }
+                            onClose: () => { Swal.fire("Batal", "Pembayaran dibatalaken.", "warning"); }
                         });
                     } else {
                         Swal.fire("Berhasil", data.message, "success");
@@ -689,18 +692,17 @@ export default {
     box-shadow: 0 4px 12px rgba(255, 153, 0, 0.15) !important;
 }
 
-.privacy-card {
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    user-select: none;
-}
+.privacy-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); user-select: none; }
 .privacy-card:active { transform: scale(0.98); }
+
+.upload-box-mini { border: 2px dashed #e4e6ef; background-color: #f9f9f9; min-height: 100px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.hover-border-orange:hover { border-color: #ff9900; background-color: rgba(255, 153, 0, 0.02); }
 
 :deep(.el-input__wrapper), :deep(.el-select__wrapper) { box-shadow: none !important; border: 1px solid #e4e6ef; border-radius: 8px; padding: 8px 12px; }
 
 .animate-bounce { animation: softBounce 2s infinite; }
 @keyframes softBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 
-/* Transition Styles */
 .slide-down-enter-active, .slide-down-leave-active { transition: all 0.3s ease-out; }
 .slide-down-enter-from, .slide-down-leave-to { transform: translateY(-20px); opacity: 0; }
 
