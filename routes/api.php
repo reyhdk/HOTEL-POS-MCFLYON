@@ -22,6 +22,9 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\RoomController;
 use App\Http\Controllers\Api\UserBookingController;
 use App\Http\Controllers\Api\UserCheckInStatusController;
+use App\Http\Controllers\Api\Warehouse\WarehouseItemController;
+use App\Http\Controllers\Api\Warehouse\StockTransactionController;
+use App\Http\Controllers\Api\Warehouse\WarehouseCategoryController;
 // Guest & Admin Namespace Controllers
 use App\Http\Controllers\Api\Admin\CheckoutHistoryController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
@@ -91,6 +94,8 @@ Route::middleware('auth:api')->group(function () {
 
     // 3. Guest Mode (Saat Tamu Menginap)
     Route::prefix('guest')->name('guest.')->group(function () {
+        Route::get('/menu', [MenuController::class, 'index']);
+
         Route::get('/profile', [GuestOrderController::class, 'getProfile']);
         Route::post('/orders', [GuestOrderController::class, 'store']);
         Route::get('/orders', [GuestOrderController::class, 'getOrderHistory']);
@@ -142,6 +147,25 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/admin/check-ins/store-direct', [CheckInController::class, 'storeDirect']);
 
         Route::post('/check-out/{room}', [CheckInController::class, 'checkout']);
+    });
+
+    Route::prefix('warehouse')->middleware('auth:api')->group(function () {
+        
+        // 1. Master Data Kategori (Baru)
+        Route::apiResource('categories', WarehouseCategoryController::class);
+
+        // 2. Items
+        Route::get('items/next-code', [WarehouseItemController::class, 'getNextCode']); // Endpoint Baru Auto Code
+        Route::get('items/low-stock', [WarehouseItemController::class, 'getLowStock']);
+        Route::get('items/stock-value', [WarehouseItemController::class, 'getStockValue']);
+        Route::get('items/categories', [WarehouseItemController::class, 'getCategories']);
+        Route::post('items/{id}/adjust-stock', [WarehouseItemController::class, 'adjustStock']);
+        Route::apiResource('items', WarehouseItemController::class);
+        
+        // 3. Transactions
+        Route::post('transactions/bulk', [StockTransactionController::class, 'bulkStore']);
+        Route::get('transactions/summary', [StockTransactionController::class, 'getSummary']);
+        Route::apiResource('transactions', StockTransactionController::class)->except(['update']);
     });
 
     Route::get('/admin/checkout-history', [CheckoutHistoryController::class, 'index'])->middleware('can:view checkout_history');
@@ -200,7 +224,7 @@ Route::middleware('auth:api')->group(function () {
     // User & Role Management
     Route::prefix('master')->group(function () {
         Route::get('/all-roles', [UserController::class, 'getAllRoles'])->middleware('can:view roles');
-        Route::apiResource('users', UserController::class)->scoped(['user' => 'uuid'])->middleware('can:view users');
+        Route::apiResource('users', UserController::class)->middleware('can:view users');
         Route::apiResource('roles', RoleController::class)->middleware('can:view roles');
         Route::get('/permissions', [RoleController::class, 'getAllPermissions'])->middleware('can:view roles');
     });

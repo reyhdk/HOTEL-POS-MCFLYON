@@ -29,4 +29,19 @@ class Menu extends Model
             get: fn () => $this->image ? Storage::url($this->image) : null,
         );
     }
+
+    public function ingredients()
+    {
+        return $this->belongsToMany(WarehouseItem::class, 'menu_ingredients')
+                    ->withPivot('quantity')
+                    ->withTimestamps();
+    }
+    
+    // Helper untuk menghitung total HPP (Optional, jika ingin diakses dari backend)
+    public function getCostPriceAttribute()
+    {
+        return $this->ingredients->sum(function($item) {
+            return $item->cost_price * $item->pivot->quantity;
+        });
+    }
 }

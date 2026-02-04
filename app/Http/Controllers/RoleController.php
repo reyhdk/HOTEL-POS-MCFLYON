@@ -4,15 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\RoleRequest;
 use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission; // <--- 1. JANGAN LUPA IMPORT INI
+use Spatie\Permission\Models\Permission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class RoleController extends Controller
 {
     /**
-     * Method BARU untuk mengambil semua permission
-     * Digunakan oleh Form.vue di frontend
+     * Mengambil semua permission untuk Form.vue
      */
     public function getAllPermissions()
     {
@@ -29,7 +28,9 @@ class RoleController extends Controller
         $perPage = $request->input('per_page', 10);
         $search = $request->input('search');
 
-        $query = Role::where('name', '!=', 'admin');
+        // PERBAIKAN 1: Tambahkan with('permissions') agar data permission terload di index
+        // Ini mengatasi masalah "0 Hak Akses" di tampilan awal
+        $query = Role::with('permissions')->where('name', '!=', 'admin');
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -54,8 +55,6 @@ class RoleController extends Controller
             ]);
 
             if (!empty($validatedData['permissions'])) {
-                // Frontend mengirim array nama permission ['view users', 'edit roles']
-                // Kita sync berdasarkan nama
                 $role->syncPermissions($validatedData['permissions']);
             }
 
@@ -74,9 +73,8 @@ class RoleController extends Controller
             'id' => $role->id,
             'name' => $role->name,
             'full_name' => $role->full_name,
-            // Mengirimkan daftar nama permission yang dimiliki role ini
+            // Controller mengirim array of strings: ['view_users', 'edit_roles']
             'permissions' => $role->permissions->pluck('name'), 
-            // Atau jika ingin object lengkap: $role->permissions
         ]);
     }
 
@@ -91,7 +89,6 @@ class RoleController extends Controller
                 'full_name' => $validatedData['full_name']
             ]);
 
-            // Sync permissions jika ada
             if (isset($validatedData['permissions'])) {
                 $role->syncPermissions($validatedData['permissions']);
             }

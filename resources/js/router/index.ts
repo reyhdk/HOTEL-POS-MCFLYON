@@ -123,14 +123,15 @@ const routes: Array<RouteRecordRaw> = [
     },
 
     // =======================================================
-    // ▼▼▼ GRUP RUTE ADMIN & STAF LAINNYA ▼▼▼
+    // ▼▼▼ GRUP RUTE ADMIN & STAF (OTOMATIS) ▼▼▼
     // =======================================================
     {
         path: "/admin",
         component: () => import("@/layouts/default-layout/DefaultLayout.vue"),
         meta: {
             middleware: "auth",
-            role: ["admin", "receptionist", "chef", "cleaning-service"],
+            // ✅ KITA HAPUS DAFTAR MANUALNYA
+            // Role dicek secara dinamis di bawah: Bukan 'user' = Staff.
         },
         children: [
             {
@@ -183,8 +184,14 @@ const routes: Array<RouteRecordRaw> = [
                 meta: {
                     pageTitle: "Verifikasi KTP",
                     breadcrumbs: ["Master Data", "Verifikasi KTP"],
-                    role: ["admin", "receptionist"],
                 },
+            },
+            {
+                path: "master/warehouse",
+                name: "admin-master-warehouse",
+                component: () =>
+                    import("@/pages/dashboard/master/warehouse/Index.vue"),
+                meta: { pageTitle: "Gudang" },
             },
             {
                 path: "master/facilities",
@@ -302,98 +309,71 @@ NProgress.configure({ showSpinner: false });
 router.beforeEach(async (to, from, next) => {
     NProgress.start();
 
-    console.log("🧭 Navigation:", {
-        from: from.name,
-        to: to.name,
-        meta: to.meta,
-    });
-
-    document.title = `${to.meta.pageTitle || "Welcome"} - ${
-        import.meta.env.VITE_APP_NAME
-    }`;
-
     const authStore = useAuthStore();
     const token = JwtService.getToken();
 
-    console.log("🔑 Auth State:", {
-        hasToken: !!token,
-        isAuthenticated: authStore.isAuthenticated,
-        isUserLoaded: authStore.isUserLoaded,
-        userRole: authStore.userRole,
-    });
-
-    // ✅ Verifikasi auth jika ada token tapi user belum loaded
+    // 1. Verifikasi auth jika ada token tapi user belum loaded
     if (token && !authStore.isUserLoaded) {
-        console.log("🔄 Verifying auth...");
         try {
             await authStore.verifyAuth();
-            console.log("✅ Auth verified:", {
-                user: authStore.user?.name,
-                role: authStore.userRole,
-            });
         } catch (error) {
-            console.error("❌ Auth verification failed:", error);
+            console.error("Auth verification failed");
         }
     }
 
     const isAuthenticated = authStore.isAuthenticated;
     const userRole = authStore.userRole;
-    const staffRoles = ["admin", "receptionist", "chef", "cleaning-service"];
 
-    // 1. Logika untuk halaman guest (login, register)
+    // 2. Logika untuk halaman guest (login, register)
     if (to.meta.middleware === "guest") {
-        console.log("👤 Guest route detected");
-
         if (isAuthenticated) {
-            console.log(
-                "✅ User is authenticated, redirecting to dashboard..."
-            );
-
-            if (staffRoles.includes(userRole)) {
-                console.log("🏢 Redirecting to admin dashboard");
-                return next({ name: "admin-dashboard" });
-            }
-
-            console.log("👥 Redirecting to user dashboard");
-            return next({ name: "user-dashboard" });
+            // Redirect otomatis ke dashboard yang sesuai jika sudah login
+            return (userRole === "user") 
+                ? next({ name: "user-dashboard" }) 
+                : next({ name: "admin-dashboard" });
         }
-
-        console.log("➡️ Allowing access to guest route");
         return next();
     }
 
-    // 2. Logika untuk halaman yang butuh login
+    // 3. Logika untuk halaman yang butuh login
     if (to.meta.middleware === "auth") {
-        console.log("🔒 Protected route detected");
-
         if (!isAuthenticated) {
-            console.warn("🚫 User not authenticated, redirecting to login");
             return next({ name: "sign-in" });
         }
 
-        // Cek otorisasi berdasarkan role
-        if (to.meta.role) {
-            const requiredRoles = Array.isArray(to.meta.role)
-                ? to.meta.role
-                : [to.meta.role];
-
-            console.log("🎭 Checking role authorization:", {
-                userRole,
-                requiredRoles,
-                hasAccess: requiredRoles.includes(userRole),
-            });
-
-            if (!requiredRoles.includes(userRole)) {
-                console.warn("🚫 User role not authorized, redirecting to 404");
+        /**
+         * ✅ LOGIKA DINAMIS AREA:
+         * Memastikan User biasa tidak masuk area Admin, 
+         * dan Staff tidak masuk area User Dashboard.
+         */
+        
+        // Cek Area Admin
+        if (to.path.startsWith("/admin")) {
+            if (userRole === "user") {
+                console.warn("🚫 Tamu dilarang masuk area admin");
                 return next({ name: "404" });
             }
         }
 
-        console.log("✅ Authorization passed");
+        // Cek Area User
+        if (to.path.startsWith("/user")) {
+            if (userRole !== "user") {
+                console.warn("🏢 Staff dilarang masuk area tamu, arahkan ke admin dashboard");
+                return next({ name: "admin-dashboard" });
+            }
+        }
+
+        /**
+         * ✅ KHUSUS: Tetap izinkan meta.role spesifik jika ada (untuk fitur super sensitif)
+         */
+        if (to.meta.role) {
+            const allowed = Array.isArray(to.meta.role) ? to.meta.role : [to.meta.role];
+            if (!allowed.includes(userRole)) {
+                return next({ name: "404" });
+            }
+        }
     }
 
-    // 3. Jika semua kondisi lolos, izinkan akses
-    console.log("✅ Navigation allowed");
     return next();
 });
 

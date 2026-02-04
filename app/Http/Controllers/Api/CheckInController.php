@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\CheckIn;
 use App\Models\Room;
 use App\Models\Guest;
+use App\Models\User; // [TAMBAHAN] Import Model User
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -234,6 +235,24 @@ class CheckInController extends Controller
                     ]);
                 }
 
+                // -------------------------------------------------------------
+                // [FIX BUG USER LOG] Sinkronisasi Guest -> User
+                // -------------------------------------------------------------
+                // Cari apakah ada User yang email atau nomor HP-nya sama dengan Guest ini
+                $linkedUser = User::where(function($q) use ($booking) {
+                    $guest = $booking->guest;
+                    if ($guest->email) $q->where('email', $guest->email);
+                    if ($guest->phone_number) $q->orWhere('phone', $guest->phone_number); // Asumsi kolom di User adalah 'phone'
+                })->first();
+
+                // Jika Guest tabel punya kolom user_id, update relasinya
+                if ($linkedUser && $booking->guest) {
+                    // Cek jika model Guest punya user_id (opsional, tergantung struktur DB Anda)
+                    // $booking->guest->user_id = $linkedUser->id;
+                    // $booking->guest->save();
+                }
+                // -------------------------------------------------------------
+
                 // 3. Hitung Pembayaran & Generate Token
                 $feeResult = $this->processCheckInPayment($booking, $paymentMethod, $isWalkIn);
                 
@@ -244,14 +263,25 @@ class CheckInController extends Controller
                         'check_in_time' => now()
                     ]);
 
-                    CheckIn::create([
+                    // Siapkan data CheckIn
+                    $checkInData = [
                         'room_id'        => $room->id,
                         'guest_id'       => $booking->guest_id,
                         'booking_id'     => $booking->id,
                         'check_in_time'  => now(),
                         'is_active'      => true,
                         'is_incognito'   => $request->boolean('is_incognito', false),
-                    ]);
+                    ];
+
+                    // [FIX BUG USER LOG] Jika tabel check_ins punya user_id, isi user_id nya
+                    if ($linkedUser) {
+                        // Pastikan Anda sudah membuat migrasi: $table->foreignId('user_id')->nullable(); di tabel check_ins
+                        // Jika kolom tidak ada di DB, baris ini akan diabaikan oleh Eloquent jika fillable tidak diatur, 
+                        // tapi lebih aman dicek dulu atau pastikan skema DB mendukung.
+                        $checkInData['user_id'] = $linkedUser->id; 
+                    }
+
+                    CheckIn::create($checkInData);
 
                     $room->update(['status' => 'occupied']);
                 } else {

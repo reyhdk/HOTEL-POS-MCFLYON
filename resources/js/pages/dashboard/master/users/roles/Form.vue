@@ -71,6 +71,7 @@
 
                     <div v-else class="row g-3">
                         <div class="col-md-6 col-lg-4" v-for="perm in filteredPermissions" :key="perm.id">
+                            <!-- PERBAIKAN CLASS: Menggunakan includes untuk highlighting yang akurat -->
                             <label class="d-flex align-items-center h-100 p-3 rounded-2 border cursor-pointer transition-200 permission-item" 
                                    :class="formData.permissions.includes(perm.name) ? 'border-orange bg-light-orange active' : 'border-gray-200 hover-border-gray-400 bg-white'">
                                 
@@ -116,9 +117,8 @@ import Swal from "sweetalert2";
 import { Modal } from "bootstrap";
 import type { FormInstance, FormRules } from 'element-plus'
 
-// Interfaces
 interface Permission { id: number; name: string; }
-interface RoleData { id: number; name: string; full_name: string; permissions?: Permission[]; }
+interface RoleData { id: number; name: string; full_name: string; permissions?: any[]; }
 interface FormData { name: string; full_name: string; permissions: string[]; }
 
 const props = defineProps<{ roleData: RoleData | null }>();
@@ -129,13 +129,12 @@ const modalRef = ref<null | HTMLElement>(null);
 const loading = ref(false);
 const loadingPermissions = ref(false);
 const allPermissions = ref<Permission[]>([]);
-const searchPermission = ref(""); // State pencarian
+const searchPermission = ref(""); 
 const isEditMode = computed(() => !!props.roleData);
 
 const getInitialFormData = (): FormData => ({ name: "", full_name: "", permissions: [] });
 const formData = ref<FormData>(getInitialFormData());
 
-// --- Fetch Logic ---
 const fetchPermissions = async () => {
     try {
         loadingPermissions.value = true;
@@ -154,9 +153,30 @@ const loadRoleDetails = async (roleId: number) => {
     try {
         const { data } = await ApiService.get(`/master/roles/${roleId}`);
         const role = data.data || data;
-        formData.value.permissions = role.permissions ? role.permissions.map((p: any) => p.name) : [];
+
+        // --- PERBAIKAN LOGIC SINKRONISASI EDIT ---
+        // Backend mengirim permissions sebagai array of strings: ['view', 'edit']
+        // Kode lama mencoba .map() seolah-olah object, sehingga hasilnya undefined/error
+        
+        if (role.permissions && Array.isArray(role.permissions)) {
+            // Cek apakah item didalamnya adalah string (langsung nama permission)
+            if (role.permissions.length > 0 && typeof role.permissions[0] === 'string') {
+                 formData.value.permissions = role.permissions;
+            } 
+            // Cek jika item didalamnya object (misal controller berubah dikemudian hari)
+            else if (role.permissions.length > 0 && typeof role.permissions[0] === 'object') {
+                 formData.value.permissions = role.permissions.map((p: any) => p.name);
+            }
+            else {
+                 formData.value.permissions = [];
+            }
+        } else {
+            formData.value.permissions = [];
+        }
+        
     } catch (e) {
         console.error("Gagal load detail role", e);
+        Swal.fire("Error", "Gagal mengambil detail role", "error");
     } finally {
         loadingPermissions.value = false;
     }
@@ -179,11 +199,9 @@ const toggleAllPermissions = (e: Event) => {
     const visiblePermissions = filteredPermissions.value.map(p => p.name);
     
     if (checked) {
-        // Tambahkan yang belum ada
         const newSet = new Set([...formData.value.permissions, ...visiblePermissions]);
         formData.value.permissions = Array.from(newSet);
     } else {
-        // Hapus yang sedang terlihat
         formData.value.permissions = formData.value.permissions.filter(p => !visiblePermissions.includes(p));
     }
 };
@@ -194,7 +212,9 @@ const formatPermissionName = (name: string) => {
 
 watch(() => props.roleData, async (newVal) => {
   if (newVal) {
+    // Set data dasar dulu agar UI responsif
     formData.value = { name: newVal.name, full_name: newVal.full_name, permissions: [] };
+    // Load permissions detail untuk mengisi checklist
     await loadRoleDetails(newVal.id);
   } else {
     formRef.value?.resetFields();

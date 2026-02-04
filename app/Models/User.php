@@ -74,7 +74,7 @@ class User extends Authenticatable implements JWTSubject
      */
     public function getRouteKeyName()
     {
-        return 'uuid';
+        return 'id';
     }
 
     // --- JWT METHODS ---

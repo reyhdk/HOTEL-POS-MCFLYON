@@ -1,12 +1,15 @@
 <template>
   <div class="d-flex flex-column flex-xl-row gap-5 h-100 anim-fade-in">
     
+    <!-- BAGIAN KIRI: DAFTAR MENU -->
     <div class="flex-lg-row-fluid">
       <div class="d-flex flex-column gap-5">
         
+        <!-- HEADER PENCARIAN -->
         <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-5 mb-2 anim-slide-down">
            <div>
-              <h2 class="fw-bolder text-gray-900 m-0">Menu Restoran</h2> <span class="text-gray-500 fw-bold fs-7">Pilih menu untuk ditambahkan ke pesanan</span>
+              <h2 class="fw-bolder text-gray-900 m-0">Menu Restoran</h2> 
+              <span class="text-gray-500 fw-bold fs-7">Pilih menu untuk ditambahkan ke pesanan</span>
            </div>
            
            <div class="position-relative w-100 w-md-300px">
@@ -20,19 +23,23 @@
            </div>
         </div>
 
+        <!-- LIST MENU -->
         <div class="position-relative min-h-300px">
            
+           <!-- LOADING STATE -->
            <div v-if="loading.menus" class="py-20 text-center">
               <div class="spinner-border text-orange mb-3" role="status"></div>
               <p class="text-gray-500 fw-semibold">Mengambil data menu...</p>
            </div>
 
+           <!-- EMPTY STATE -->
            <div v-else-if="filteredMenus.length === 0" class="card border-dashed border-gray-300 bg-light-orange-subtle rounded-4 py-15 text-center anim-fade-up">
               <i class="bi bi-egg-fried fs-3x text-orange opacity-50 mb-3"></i>
               <h4 class="text-gray-800 fw-bold">Menu Tidak Ditemukan</h4>
               <span class="text-gray-400 fs-7">Coba kata kunci pencarian lain.</span>
            </div>
 
+           <!-- GRID MENU -->
            <div v-else class="row g-4">
               <TransitionGroup name="staggered-list" tag="div" class="contents" style="display: contents;">
                  <div 
@@ -47,18 +54,22 @@
                           @click="addToCart(menu)"
                           :class="{ 'opacity-50 grayscale': menu.stock <= 0 }"
                        >
+                          <!-- BADGE STOCK -->
                           <div class="position-absolute top-0 end-0 m-3 z-index-1">
                              <span v-if="menu.stock <= 0" class="badge bg-danger shadow-sm">Habis</span>
                              <span v-else-if="menu.stock < 5" class="badge bg-warning text-dark shadow-sm">Sisa {{ menu.stock }}</span>
                           </div>
 
                           <div class="card-body p-0 d-flex flex-column h-100">
+                             <!-- GAMBAR MENU -->
                              <div class="position-relative h-150px overflow-hidden bg-light-gray rounded-top-4">
                                 <img 
                                    :src="menu.image_url || '/media/svg/files/blank-image.svg'" 
                                    class="w-100 h-100 object-fit-cover transition-transform" 
                                    alt="Menu"
+                                   loading="lazy"
                                 />
+                                <!-- OVERLAY ADD BUTTON -->
                                 <div v-if="menu.stock > 0" class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-10 d-flex align-items-center justify-content-center opacity-0 group-hover-show transition-opacity">
                                    <div class="btn btn-icon btn-orange rounded-circle shadow-sm pulse-anim">
                                       <i class="bi bi-plus-lg fs-2 text-white"></i>
@@ -66,6 +77,7 @@
                                 </div>
                              </div>
 
+                             <!-- DETAIL MENU -->
                              <div class="p-4 d-flex flex-column flex-grow-1">
                                 <div class="mb-2">
                                    <div class="fw-bolder text-gray-900 fs-6 line-clamp-2 mb-1">{{ menu.name }}</div>
@@ -85,6 +97,7 @@
       </div>
     </div>
 
+    <!-- BAGIAN KANAN: KERANJANG / SIDEBAR -->
     <div class="flex-column-auto w-100 w-xl-400px w-xxl-450px">
        <div class="card card-custom border-0 shadow-sm rounded-4 h-100 anim-slide-left position-sticky top-20px" style="z-index: 99;">
           
@@ -100,6 +113,7 @@
 
           <div class="card-body d-flex flex-column px-6 pt-4 pb-6">
              
+             <!-- PILIH KAMAR -->
              <div class="mb-5">
                 <label class="form-label fs-8 fw-bold text-uppercase text-gray-500 required">Pilih Kamar / Meja</label>
                 <el-select
@@ -119,13 +133,16 @@
                       :value="room.id"
                    >
                       <span style="float: left">{{ room.room_number }}</span>
-                      <span style="float: right; color: #8492a6; font-size: 13px">{{ room.check_ins[0]?.guest?.name }}</span>
+                      <span style="float: right; color: #8492a6; font-size: 13px">
+                          {{ room.check_ins?.[0]?.guest?.name || 'Tamu' }}
+                      </span>
                    </el-option>
                 </el-select>
              </div>
 
              <div class="separator separator-dashed border-gray-300 mb-4"></div>
 
+             <!-- LIST ITEMS CART -->
              <div class="flex-grow-1 overflow-auto custom-scroll pe-2 mb-4" style="max-height: calc(100vh - 450px); min-height: 200px;">
                 <div v-if="cart.length === 0" class="d-flex flex-column align-items-center justify-content-center h-100 text-center opacity-50">
                    <i class="bi bi-cart-x fs-3x text-gray-300 mb-3"></i>
@@ -152,6 +169,7 @@
                 </TransitionGroup>
              </div>
 
+             <!-- TOTAL & BUTTON -->
              <div class="mt-auto">
                 <div class="bg-light-gray rounded-3 p-4 mb-4">
                    <div class="d-flex justify-content-between align-items-center mb-2">
@@ -217,57 +235,100 @@ const filteredMenus = computed(() => {
 });
 
 const fetchMenus = async () => {
-  try { loading.value.menus = true; const { data } = await ApiService.get("/menus"); menus.value = data; } 
-  catch (e) { console.error(e); } finally { loading.value.menus = false; }
+  try { 
+    loading.value.menus = true; 
+    const { data } = await ApiService.get("/menus"); 
+    menus.value = data || []; 
+  } 
+  catch (e) { console.error(e); } 
+  finally { loading.value.menus = false; }
 };
 
 const fetchOccupiedRooms = async () => {
-  try { loading.value.rooms = true; const { data } = await ApiService.get("/pos/occupied-rooms"); occupiedRooms.value = data; } 
-  catch (e) { console.error(e); } finally { loading.value.rooms = false; }
+  try { 
+    loading.value.rooms = true; 
+    const { data } = await ApiService.get("/pos/occupied-rooms"); 
+    occupiedRooms.value = data || []; 
+  } 
+  catch (e) { console.error(e); } 
+  finally { loading.value.rooms = false; }
 };
 
+// FIX: Menambahkan Optional Chaining (?.) untuk mencegah crash jika check_ins undefined
 const getRoomLabel = (room: Room): string => {
-  const guestName = room.check_ins[0]?.guest?.name || 'Tamu';
+  const checkIn = room.check_ins && room.check_ins.length > 0 ? room.check_ins[0] : null;
+  const guestName = checkIn?.guest?.name || 'Tamu';
   return `${room.room_number} - ${guestName}`;
 };
 
 const addToCart = (menu: Menu) => {
-  if (menu.stock <= 0) return;
+  // Safe guard: pastikan menu valid
+  if (!menu || menu.stock <= 0) return;
+
   const existingItem = cart.value.find(item => item.menu_id === menu.id);
+  
   if (existingItem) {
-    if (existingItem.quantity < menu.stock) existingItem.quantity++;
+    if (existingItem.quantity < menu.stock) {
+        existingItem.quantity++;
+    }
   } else {
-    cart.value.push({ menu_id: menu.id, name: menu.name, price: menu.price, quantity: 1 });
+    cart.value.push({ 
+        menu_id: menu.id, 
+        name: menu.name, 
+        price: menu.price, 
+        quantity: 1 
+    });
   }
 };
 
 const updateQuantity = (item: CartItem, change: number) => {
   const menu = menus.value.find(m => m.id === item.menu_id);
   if (!menu) return;
+  
   const newQuantity = item.quantity + change;
-  if (newQuantity > 0 && newQuantity <= menu.stock) { item.quantity = newQuantity; } 
-  else if (newQuantity <= 0) { cart.value = cart.value.filter(c => c.menu_id !== item.menu_id); }
+  
+  if (newQuantity > 0 && newQuantity <= menu.stock) { 
+      item.quantity = newQuantity; 
+  } else if (newQuantity <= 0) { 
+      cart.value = cart.value.filter(c => c.menu_id !== item.menu_id); 
+  }
 };
 
 const processOrder = async () => {
   if (!canProcessOrder.value) return;
   loading.value.processing = true;
+  
   try {
     await ApiService.post('/orders', {
       room_id: selectedRoomId.value,
       items: cart.value.map(i => ({ menu_id: i.menu_id, quantity: i.quantity })),
       payment_method: 'pay_at_checkout'
     });
-    Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Pesanan terkirim ke dapur & tagihan masuk folio.', timer: 2000, showConfirmButton: false });
-    cart.value = []; selectedRoomId.value = null;
-    await fetchMenus(); 
-  } catch (error: any) { Swal.fire("Gagal", error.response?.data?.message || "Error memproses pesanan.", "error"); } 
-  finally { loading.value.processing = false; }
+    
+    Swal.fire({ 
+        icon: 'success', 
+        title: 'Berhasil', 
+        text: 'Pesanan terkirim ke dapur & tagihan masuk folio.', 
+        timer: 2000, 
+        showConfirmButton: false 
+    });
+    
+    cart.value = []; 
+    selectedRoomId.value = null;
+    await fetchMenus(); // Refresh stock
+  } catch (error: any) { 
+      Swal.fire("Gagal", error.response?.data?.message || "Error memproses pesanan.", "error"); 
+  } finally { 
+      loading.value.processing = false; 
+  }
 };
 
 const formatCurrency = (val: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(val);
 
-onMounted(() => { fetchMenus(); fetchOccupiedRooms(); });
+onMounted(() => { 
+    fetchMenus(); 
+    fetchOccupiedRooms(); 
+});
 </script>
 
 <style scoped>
@@ -302,8 +363,8 @@ onMounted(() => { fetchMenus(); fetchOccupiedRooms(); });
 
 /* --- UTILITIES --- */
 .grayscale { filter: grayscale(100%); }
-.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 .custom-scroll::-webkit-scrollbar { width: 5px; }
 .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
 .btn-active-push:active { transform: scale(0.97); }

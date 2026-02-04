@@ -18,89 +18,105 @@ use Throwable;
 class GuestOrderController extends Controller
 {
     /**
-     * Mendapatkan profil tamu yang sedang login dan info kamar aktif mereka.
+     * Mendapatkan profil tamu yang sedang aktif Check-In (Untuk validasi di halaman Guest)
      */
     public function getProfile(Request $request)
     {
         $user = Auth::user();
 
+        // Cari sesi CheckIn yang aktif berdasarkan User -> Booking -> CheckIn
         $activeCheckIn = CheckIn::where('is_active', true)
             ->whereHas('booking', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })
             ->with(['room', 'guest'])
+            ->latest()
             ->first();
 
+        // Jika tidak ada CheckIn aktif, kembalikan 403
         if (!$activeCheckIn) {
-            return response()->json(['message' => 'Anda tidak memiliki sesi check-in yang aktif.'], 403);
+            return response()->json([
+                'message' => 'Anda tidak memiliki sesi check-in yang aktif.',
+                'debug_info' => 'Pastikan admin sudah melakukan Check-In untuk booking Anda.'
+            ], 403);
         }
 
         return response()->json([
-            'user' => $user,
             'guest_details' => $activeCheckIn->guest,
-            'active_room' => $activeCheckIn->room
+            'active_room' => $activeCheckIn->room,
+            'check_in_time' => $activeCheckIn->created_at,
+            'check_in_id' => $activeCheckIn->id
         ]);
     }
 
     /**
-     * Menyimpan pesanan makanan baru dari tamu dengan pilihan pembayaran.
+     * Membuat Order baru dari sisi Tamu
      */
-public function store(Request $request)
-{
-    $user = Auth::user();
-    $activeCheckIn = CheckIn::where('is_active', true)
-        ->whereHas('booking', fn($q) => $q->where('user_id', $user->id))
-        ->first();
+    public function store(Request $request)
+    {
+        $user = Auth::user();
 
-    if (!$activeCheckIn) {
-        return response()->json(['message' => 'Anda harus sedang check-in untuk dapat membuat pesanan.'], 403);
-    }
+        // Validasi input
+        $validated = $request->validate([
+            'room_id' => 'required|exists:rooms,id',
+            'items' => 'required|array|min:1',
+            'items.*.menu_id' => 'required|exists:menus,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'payment_method' => 'required|string|in:pay_now_midtrans,pay_at_checkout',
+        ]);
 
-    $validated = $request->validate([
-        'items' => 'required|array|min:1',
-        'items.*.menu_id' => 'required|exists:menus,id',
-        'items.*.quantity' => 'required|integer|min:1',
-        'payment_method' => 'required|string|in:pay_at_checkout,pay_now_midtrans',
-    ]);
+        // Verifikasi kepemilikan kamar (Security Check)
+        $activeCheckIn = CheckIn::where('room_id', $validated['room_id'])
+            ->where('is_active', true)
+            ->whereHas('booking', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })
+            ->first();
 
-    try {
-        $order = DB::transaction(function () use ($validated, $activeCheckIn, $user) {
-            $totalPrice = 0;
-            $orderItemsData = [];
+        if (!$activeCheckIn) {
+            return response()->json(['message' => 'Akses ditolak. Kamar ini bukan milik sesi Anda.'], 403);
+        }
 
-            foreach ($validated['items'] as $item) {
-                $menu = Menu::find($item['menu_id']);
-                if ($menu->stock < $item['quantity']) {
-                    throw ValidationException::withMessages([
-                        'items' => "Stok untuk menu '{$menu->name}' tidak mencukupi."
-                    ]);
+        try {
+            $order = DB::transaction(function () use ($validated, $activeCheckIn, $user) {
+                $totalPrice = 0;
+                $orderItemsData = [];
+                
+                // Hitung total dan cek stok
+                foreach ($validated['items'] as $item) {
+                    $menu = Menu::findOrFail($item['menu_id']);
+                    if ($menu->stock < $item['quantity']) {
+                        throw ValidationException::withMessages([
+                            'items' => "Stok untuk menu '{$menu->name}' tidak mencukupi."
+                        ]);
+                    }
+                    $totalPrice += $menu->price * $item['quantity'];
+                    $orderItemsData[] = ['menu_id' => $menu->id, 'quantity' => $item['quantity'], 'price' => $menu->price];
                 }
-                $totalPrice += $menu->price * $item['quantity'];
-                $orderItemsData[] = ['menu_id' => $menu->id, 'quantity' => $item['quantity'], 'price' => $menu->price];
-            }
 
-            // [PERBAIKAN UTAMA] Standarkan status menjadi 'pending' untuk semua tagihan
-            $status = 'pending';
+                // Buat Order (Status default 'pending')
+                $order = Order::create([
+                    'room_id' => $validated['room_id'],
+                    'user_id' => $user->id,
+                    'guest_id' => $activeCheckIn->guest_id,
+                    'booking_id' => $activeCheckIn->booking_id,
+                    'total_price' => $totalPrice,
+                    'status' => 'pending', 
+                    'payment_method' => $validated['payment_method']
+                ]);
 
-            $order = Order::create([
-                'room_id' => $activeCheckIn->room_id,
-                'user_id' => $user->id,
-                'guest_id' => $activeCheckIn->guest_id,
-                'total_price' => $totalPrice,
-                'status' => $status,
-                'booking_id' => $activeCheckIn->booking_id,
-            ]);
+                // Buat Order Items
+                $order->items()->createMany($orderItemsData);
 
-            $order->items()->createMany($orderItemsData);
+                // Kurangi Stok
+                foreach ($order->items as $item) {
+                    Menu::find($item->menu_id)->decrement('stock', $item->quantity);
+                }
 
-            foreach ($order->items as $item) {
-                Menu::find($item->menu_id)->decrement('stock', $item->quantity);
-            }
+                return $order;
+            });
 
-            return $order;
-        });
-
-            // Jika tamu memilih 'Bayar Sekarang', buat token Midtrans
+            // Logika Midtrans (Jika Bayar Sekarang)
             if ($validated['payment_method'] === 'pay_now_midtrans') {
                 $midtransOrderId = 'ORDER-' . $order->id . '-' . time();
                 $order->midtrans_order_id = $midtransOrderId;
@@ -118,40 +134,22 @@ public function store(Request $request)
                 ];
 
                 $snapToken = Snap::getSnapToken($params);
-                return response()->json(['snap_token' => $snapToken], 201);
+                return response()->json(['snap_token' => $snapToken, 'order' => $order], 201);
             }
 
-            // Jika tamu memilih 'Bayar saat Checkout'
-            return response()->json(['message' => 'Pesanan berhasil ditambahkan ke tagihan kamar.'], 201);
+            return response()->json(['message' => 'Pesanan berhasil ditambahkan ke tagihan kamar.', 'order' => $order], 201);
 
         } catch (Throwable $e) {
-            Log::error('Gagal membuat pesanan makanan oleh tamu: ' . $e->getMessage());
-            return response()->json(['message' => 'Gagal membuat pesanan.'], 500);
+            Log::error('Guest Order Error: ' . $e->getMessage());
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-    }
-
-    /**
-     * Fungsi ini akan dipanggil oleh Webhook Midtrans setelah pembayaran berhasil.
-     * Tugasnya: mengurangi stok.
-     */
-    public static function handleSuccessfulPayment(Order $order)
-    {
-        DB::transaction(function () use ($order) {
-            foreach ($order->items as $item) {
-                $menu = Menu::where('id', $item->menu_id)->lockForUpdate()->first();
-                if ($menu) {
-                    $menu->decrement('stock', $item->quantity);
-                }
-            }
-        });
     }
 
     /**
      * Menampilkan riwayat pesanan untuk kamar tamu yang sedang aktif.
      */
- public function getOrderHistory(Request $request)
+    public function getOrderHistory(Request $request)
     {
-
         $orders = $request->user()
                           ->orders()
                           ->with('items.menu')
@@ -171,5 +169,15 @@ public function store(Request $request)
         }
 
         return $order->load(['room', 'user', 'items.menu']);
+    }
+
+    /**
+     * Fungsi ini akan dipanggil oleh Webhook Midtrans setelah pembayaran berhasil.
+     */
+    public static function handleSuccessfulPayment(Order $order)
+    {
+        // Stok sudah dikurangi saat order dibuat (store), jadi di sini mungkin update status saja
+        // atau logika lain jika diperlukan.
+        Log::info("Pembayaran berhasil untuk Order ID: {$order->id}");
     }
 }
