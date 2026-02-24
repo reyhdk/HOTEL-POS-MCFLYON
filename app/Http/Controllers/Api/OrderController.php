@@ -6,84 +6,206 @@ use App\Http\Controllers\Controller;
 use App\Models\CheckIn;
 use App\Models\Menu;
 use App\Models\Order;
+use App\Models\WarehouseItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str; 
+use Midtrans\Config;
+use Midtrans\Snap;
 use Throwable;
 
 class OrderController extends Controller
 {
     public function store(Request $request)
     {
+        Log::info('Order Store Request Data:', $request->all());
+
         $validated = $request->validate([
-            'room_id' => 'required|exists:rooms,id',
+            'room_id' => 'nullable|exists:rooms,id',
+            'table_id' => 'nullable|exists:tables,id',
             'items' => 'required|array|min:1',
             'items.*.menu_id' => 'required|exists:menus,id',
             'items.*.quantity' => 'required|integer|min:1',
             'payment_method' => 'required|string|in:cash,midtrans,pay_at_checkout',
         ]);
 
-        try {
-            $order = DB::transaction(function () use ($validated) {
-                $activeCheckIn = CheckIn::where('room_id', $validated['room_id'])
-                                        ->where('is_active', true)
-                                        ->with('booking')
-                                        ->first();
+        if (empty($validated['room_id']) && empty($validated['table_id'])) {
+            return response()->json(['message' => 'Harus memilih Kamar atau Meja.'], 422);
+        }
 
-                if (!$activeCheckIn) {
-                    throw new \Exception("Tidak ada sesi check-in yang aktif untuk kamar ini.");
+        try {
+            // Gunakan transaksi agar jika error, data tidak tersimpan setengah-setengah
+            $result = DB::transaction(function () use ($validated, $request) {
+                
+                $userId = Auth::id() ?? ($request->user() ? $request->user()->id : 1);
+                $guestId = null;
+                $bookingId = null;
+                $roomId = $validated['room_id'] ?? null;
+                $tableId = $validated['table_id'] ?? null;
+
+                // --- CONTEXT: ROOM SERVICE ---
+                if ($roomId) {
+                    $activeCheckIn = CheckIn::where('room_id', $roomId)
+                                            ->where('is_active', true)
+                                            ->with('booking')
+                                            ->first();
+                    if (!$activeCheckIn) {
+                        throw new \Exception("Tidak ada sesi check-in yang aktif untuk kamar ini.");
+                    }
+                    $bookingId = $activeCheckIn->booking_id;
+                    $guestId = $activeCheckIn->guest_id;
+                }
+                
+                // --- CONTEXT: DINE IN (MEJA) ---
+                if ($tableId) {
+                    $table = DB::table('tables')->where('id', $tableId)->first();
+                    if ($table && $table->status === 'available') {
+                        DB::table('tables')->where('id', $tableId)->update(['status' => 'occupied']);
+                    }
                 }
 
+                // --- HITUNG TOTAL ---
                 $totalPrice = 0;
+                $orderItems = [];
+
                 foreach ($validated['items'] as $item) {
                     $menu = Menu::findOrFail($item['menu_id']);
-                    if ($menu->stock < $item['quantity']) {
-                        throw new \Exception("Stok untuk menu '{$menu->name}' tidak mencukupi.");
-                    }
+                    // Opsional: Cek stok menu jadi (jika Anda masih pakai stok di tabel menu)
+                    // if ($menu->stock < $item['quantity']) {
+                    //     throw new \Exception("Stok untuk menu '{$menu->name}' tidak mencukupi.");
+                    // }
                     $totalPrice += $menu->price * $item['quantity'];
+                    
+                    $orderItems[] = [
+                        'menu_id' => $menu->id,
+                        'quantity' => $item['quantity'],
+                        'price' => $menu->price
+                    ];
                 }
 
-                // PERBAIKAN: Standarisasi status order
-                // - 'pending' = belum dibayar, akan masuk folio
-                // - 'paid' = sudah dibayar tunai
-                $status = 'pending'; // Default untuk midtrans DAN pay_at_checkout
+                // --- SET PAYMENT & STATUS ---
+                $status = 'pending'; 
+                $paidAmount = 0;
+                
                 if ($validated['payment_method'] === 'cash') {
-                    $status = 'paid'; // Langsung lunas untuk cash
+                    $status = 'paid'; 
+                    $paidAmount = $totalPrice;
                 }
 
-                $order = Order::create([
-                    'room_id' => $validated['room_id'],
-                    'total_price' => $totalPrice,
-                    'status' => $status,
-                    'user_id' => $activeCheckIn->booking->user_id,
-                    'guest_id' => $activeCheckIn->guest_id,
-                    'booking_id' => $activeCheckIn->booking_id,
-                ]);
+                $orderCode = 'ORD/' . date('Ymd') . '/' . strtoupper(Str::random(5));
 
-                $orderItemsData = collect($validated['items'])->map(function($item) {
-                    $menu = Menu::find($item['menu_id']);
-                    return ['menu_id' => $menu->id, 'quantity' => $item['quantity'], 'price' => $menu->price];
-                });
+                // --- INSERT ORDER ---
+                $order = new Order();
+                $order->order_code = $orderCode;
+                $order->room_id = $roomId;
+                $order->table_id = $tableId;
+                $order->total_price = $totalPrice;
+                $order->paid_amount = $paidAmount;
+                $order->change_amount = 0;
+                $order->payment_method = $validated['payment_method'];
+                $order->status = $status;
+                $order->user_id = $userId;
+                $order->guest_id = $guestId; 
+                $order->booking_id = $bookingId;
+                $order->save();
 
-                $order->items()->createMany($orderItemsData);
+                // Insert Items
+                $order->items()->createMany($orderItems);
 
-                // Kurangi stok
-                foreach ($order->items as $item) {
-                    Menu::find($item->menu_id)->decrement('stock', $item->quantity);
+                // ==========================================
+                // LOGIKA 1: JIKA CASH, LANGSUNG POTONG BAHAN BAKU
+                // ==========================================
+                if ($validated['payment_method'] === 'cash') {
+                    $this->deductIngredients($order);
                 }
 
-                return $order;
+                // ==========================================
+                // LOGIKA 2: JIKA MIDTRANS, BUAT SNAP TOKEN QRIS
+                // ==========================================
+                $snapToken = null;
+                if ($validated['payment_method'] === 'midtrans') {
+                    Config::$serverKey = config('services.midtrans.server_key');
+                    Config::$isProduction = config('services.midtrans.is_production');
+                    Config::$isSanitized = true;
+                    Config::$is3ds = true;
+
+                    $params = [
+                        'transaction_details' => [
+                            'order_id' => $orderCode,
+                            'gross_amount' => $totalPrice,
+                        ],
+                        'customer_details' => [
+                            'first_name' => 'Tamu / Meja',
+                        ]
+                    ];
+
+                    $snapToken = Snap::getSnapToken($params);
+                    $order->midtrans_order_id = $orderCode; // Simpan untuk dicocokkan di webhook
+                    $order->save();
+                }
+
+                return ['order' => $order, 'snap_token' => $snapToken];
             });
 
-            if ($validated['payment_method'] === 'midtrans') {
-                // ... (logika midtrans Anda)
-            }
-
-            return response()->json(['message' => 'Pesanan berhasil dibuat.', 'order' => $order], 201);
+            return response()->json([
+                'message' => 'Pesanan berhasil dibuat.', 
+                'order' => $result['order'],
+                'snap_token' => $result['snap_token'] // Kirim token ke frontend
+            ], 201);
 
         } catch (Throwable $e) {
-            Log::error('Gagal membuat pesanan POS: ' . $e->getMessage());
-            return response()->json(['message' => $e->getMessage()], 422);
+            Log::error('CRITICAL ORDER ERROR: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Gagal Database: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Helper Function: Memotong bahan baku dari gudang berdasarkan resep menu
+     */
+    public function deductIngredients(Order $order)
+    {
+        $order->load('items.menu.ingredients');
+
+        foreach ($order->items as $orderItem) {
+            $menu = $orderItem->menu;
+            
+            // 1. Kurangi stok menu jadi (opsional, jika dipakai)
+            if($menu->stock >= $orderItem->quantity){
+               $menu->decrement('stock', $orderItem->quantity);
+            }
+
+            // 2. Kurangi stok bahan baku dari gudang (Sesuai Resep)
+            if ($menu->ingredients) {
+                foreach ($menu->ingredients as $ingredient) {
+                    // Kuantitas bahan per porsi x jumlah porsi dipesan
+                    $totalDeduction = $ingredient->pivot->quantity * $orderItem->quantity;
+                    
+                    $warehouseItem = WarehouseItem::find($ingredient->id);
+                    if ($warehouseItem) {
+                        $warehouseItem->decrement('current_stock', $totalDeduction);
+
+                        // 3. Catat ke riwayat transaksi gudang agar laporan rapi
+                        DB::table('stock_transactions')->insert([
+                            'transaction_code' => 'OUT/' . date('Ymd') . '/' . strtoupper(Str::random(5)),
+                            'warehouse_item_id' => $warehouseItem->id,
+                            'transaction_type' => 'out',
+                            'quantity' => $totalDeduction,
+                            'unit_price' => $warehouseItem->cost_price,
+                            'total_price' => $totalDeduction * $warehouseItem->cost_price,
+                            'reference_type' => 'sale',
+                            'notes' => "Terjual via Pesanan {$order->order_code} (Menu: {$menu->name})",
+                            'transaction_date' => now(),
+                            'created_by' => $order->user_id ?? 1,
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ]);
+                    }
+                }
+            }
         }
     }
 }

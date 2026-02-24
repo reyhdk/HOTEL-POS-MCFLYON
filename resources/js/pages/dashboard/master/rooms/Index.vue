@@ -373,6 +373,28 @@ const handleDeleteRoom = (id: number) => {
 onMounted(refreshData);
 </script>
 
+<style>
+/* Global Element Plus Dark Mode Overrides for Tooltips/Dropdowns (Teleported) */
+[data-bs-theme="dark"] .el-select-dropdown,
+[data-bs-theme="dark"] .el-picker-panel {
+    background: #1e1e2d !important; 
+    border-color: #323248 !important;
+}
+[data-bs-theme="dark"] .el-select-dropdown__item { color: #cdcdde !important; }
+[data-bs-theme="dark"] .el-select-dropdown__item.is-hovering,
+[data-bs-theme="dark"] .el-select-dropdown__item.hover { 
+    background-color: #2b2b40 !important; color: #F68B1E !important; 
+}
+[data-bs-theme="dark"] .el-popper[data-popper-placement^="bottom"] .el-popper__arrow::before {
+    background: #1e1e2d !important; border-color: #323248 !important;
+}
+[data-bs-theme="dark"] .el-date-table th { color: #a1a5b7; border-bottom-color: #323248; }
+[data-bs-theme="dark"] .el-date-table td.available .el-date-table-cell__text { color: #cdcdde; }
+[data-bs-theme="dark"] .el-date-table td.disabled .el-date-table-cell__text { background-color: transparent !important; color: #474761 !important; }
+[data-bs-theme="dark"] .el-date-picker__header-label { color: #ffffff !important; }
+[data-bs-theme="dark"] .el-picker-panel__icon-btn { color: #a1a5b7 !important; }
+</style>
+
 <style scoped>
 .text-orange { color: #f68b1e !important; }
 .bg-light-orange { background-color: rgba(246, 139, 30, 0.1) !important; }
@@ -406,4 +428,27 @@ onMounted(refreshData);
 :deep(.premium-filter-select .el-input__prefix-inner) {
     align-items: center;
 }
+
+/* ========================
+   DARK MODE OVERRIDES
+   ======================== */
+[data-bs-theme="dark"] .theme-card { background-color: #1e1e2d !important; }
+[data-bs-theme="dark"] .bg-body { background-color: #1e1e2d !important; }
+[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
+[data-bs-theme="dark"] .text-gray-800 { color: #cdcdde !important; }
+[data-bs-theme="dark"] .text-gray-600, 
+[data-bs-theme="dark"] .text-gray-500 { color: #a1a5b7 !important; }
+[data-bs-theme="dark"] .bg-secondary { background-color: #1b1b29 !important; }
+[data-bs-theme="dark"] .bg-white { background-color: #1e1e2d !important; }
+[data-bs-theme="dark"] .bg-light-subtle { background-color: #151521 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .border-gray-200, 
+[data-bs-theme="dark"] .border-gray-300 { border-color: #323248 !important; }
+[data-bs-theme="dark"] .form-control-solid { background-color: #1b1b29 !important; color: #cdcdde !important; border-color: transparent !important; }
+[data-bs-theme="dark"] .theme-dropdown { background-color: #1e1e2d !important; border: 1px solid #323248 !important; }
+[data-bs-theme="dark"] .theme-dropdown .dropdown-item { color: #cdcdde; }
+[data-bs-theme="dark"] .theme-dropdown .dropdown-item:hover { background-color: #2b2b40; color: #f68b1e; }
+[data-bs-theme="dark"] .dropdown-divider { border-color: #323248 !important; }
+[data-bs-theme="dark"] :deep(.premium-filter-select .el-input__wrapper) { background-color: #1b1b29 !important; }
+[data-bs-theme="dark"] :deep(.premium-filter-select .el-input__inner) { color: #cdcdde !important; }
+[data-bs-theme="dark"] .btn-light-primary { background-color: rgba(0, 158, 247, 0.1); color: #009ef7; }
 </style>

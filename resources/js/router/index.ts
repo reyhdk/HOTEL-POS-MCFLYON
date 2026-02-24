@@ -156,11 +156,11 @@ const routes: Array<RouteRecordRaw> = [
                 meta: { pageTitle: "Point of Sale" },
             },
             {
-                path: "online-orders",
-                name: "admin-online-orders",
+                path: "kitchen",
+                name: "admin-kitchen",
                 component: () =>
-                    import("@/pages/dashboard/online-orders/Index.vue"),
-                meta: { pageTitle: "Pesanan Online" },
+                    import("@/pages/dashboard/kitchen/Index.vue"),
+                meta: { pageTitle: "Kitchen" },
             },
             {
                 path: "service-requests",

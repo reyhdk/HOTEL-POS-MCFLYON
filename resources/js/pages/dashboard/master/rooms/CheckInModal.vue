@@ -711,4 +711,46 @@ export default {
 
 .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ========================
+   DARK MODE OVERRIDES
+   ======================== */
+[data-bs-theme="dark"] .theme-transition { background-color: #1e1e2d; }
+[data-bs-theme="dark"] .bg-white { background-color: #1e1e2d !important; }
+[data-bs-theme="dark"] .bg-light { background-color: #1b1b29 !important; }
+[data-bs-theme="dark"] .bg-light-subtle { background-color: #151521 !important; }
+[data-bs-theme="dark"] .border-end, 
+[data-bs-theme="dark"] .border-gray-200, 
+[data-bs-theme="dark"] .border-gray-300, 
+[data-bs-theme="dark"] .border-gray-400,
+[data-bs-theme="dark"] .border-dashed { border-color: #323248 !important; }
+[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
+[data-bs-theme="dark"] .text-gray-800 { color: #e4e6ef !important; }
+[data-bs-theme="dark"] .text-gray-700 { color: #cdcdde !important; }
+[data-bs-theme="dark"] .text-gray-600, 
+[data-bs-theme="dark"] .text-gray-500, 
+[data-bs-theme="dark"] .text-gray-400, 
+[data-bs-theme="dark"] .text-muted { color: #a1a5b7 !important; }
+[data-bs-theme="dark"] .nav-switcher { background-color: #1b1b29 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .btn-active-mode { background-color: #2b2b40 !important; color: #f68b1e !important; }
+[data-bs-theme="dark"] .hover-text-adaptive:hover { color: #cdcdde !important; }
+[data-bs-theme="dark"] .card-option { border-color: #323248 !important; background-color: #1b1b29; }
+[data-bs-theme="dark"] .card-option:not(.active-selection):hover { border-color: #474761 !important; background-color: #2b2b40; }
+[data-bs-theme="dark"] .active-selection { background-color: rgba(246, 139, 30, 0.1) !important; border-color: #f68b1e !important; }
+[data-bs-theme="dark"] .upload-box, [data-bs-theme="dark"] .date-box { background-color: #1b1b29 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .upload-box-mini { background-color: #1b1b29 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] :deep(.el-input__wrapper), [data-bs-theme="dark"] :deep(.el-select__wrapper) { background-color: #151521 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] :deep(.el-input__inner) { color: #cdcdde !important; }
+[data-bs-theme="dark"] .mini-calendar { background-color: #1b1b29; border-color: #323248; }
+[data-bs-theme="dark"] .day.is-empty { background-color: #151521; color: #7e8299; }
+[data-bs-theme="dark"] .day.is-occupied { background-color: rgba(23, 198, 83, 0.1); color: #17c653; }
+[data-bs-theme="dark"] .day.is-reserved { background-color: rgba(246, 139, 30, 0.1); color: #f68b1e; }
+[data-bs-theme="dark"] .day:hover:not(.empty) { background-color: #2b2b40; }
+[data-bs-theme="dark"] .day.is-clicked { background-color: #2b2b40; color: #ffffff; }
+[data-bs-theme="dark"] .privacy-card { background-color: #1b1b29 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .privacy-card.bg-dark { background-color: #151521 !important; border-color: #f68b1e !important; }
+[data-bs-theme="dark"] .alert-booking { background-color: rgba(241, 196, 15, 0.1) !important; border-color: rgba(241, 196, 15, 0.3) !important; }
+[data-bs-theme="dark"] .booking-info-box { background-color: rgba(0, 158, 247, 0.1) !important; border-color: rgba(0, 158, 247, 0.5) !important; }
+[data-bs-theme="dark"] .booking-info-box .text-primary { color: #009ef7 !important; }
+[data-bs-theme="dark"] .bg-light-danger { background-color: rgba(241, 65, 108, 0.1) !important; }
 </style>

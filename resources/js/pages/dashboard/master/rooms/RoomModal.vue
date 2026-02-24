@@ -141,8 +141,8 @@ interface RoomData {
     status: string; 
     price_per_night: number; 
     description: string | null; 
-    image: string | null; // API biasanya mengembalikan field 'image' berisi path
-    image_url?: string | null; // Optional jika pakai accessor
+    image: string | null; 
+    image_url?: string | null; 
     tersedia_mulai: string | null; 
     tersedia_sampai: string | null; 
     facilities: Facility[]; 
@@ -192,7 +192,6 @@ const formData = ref<FormData>(getInitialFormData());
 const getStorageUrl = (path: string | null) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    // Asumsi folder storage sudah dilink ke public/storage
     return `/storage/${path}`;
 };
 
@@ -217,20 +216,19 @@ watch(() => props.roomData, (newVal) => {
   if (newVal) {
     // Mode Edit
     formData.value = { 
-        ...getInitialFormData(), // Reset structure first
+        ...getInitialFormData(),
         id: newVal.id,
         room_number: newVal.room_number,
         type: newVal.type,
         status: newVal.status,
         price_per_night: newVal.price_per_night,
         description: newVal.description,
-        image: null, // File upload tetap null saat init
+        image: null, 
         facility_ids: newVal.facilities ? newVal.facilities.map(f => f.id) : [], 
         tersedia_mulai: formatDate(newVal.tersedia_mulai), 
         tersedia_sampai: formatDate(newVal.tersedia_sampai) 
     };
     
-    // Logic pintar untuk preview gambar dari backend
     const imagePath = newVal.image_url || newVal.image;
     imagePreview.value = getStorageUrl(imagePath);
 
@@ -246,7 +244,6 @@ const handleImageChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
   if (target.files && target.files[0]) {
     const file = target.files[0];
-    // Validasi size di frontend (4MB)
     if (file.size > 4 * 1024 * 1024) {
         Swal.fire({ text: "Ukuran file terlalu besar! Max 4MB.", icon: "warning" });
         return;
@@ -261,7 +258,6 @@ const handleImageChange = (event: Event) => {
 const removeImage = () => { 
     imagePreview.value = null; 
     formData.value.image = null; 
-    // Jika perlu, bisa tambahkan flag untuk menghapus gambar di backend (opsional)
 };
 
 const rules = ref<FormRules>({
@@ -277,10 +273,8 @@ const submit = () => {
   formRef.value.validate(async (valid: boolean) => {
     if (valid) {
       loading.value = true;
-      
       const data = new FormData();
       
-      // Append Data
       data.append('room_number', formData.value.room_number);
       data.append('type', formData.value.type);
       data.append('status', formData.value.status);
@@ -290,19 +284,16 @@ const submit = () => {
       if (formData.value.tersedia_mulai) data.append('tersedia_mulai', formData.value.tersedia_mulai);
       if (formData.value.tersedia_sampai) data.append('tersedia_sampai', formData.value.tersedia_sampai);
       
-      // Handle Fasilitas (Array)
       if (formData.value.facility_ids && formData.value.facility_ids.length > 0) {
           formData.value.facility_ids.forEach(id => data.append('facility_ids[]', String(id)));
       }
 
-      // Handle Image
       if (formData.value.image) {
           data.append('image', formData.value.image);
       }
 
       try {
         if (isEditMode.value) { 
-            // Laravel Method Spoofing untuk PUT dengan File
             data.append('_method', 'PUT'); 
             await ApiService.post(`/rooms/${formData.value.id}`, data); 
         } else { 
@@ -327,6 +318,28 @@ const submit = () => {
 };
 </script>
 
+<style>
+/* Global Element Plus Dark Mode Overrides for Room Modal Popovers */
+[data-bs-theme="dark"] .el-select-dropdown,
+[data-bs-theme="dark"] .el-picker-panel {
+    background: #1e1e2d !important; 
+    border-color: #323248 !important;
+}
+[data-bs-theme="dark"] .el-select-dropdown__item { color: #cdcdde !important; }
+[data-bs-theme="dark"] .el-select-dropdown__item.is-hovering,
+[data-bs-theme="dark"] .el-select-dropdown__item.hover { 
+    background-color: #2b2b40 !important; color: #F68B1E !important; 
+}
+[data-bs-theme="dark"] .el-popper[data-popper-placement^="bottom"] .el-popper__arrow::before {
+    background: #1e1e2d !important; border-color: #323248 !important;
+}
+[data-bs-theme="dark"] .el-date-table th { color: #a1a5b7; border-bottom-color: #323248; }
+[data-bs-theme="dark"] .el-date-table td.available .el-date-table-cell__text { color: #cdcdde; }
+[data-bs-theme="dark"] .el-date-table td.disabled .el-date-table-cell__text { background-color: transparent !important; color: #474761 !important; }
+[data-bs-theme="dark"] .el-date-picker__header-label { color: #ffffff !important; }
+[data-bs-theme="dark"] .el-picker-panel__icon-btn { color: #a1a5b7 !important; }
+</style>
+
 <style scoped>
 /* ========================
    THEME COLORS
@@ -339,7 +352,7 @@ const submit = () => {
    COMPACT IMAGE UPLOAD
    ======================== */
 .image-upload-box {
-    height: 130px; /* Reduced Height */
+    height: 130px; 
     background-size: cover; background-position: center;
     transition: all 0.2s ease;
 }
@@ -351,30 +364,40 @@ const submit = () => {
 .backdrop-blur { backdrop-filter: blur(2px); }
 
 /* ========================
-   COMPACT INPUTS
+   COMPACT INPUTS & BUG FIX OVERLAP
    ======================== */
 .required:after { content: "*"; color: #f1416c; margin-left: 2px; }
 
-/* Menimpa style element plus agar lebih ramping */
-:deep(.metronic-input .el-input__wrapper), 
-:deep(.metronic-input .el-textarea__inner),
-:deep(.metronic-date .el-input__wrapper) {
-    background-color: #F9F9F9; /* Match Index */
+/* Gunakan .theme-modal agar specificity tinggi sehingga tidak kalah dengan CSS Element Plus Default */
+.theme-modal :deep(.el-input__wrapper), 
+.theme-modal :deep(.el-textarea__inner) {
+    background-color: #F9F9F9 !important; 
     box-shadow: none !important; 
-    border: 1px solid transparent; 
+    border: 1px solid #E4E6EF !important; 
     border-radius: 0.45rem; 
-    padding: 6px 10px; /* Reduced Padding */
-    height: 38px; /* Slightly shorter */
     transition: all 0.2s;
 }
 
-:deep(.metronic-input .el-textarea__inner) { height: auto; }
+.theme-modal :deep(.el-input__wrapper) {
+    height: 42px; /* Ditinggikan sedikit agar teks tidak menumpuk placeholder */
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+}
+
+.theme-modal :deep(.el-textarea__inner) { 
+    padding: 10px 12px; 
+}
+
+/* Memastikan DatePicker tidak merusak line-height */
+.theme-modal :deep(.el-date-editor .el-input__inner) {
+    line-height: normal;
+}
 
 /* Focus State */
-:deep(.metronic-input .el-input__wrapper.is-focus),
-:deep(.metronic-input .el-textarea__inner:focus),
-:deep(.metronic-date .el-input__wrapper.is-focus) {
-    background-color: #ffffff;
+.theme-modal :deep(.el-input__wrapper.is-focus),
+.theme-modal :deep(.el-textarea__inner:focus) {
+    background-color: #ffffff !important;
     border-color: #F68B1E !important;
     box-shadow: 0 0 0 2px rgba(246, 139, 30, 0.1) !important;
 }
@@ -384,42 +407,44 @@ const submit = () => {
 .hover-scale:hover { transform: scale(1.05); transition: all 0.2s; }
 
 /* ========================
-   DARK MODE
+   DARK MODE OVERRIDES (FIXED BACKGROUND INPUT)
    ======================== */
-[data-bs-theme="dark"] .theme-modal { background-color: #1e1e2d; color: #ffffff; }
+[data-bs-theme="dark"] .theme-modal { background-color: #1e1e2d !important; }
 [data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
 [data-bs-theme="dark"] .text-gray-700, 
 [data-bs-theme="dark"] .text-gray-600 { color: #CDCDDE !important; }
-[data-bs-theme="dark"] .bg-light-subtle { background-color: #1b1b29 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .text-gray-400,
+[data-bs-theme="dark"] .text-muted { color: #a1a5b7 !important; }
+[data-bs-theme="dark"] .bg-light-subtle { background-color: #151521 !important; border-color: #323248 !important; }
 [data-bs-theme="dark"] .border-gray-200, 
 [data-bs-theme="dark"] .border-gray-300 { border-color: #323248 !important; }
+[data-bs-theme="dark"] .btn-light { background-color: #2b2b40 !important; color: #cdcdde !important; border: none; }
+[data-bs-theme="dark"] .btn-light:hover { background-color: #323248 !important; color: #ffffff !important; }
+[data-bs-theme="dark"] .image-upload-box { background-color: #1b1b29 !important; border-color: #323248 !important; }
 
-/* Input Dark */
-[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper),
-[data-bs-theme="dark"] :deep(.metronic-date .el-input__wrapper),
-[data-bs-theme="dark"] :deep(.metronic-input .el-textarea__inner) {
+/* Memaksa input menjadi gelap menggunakan specificity tinggi */
+[data-bs-theme="dark"] .theme-modal :deep(.el-input__wrapper),
+[data-bs-theme="dark"] .theme-modal :deep(.el-textarea__inner) {
     background-color: #1b1b29 !important; 
-    color: #ffffff;
     border-color: #323248 !important;
 }
 
-[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper.is-focus),
-[data-bs-theme="dark"] :deep(.metronic-date .el-input__wrapper.is-focus),
-[data-bs-theme="dark"] :deep(.metronic-input .el-textarea__inner:focus) {
+/* Memastikan teks berwarna putih di dark mode */
+[data-bs-theme="dark"] .theme-modal :deep(.el-input__inner),
+[data-bs-theme="dark"] .theme-modal :deep(.el-textarea__inner) {
+    color: #ffffff !important;
+}
+
+/* Memastikan Placeholder cukup terang namun tidak seputih teks biasa di dark mode */
+[data-bs-theme="dark"] .theme-modal :deep(.el-input__inner::placeholder),
+[data-bs-theme="dark"] .theme-modal :deep(.el-textarea__inner::placeholder) {
+    color: #7e8299 !important;
+}
+
+/* Focus pada dark mode */
+[data-bs-theme="dark"] .theme-modal :deep(.el-input__wrapper.is-focus),
+[data-bs-theme="dark"] .theme-modal :deep(.el-textarea__inner:focus) {
     border-color: #F68B1E !important;
     background-color: #151521 !important;
 }
-
-[data-bs-theme="dark"] :deep(.el-input__inner) { color: #ffffff; }
-
-/* Popups Dark */
-[data-bs-theme="dark"] :deep(.el-picker-panel), 
-[data-bs-theme="dark"] :deep(.el-select-dropdown) {
-    background: #1e1e2d !important; border-color: #323248 !important;
-}
-[data-bs-theme="dark"] :deep(.el-select-dropdown__item.hover) { 
-    background-color: #2b2b40 !important; color: #F68B1E; 
-}
-[data-bs-theme="dark"] :deep(.el-date-table th) { color: #CDCDDE; }
-[data-bs-theme="dark"] :deep(.el-date-table td.available .el-date-table-cell__text) { color: #ffffff; }
 </style>

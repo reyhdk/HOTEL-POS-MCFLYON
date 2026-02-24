@@ -1,209 +1,146 @@
 <template>
-  <div class="d-flex flex-column flex-xl-row gap-5 h-100 anim-fade-in">
+  <div class="d-flex flex-column flex-xl-row gap-7 h-100 anim-fade-in p-2 position-relative">
     
-    <!-- BAGIAN KIRI: DAFTAR MENU -->
+    <!-- Kolom Kiri: Konten Utama (Menu, Table, Online, Kitchen) -->
     <div class="flex-lg-row-fluid">
-      <div class="d-flex flex-column gap-5">
+      <div class="card card-custom border-0 shadow-lg rounded-4 overflow-hidden h-100">
         
-        <!-- HEADER PENCARIAN -->
-        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-5 mb-2 anim-slide-down">
-           <div>
-              <h2 class="fw-bolder text-gray-900 m-0">Menu Restoran</h2> 
-              <span class="text-gray-500 fw-bold fs-7">Pilih menu untuk ditambahkan ke pesanan</span>
-           </div>
-           
-           <div class="position-relative w-100 w-md-300px">
-              <i class="bi bi-search position-absolute top-50 ms-4 translate-middle-y text-gray-500 fs-7"></i>
-              <input 
-                 type="text" 
-                 v-model="searchMenuQuery" 
-                 class="form-control form-control-solid ps-12 rounded-pill border-0 shadow-sm h-45px custom-input" 
-                 placeholder="Cari Menu..."
-              />
-           </div>
+        <!-- Header Navigasi Tab -->
+        <div class="card-header border-0 pt-6 px-8 bg-adaptive-light z-index-1 pb-0 min-h-auto">
+            <div class="d-flex align-items-center justify-content-between w-100 overflow-auto">
+              <ul class="nav nav-pills nav-pills-custom gap-3 border-0 flex-nowrap">
+                <li class="nav-item">
+                  <a href="#" :class="getTabClass('menu')" @click.prevent="activeTab = 'menu'">
+                    <i class="bi bi-grid-fill fs-4 me-2" :class="getIconClass('menu')"></i> Menu
+                  </a>
+                </li>
+                <li class="nav-item position-relative">
+                  <a href="#" :class="getTabClass('online')" @click.prevent="activeTab = 'online'">
+                    <i class="bi bi-cloud-download-fill fs-4 me-2" :class="getIconClass('online')"></i>
+                    Pesanan Online
+                    <span v-if="onlineOrdersCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-2 border-white shadow-sm">
+                      {{ onlineOrdersCount }}
+                    </span>
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a href="#" :class="getTabClass('tables')" @click.prevent="activeTab = 'tables'">
+                    <i class="bi bi-layout-three-columns fs-4 me-2" :class="getIconClass('tables')"></i> Kelola Meja
+                  </a>
+                </li>
+                <!-- Tab Estimasi Dapur -->
+                <li class="nav-item">
+                  <a href="#" :class="getTabClass('estimasi')" @click.prevent="activeTab = 'estimasi'">
+                    <i class="bi bi-stopwatch-fill fs-4 me-2" :class="getIconClass('estimasi')"></i> Dapur & Estimasi
+                  </a>
+                </li>
+              </ul>
+            </div>
         </div>
 
-        <!-- LIST MENU -->
-        <div class="position-relative min-h-300px">
-           
-           <!-- LOADING STATE -->
-           <div v-if="loading.menus" class="py-20 text-center">
-              <div class="spinner-border text-orange mb-3" role="status"></div>
-              <p class="text-gray-500 fw-semibold">Mengambil data menu...</p>
-           </div>
-
-           <!-- EMPTY STATE -->
-           <div v-else-if="filteredMenus.length === 0" class="card border-dashed border-gray-300 bg-light-orange-subtle rounded-4 py-15 text-center anim-fade-up">
-              <i class="bi bi-egg-fried fs-3x text-orange opacity-50 mb-3"></i>
-              <h4 class="text-gray-800 fw-bold">Menu Tidak Ditemukan</h4>
-              <span class="text-gray-400 fs-7">Coba kata kunci pencarian lain.</span>
-           </div>
-
-           <!-- GRID MENU -->
-           <div v-else class="row g-4">
-              <TransitionGroup name="staggered-list" tag="div" class="contents" style="display: contents;">
-                 <div 
-                    class="col-12 col-md-4 col-xxl-3" 
-                    v-for="(menu, index) in filteredMenus" 
-                    :key="menu.id"
-                    :style="{ '--delay': `${index * 0.05}s` }"
-                 >
-                    <div class="h-100 anim-staggered-item">
-                       <div 
-                          class="card card-custom h-100 border-0 shadow-sm rounded-4 cursor-pointer hover-float position-relative overflow-hidden group-hover"
-                          @click="addToCart(menu)"
-                          :class="{ 'opacity-50 grayscale': menu.stock <= 0 }"
-                       >
-                          <!-- BADGE STOCK -->
-                          <div class="position-absolute top-0 end-0 m-3 z-index-1">
-                             <span v-if="menu.stock <= 0" class="badge bg-danger shadow-sm">Habis</span>
-                             <span v-else-if="menu.stock < 5" class="badge bg-warning text-dark shadow-sm">Sisa {{ menu.stock }}</span>
-                          </div>
-
-                          <div class="card-body p-0 d-flex flex-column h-100">
-                             <!-- GAMBAR MENU -->
-                             <div class="position-relative h-150px overflow-hidden bg-light-gray rounded-top-4">
-                                <img 
-                                   :src="menu.image_url || '/media/svg/files/blank-image.svg'" 
-                                   class="w-100 h-100 object-fit-cover transition-transform" 
-                                   alt="Menu"
-                                   loading="lazy"
-                                />
-                                <!-- OVERLAY ADD BUTTON -->
-                                <div v-if="menu.stock > 0" class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-10 d-flex align-items-center justify-content-center opacity-0 group-hover-show transition-opacity">
-                                   <div class="btn btn-icon btn-orange rounded-circle shadow-sm pulse-anim">
-                                      <i class="bi bi-plus-lg fs-2 text-white"></i>
-                                   </div>
-                                </div>
-                             </div>
-
-                             <!-- DETAIL MENU -->
-                             <div class="p-4 d-flex flex-column flex-grow-1">
-                                <div class="mb-2">
-                                   <div class="fw-bolder text-gray-900 fs-6 line-clamp-2 mb-1">{{ menu.name }}</div>
-                                   <div class="d-flex justify-content-between align-items-center">
-                                      <span class="text-orange fw-bolder fs-5">{{ formatCurrency(menu.price) }}</span>
-                                      <span v-if="menu.stock > 0" class="text-gray-500 fs-9 fw-bold">Stok: {{ menu.stock }}</span>
-                                   </div>
-                                </div>
-                             </div>
-                          </div>
-                       </div>
-                    </div>
-                 </div>
-              </TransitionGroup>
-           </div>
+        <!-- Body Konten -->
+        <div class="card-body px-8 py-6 h-100">
+            <KeepAlive>
+                <component 
+                    :is="activeComponent"
+                    @add-to-cart="addToCart"
+                    @import-order="importOrderToCart"
+                    @select-table="selectTableFromLayout"
+                    @update-count="updateOnlineCount"
+                />
+            </KeepAlive>
         </div>
       </div>
     </div>
 
-    <!-- BAGIAN KANAN: KERANJANG / SIDEBAR -->
-    <div class="flex-column-auto w-100 w-xl-400px w-xxl-450px">
-       <div class="card card-custom border-0 shadow-sm rounded-4 h-100 anim-slide-left position-sticky top-20px" style="z-index: 99;">
-          
-          <div class="card-header border-0 pt-6 pb-0 px-6">
-             <h3 class="card-title fw-bolder text-gray-900 flex-column">
-                <span>Pesanan Baru</span>
-                <span class="text-gray-500 fs-8 fw-bold mt-1">Isi detail pesanan tamu</span>
-             </h3>
-             <div class="card-toolbar">
-                <span class="badge badge-light-orange text-orange fw-bold fs-7">{{ cart.length }} Items</span>
+    <!-- Kolom Kanan: Keranjang / POS (Sidebar) -->
+    <!-- PERBAIKAN: Menghapus v-if="activeTab !== 'estimasi'" agar sidebar selalu muncul -->
+    <div class="flex-column-auto w-100 w-xl-400px transition-all">
+       <div class="card card-custom border-0 shadow-lg rounded-4 h-100 position-sticky top-0 bg-adaptive-light">
+          <div class="card-header border-0 pt-6 px-7 pb-0 bg-adaptive-light">
+             <div class="w-100 d-flex justify-content-between align-items-start">
+                <h3 class="card-title fw-bolder text-adaptive-dark flex-column align-items-start">
+                  <span class="fs-4">Pesanan Baru</span>
+                  <span class="text-gray-400 fs-8 mt-1 fw-bold">Items dalam keranjang</span>
+                </h3>
+                <div class="card-toolbar">
+                  <button @click="clearCart" class="btn btn-icon btn-sm btn-light-danger rounded-circle shadow-sm hover-scale" title="Kosongkan"><i class="bi bi-trash-fill"></i></button>
+                </div>
              </div>
           </div>
 
-          <div class="card-body d-flex flex-column px-6 pt-4 pb-6">
-             
-             <!-- PILIH KAMAR -->
-             <div class="mb-5">
-                <label class="form-label fs-8 fw-bold text-uppercase text-gray-500 required">Pilih Kamar / Meja</label>
-                <el-select
-                   v-model="selectedRoomId"
-                   filterable
-                   placeholder="Cari Nomor Kamar..."
-                   class="w-100 custom-select"
-                   :loading="loading.rooms"
-                   clearable
-                   size="large"
-                >
-                   <template #prefix><i class="bi bi-door-open fs-5 text-gray-500"></i></template>
-                   <el-option
-                      v-for="room in occupiedRooms"
-                      :key="room.id"
-                      :label="getRoomLabel(room)"
-                      :value="room.id"
-                   >
-                      <span style="float: left">{{ room.room_number }}</span>
-                      <span style="float: right; color: #8492a6; font-size: 13px">
-                          {{ room.check_ins?.[0]?.guest?.name || 'Tamu' }}
-                      </span>
-                   </el-option>
+          <div class="card-body px-7 pt-4 d-flex flex-column h-100">
+             <!-- Pilihan Lokasi (Meja/Kamar) -->
+             <div class="mb-6 bg-light p-4 rounded-4 border border-dashed border-gray-300">
+                <label class="form-label fs-8 fw-bold text-uppercase text-gray-500 mb-3 d-block">Tujuan Pesanan</label>
+                <el-tabs v-model="deliveryType" class="compact-tabs mb-3 w-100">
+                   <el-tab-pane label="Kamar Hotel" name="room"></el-tab-pane>
+                   <el-tab-pane label="Dine In (Meja)" name="table"></el-tab-pane>
+                </el-tabs>
+                <el-select v-model="selectedLocationId" filterable placeholder="Pilih Nomor..." class="w-100 custom-el-select shadow-sm" size="large">
+                   <template v-if="deliveryType === 'room'">
+                      <el-option v-for="room in occupiedRooms" :key="room.id" :label="getRoomLabel(room)" :value="room.id">
+                         <div class="d-flex justify-content-between">
+                            <span class="fw-bold">{{ room.room_number }}</span>
+                            <span class="text-muted fs-9">{{ room.check_ins?.[0]?.guest?.name }}</span>
+                         </div>
+                      </el-option>
+                   </template>
+                   <template v-else>
+                      <el-option v-for="table in tables" :key="table.id" :label="table.name" :value="table.id">
+                          <span class="float-start fw-bold">{{ table.name }}</span>
+                          <span class="float-end fs-9 badge" :class="table.status === 'available' ? 'badge-light-success text-success' : 'badge-light-danger text-danger'">{{ table.status_label }}</span>
+                      </el-option>
+                   </template>
                 </el-select>
              </div>
 
-             <div class="separator separator-dashed border-gray-300 mb-4"></div>
-
-             <!-- LIST ITEMS CART -->
-             <div class="flex-grow-1 overflow-auto custom-scroll pe-2 mb-4" style="max-height: calc(100vh - 450px); min-height: 200px;">
-                <div v-if="cart.length === 0" class="d-flex flex-column align-items-center justify-content-center h-100 text-center opacity-50">
-                   <i class="bi bi-cart-x fs-3x text-gray-300 mb-3"></i>
-                   <span class="text-gray-400 fw-bold fs-7">Keranjang kosong</span>
+             <!-- List Item Keranjang -->
+             <div class="flex-grow-1 overflow-auto custom-scroll mb-5 pe-2" style="max-height: 380px;">
+                <div v-if="cart.length === 0" class="d-flex flex-column align-items-center justify-content-center h-100 text-center py-10 opacity-50">
+                   <img src="https://cdn-icons-png.flaticon.com/512/2038/2038854.png" width="60" class="mb-3 grayscale" alt="Empty">
+                   <span class="text-gray-500 fw-bold fs-7">Keranjang kosong</span>
                 </div>
-
-                <TransitionGroup name="list">
-                   <div v-for="item in cart" :key="item.menu_id" class="d-flex align-items-center mb-4 bg-light-orange-subtle rounded-3 p-3 border border-orange-subtle cart-item-anim">
-                      <div class="d-flex flex-column align-items-center me-3 gap-1">
-                         <button @click="updateQuantity(item, 1)" class="btn btn-icon btn-xs btn-light shadow-sm text-success rounded-circle hover-scale"><i class="bi bi-chevron-up fs-8"></i></button>
-                         <span class="fw-bolder text-gray-800 fs-7">{{ item.quantity }}</span>
-                         <button @click="updateQuantity(item, -1)" class="btn btn-icon btn-xs btn-light shadow-sm text-danger rounded-circle hover-scale"><i class="bi bi-chevron-down fs-8"></i></button>
-                      </div>
-                      
-                      <div class="flex-grow-1">
-                         <div class="fw-bold text-gray-800 fs-7 line-clamp-1">{{ item.name }}</div>
-                         <div class="text-gray-500 fs-9">{{ formatCurrency(item.price) }} / porsi</div>
-                      </div>
-
-                      <div class="fw-bolder text-orange fs-7 text-end ps-2">
-                         {{ formatCurrency(item.price * item.quantity) }}
-                      </div>
+                <div v-for="item in cart" :key="item.menu_id" class="d-flex align-items-center mb-3 bg-adaptive-light rounded-3 p-3 shadow-sm border border-adaptive-border transition-all hover-elevate-up">
+                   <div class="symbol symbol-40px me-3">
+                      <div class="symbol-label bg-orange text-white fw-bold fs-7">{{ item.quantity }}x</div>
                    </div>
-                </TransitionGroup>
+                   <div class="flex-grow-1">
+                      <div class="fw-bolder text-adaptive-dark fs-7 line-clamp-1">{{ item.name }}</div>
+                      <div class="text-adaptive-secondary fs-9 fw-bold">{{ formatCurrency(item.price) }}</div>
+                   </div>
+                   <div class="d-flex align-items-center bg-adaptive-lighter rounded-pill p-1">
+                      <button @click="updateQuantity(item, -1)" class="btn btn-icon btn-xs btn-white text-danger rounded-circle shadow-sm w-25px h-25px"><i class="bi bi-dash"></i></button>
+                      <button @click="updateQuantity(item, 1)" class="btn btn-icon btn-xs btn-white text-success rounded-circle shadow-sm w-25px h-25px ms-1"><i class="bi bi-plus"></i></button>
+                   </div>
+                </div>
              </div>
 
-             <!-- TOTAL & BUTTON -->
-             <div class="mt-auto">
-                <div class="bg-light-gray rounded-3 p-4 mb-4">
-                   <div class="d-flex justify-content-between align-items-center mb-2">
-                      <span class="text-gray-500 fw-bold fs-8">Subtotal</span>
-                      <span class="text-gray-800 fw-bold fs-7">{{ formatCurrency(totalPrice) }}</span>
-                   </div>
-                   <div class="d-flex justify-content-between align-items-center mb-3">
-                      <span class="text-gray-500 fw-bold fs-8">Pajak (0%)</span>
-                      <span class="text-gray-800 fw-bold fs-7">Rp 0</span>
-                   </div>
-                   <div class="separator separator-dashed border-gray-400 mb-3"></div>
-                   <div class="d-flex justify-content-between align-items-center">
-                      <span class="text-gray-900 fw-bolder fs-5">TOTAL</span>
-                      <span class="text-orange fw-bolder fs-3">{{ formatCurrency(totalPrice) }}</span>
-                   </div>
+             <!-- Footer Total & Aksi -->
+             <div class="mt-auto border-top border-adaptive-border pt-5 bg-adaptive-light z-index-2">
+                <div class="d-flex justify-content-between align-items-center mb-5">
+                   <span class="text-adaptive-secondary fw-bold fs-5">Total Bayar</span>
+                   <span class="text-orange fw-bolder fs-2">{{ formatCurrency(totalPrice) }}</span>
+                </div>
+                
+                <div class="d-grid grid-cols-2 gap-3 mb-4 d-flex">
+                    <button @click="selectedPaymentMethod = 'cash'" :class="selectedPaymentMethod === 'cash' ? 'bg-success text-white border-success' : 'bg-adaptive-lighter text-adaptive-dark border-adaptive-border'" class="btn btn-outline border-2 fw-bold flex-grow-1 py-3 rounded-3 d-flex align-items-center justify-content-center gap-2 transition-all">
+                        <i class="bi bi-cash fs-4" :class="selectedPaymentMethod === 'cash' ? 'text-white' : 'text-success'"></i> CASH
+                    </button>
+                    <button @click="selectedPaymentMethod = 'midtrans'" :class="selectedPaymentMethod === 'midtrans' ? 'bg-primary text-white border-primary' : 'bg-adaptive-lighter text-adaptive-dark border-adaptive-border'" class="btn btn-outline border-2 fw-bold flex-grow-1 py-3 rounded-3 d-flex align-items-center justify-content-center gap-2 transition-all">
+                        <i class="bi bi-qr-code-scan fs-4" :class="selectedPaymentMethod === 'midtrans' ? 'text-white' : 'text-primary'"></i> QRIS
+                    </button>
                 </div>
 
-                <button 
-                   @click="processOrder" 
-                   class="btn btn-orange w-100 py-3 rounded-3 shadow-sm d-flex justify-content-center align-items-center gap-2 btn-active-push" 
-                   :disabled="!canProcessOrder"
-                >
-                   <span v-if="!loading.processing" class="fw-bolder fs-6">Proses Pesanan</span>
-                   <span v-else class="d-flex align-items-center">
-                      <span class="spinner-border spinner-border-sm me-2"></span> Memproses...
-                   </span>
-                   <i v-if="!loading.processing" class="bi bi-arrow-right-circle-fill fs-4"></i>
+                <button @click="submitOrder" class="btn btn-orange w-100 py-3 rounded-3 shadow-lg hover-scale fw-bold fs-6 d-flex justify-content-center align-items-center gap-2" :disabled="!canProcessOrder || processing">
+                   <span v-if="processing" class="spinner-border spinner-border-sm"></span>
+                   <i v-else class="bi bi-check-circle-fill"></i> 
+                   {{ processing ? 'Memproses...' : 'Proses Pembayaran' }}
                 </button>
              </div>
-
           </div>
        </div>
     </div>
-
   </div>
 </template>
 
@@ -211,181 +148,211 @@
 import { ref, computed, onMounted } from "vue";
 import ApiService from "@/core/services/ApiService"; 
 import Swal from "sweetalert2";
+import { useThemeStore } from "@/stores/theme";
 
-// --- TYPES & INTERFACES ---
-interface Room { id: number; room_number: string; check_ins: any[]; }
-interface Menu { id: number; name: string; price: number; image_url: string | null; stock: number; }
-interface CartItem { menu_id: number; name: string; price: number; quantity: number; }
+// Import Component
+import MenuTab from "./components/MenuTab.vue";
+import OnlineOrdersTab from "./components/OnlineOrdersTab.vue";
+import TablesTab from "./components/TablesTab.vue";
+import EstimasiTab from "./components/EstimasiTab.vue";
 
-// --- STATE ---
-const menus = ref<Menu[]>([]);
-const occupiedRooms = ref<Room[]>([]);
-const cart = ref<CartItem[]>([]);
-const loading = ref({ menus: true, rooms: true, processing: false });
-const searchMenuQuery = ref("");
-const selectedRoomId = ref<number | null>(null);
+// Tipe Tab yang valid
+const themeStore = useThemeStore();
+const activeTab = ref<'menu' | 'online' | 'tables' | 'estimasi'>('menu');
 
-// --- LOGIC ---
-const totalPrice = computed(() => cart.value.reduce((total, item) => total + item.price * item.quantity, 0));
-const canProcessOrder = computed(() => selectedRoomId.value !== null && cart.value.length > 0 && !loading.value.processing);
-
-const filteredMenus = computed(() => {
-  if (!searchMenuQuery.value) return menus.value;
-  return menus.value.filter((menu) => menu.name.toLowerCase().includes(searchMenuQuery.value.toLowerCase()));
-});
-
-const fetchMenus = async () => {
-  try { 
-    loading.value.menus = true; 
-    const { data } = await ApiService.get("/menus"); 
-    menus.value = data || []; 
-  } 
-  catch (e) { console.error(e); } 
-  finally { loading.value.menus = false; }
-};
-
-const fetchOccupiedRooms = async () => {
-  try { 
-    loading.value.rooms = true; 
-    const { data } = await ApiService.get("/pos/occupied-rooms"); 
-    occupiedRooms.value = data || []; 
-  } 
-  catch (e) { console.error(e); } 
-  finally { loading.value.rooms = false; }
-};
-
-// FIX: Menambahkan Optional Chaining (?.) untuk mencegah crash jika check_ins undefined
-const getRoomLabel = (room: Room): string => {
-  const checkIn = room.check_ins && room.check_ins.length > 0 ? room.check_ins[0] : null;
-  const guestName = checkIn?.guest?.name || 'Tamu';
-  return `${room.room_number} - ${guestName}`;
-};
-
-const addToCart = (menu: Menu) => {
-  // Safe guard: pastikan menu valid
-  if (!menu || menu.stock <= 0) return;
-
-  const existingItem = cart.value.find(item => item.menu_id === menu.id);
-  
-  if (existingItem) {
-    if (existingItem.quantity < menu.stock) {
-        existingItem.quantity++;
+// Logika Switch Component
+const activeComponent = computed(() => {
+    switch(activeTab.value) {
+        case 'menu': return MenuTab;
+        case 'online': return OnlineOrdersTab;
+        case 'tables': return TablesTab;
+        case 'estimasi': return EstimasiTab;
+        default: return MenuTab;
     }
-  } else {
-    cart.value.push({ 
-        menu_id: menu.id, 
-        name: menu.name, 
-        price: menu.price, 
-        quantity: 1 
-    });
-  }
-};
-
-const updateQuantity = (item: CartItem, change: number) => {
-  const menu = menus.value.find(m => m.id === item.menu_id);
-  if (!menu) return;
-  
-  const newQuantity = item.quantity + change;
-  
-  if (newQuantity > 0 && newQuantity <= menu.stock) { 
-      item.quantity = newQuantity; 
-  } else if (newQuantity <= 0) { 
-      cart.value = cart.value.filter(c => c.menu_id !== item.menu_id); 
-  }
-};
-
-const processOrder = async () => {
-  if (!canProcessOrder.value) return;
-  loading.value.processing = true;
-  
-  try {
-    await ApiService.post('/orders', {
-      room_id: selectedRoomId.value,
-      items: cart.value.map(i => ({ menu_id: i.menu_id, quantity: i.quantity })),
-      payment_method: 'pay_at_checkout'
-    });
-    
-    Swal.fire({ 
-        icon: 'success', 
-        title: 'Berhasil', 
-        text: 'Pesanan terkirim ke dapur & tagihan masuk folio.', 
-        timer: 2000, 
-        showConfirmButton: false 
-    });
-    
-    cart.value = []; 
-    selectedRoomId.value = null;
-    await fetchMenus(); // Refresh stock
-  } catch (error: any) { 
-      Swal.fire("Gagal", error.response?.data?.message || "Error memproses pesanan.", "error"); 
-  } finally { 
-      loading.value.processing = false; 
-  }
-};
-
-const formatCurrency = (val: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(val);
-
-onMounted(() => { 
-    fetchMenus(); 
-    fetchOccupiedRooms(); 
 });
+
+const deliveryType = ref<'room' | 'table'>('room');
+const selectedLocationId = ref<number | null>(null);
+const selectedPaymentMethod = ref<'cash' | 'midtrans' | null>(null);
+const cart = ref<any[]>([]);
+const occupiedRooms = ref<any[]>([]);
+const tables = ref<any[]>([]);
+const onlineOrdersCount = ref(0);
+const processing = ref(false); 
+
+const addToCart = (menu: any) => {
+    const item = cart.value.find(i => i.menu_id === menu.id);
+    if(item) { item.quantity++; }
+    else cart.value.push({ menu_id: menu.id, name: menu.name, price: menu.price, quantity: 1 });
+};
+
+const updateQuantity = (item: any, n: number) => {
+    const qty = item.quantity + n;
+    if (qty > 0) item.quantity = qty;
+    else cart.value = cart.value.filter(c => c.menu_id !== item.menu_id);
+};
+
+const importOrderToCart = (order: any) => {
+    cart.value = order.items.map((i: any) => ({ menu_id: i.menu_id, name: i.menu?.name, price: i.price, quantity: i.quantity }));
+    if(order.room_id) { deliveryType.value = 'room'; selectedLocationId.value = order.room_id; }
+    else if(order.table_id) { deliveryType.value = 'table'; selectedLocationId.value = order.table_id; }
+    
+    // Auto switch ke menu tab untuk checkout
+    activeTab.value = 'menu';
+};
+
+const selectTableFromLayout = (t: any) => {
+    activeTab.value = 'menu';
+    deliveryType.value = 'table';
+    selectedLocationId.value = t.id;
+};
+
+const clearCart = () => { cart.value = []; selectedPaymentMethod.value = null; };
+const totalPrice = computed(() => cart.value.reduce((total, item) => total + item.price * item.quantity, 0));
+const canProcessOrder = computed(() => selectedLocationId.value !== null && cart.value.length > 0 && selectedPaymentMethod.value);
+
+const updateOnlineCount = (count: number) => { onlineOrdersCount.value = count; };
+
+const submitOrder = async () => {
+    if(!canProcessOrder.value) return;
+    
+    processing.value = true;
+    try {
+        const res = await ApiService.post('/orders', {
+            items: cart.value.map(i => ({ menu_id: i.menu_id, quantity: i.quantity })),
+            payment_method: selectedPaymentMethod.value,
+            room_id: deliveryType.value === 'room' ? selectedLocationId.value : null,
+            table_id: deliveryType.value === 'table' ? selectedLocationId.value : null
+        });
+
+        if (selectedPaymentMethod.value === 'midtrans' && res.data.snap_token) {
+            (window as any).snap.pay(res.data.snap_token, {
+                onSuccess: function (result: any) {
+                    Swal.fire('Berhasil!', 'Pembayaran QRIS Diterima.', 'success');
+                    clearCart();
+                },
+                onPending: function (result: any) {
+                    Swal.fire('Pending', 'Selesaikan pembayaran QRIS Anda.', 'info');
+                    clearCart();
+                },
+                onError: function (result: any) {
+                    Swal.fire('Gagal', 'Pembayaran QRIS gagal.', 'error');
+                },
+                onClose: function () {
+                    Swal.fire('Dibatalkan', 'Anda menutup layar pembayaran.', 'warning');
+                    clearCart();
+                }
+            });
+        } else {
+            Swal.fire({ icon: 'success', title: 'Pesanan Dibuat', text: 'Bahan baku telah terpotong', showConfirmButton: false, timer: 1500 });
+            clearCart(); 
+        }
+
+    } catch(e) { 
+        Swal.fire('Error', 'Gagal memproses pesanan', 'error'); 
+    } finally {
+        processing.value = false;
+    }
+};
+
+const fetchGlobalData = async () => {
+    try {
+        const [roomsRes, tablesRes] = await Promise.all([
+            ApiService.get("/pos/occupied-rooms"),
+            ApiService.get("/pos/tables"),
+        ]);
+        occupiedRooms.value = roomsRes.data || [];
+        tables.value = tablesRes.data || [];
+    } catch (e) { console.error(e); }
+};
+
+const getTabClass = (tabName: string) => {
+    const isActive = activeTab.value === tabName;
+    const common = "nav-link d-flex align-items-center px-6 py-3 rounded-pill fw-bold transition-all";
+    return isActive ? `${common} bg-orange text-white shadow-md` : `${common} bg-light text-gray-600 hover-scale`;
+};
+const getIconClass = (tabName: string) => activeTab.value === tabName ? "text-white" : "text-gray-500";
+const formatCurrency = (v: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(v);
+const getRoomLabel = (r: any) => `${r.room_number}`;
+
+onMounted(() => { fetchGlobalData(); setInterval(fetchGlobalData, 30000); });
 </script>
 
 <style scoped>
-/* --- THEME COLORS --- */
 .text-orange { color: #ff6b00 !important; }
 .bg-orange { background-color: #ff6b00 !important; }
-.btn-orange { background: #ff6b00; color: white; border: none; transition: 0.2s; }
-.btn-orange:hover { background: #e56000; box-shadow: 0 5px 15px rgba(255, 107, 0, 0.3); }
-
-/* --- LIGHT MODE DEFAULTS --- */
-.bg-light-orange { background-color: #fff5f0 !important; }
-.bg-light-orange-subtle { background-color: #fff9f6 !important; }
-.border-orange-subtle { border-color: rgba(255, 107, 0, 0.15) !important; }
-.bg-light-gray { background-color: #f8f9fa; }
-.card-custom { background-color: #ffffff; }
-
-/* --- DARK MODE OVERRIDES --- */
-[data-bs-theme="dark"] .card-custom { background-color: #1e1e2d !important; }
-[data-bs-theme="dark"] .bg-light-orange-subtle { background-color: rgba(255, 107, 0, 0.1) !important; border-color: rgba(255, 107, 0, 0.2) !important; }
-[data-bs-theme="dark"] .bg-light-gray { background-color: #1b1b29 !important; }
-[data-bs-theme="dark"] .form-control-solid { background-color: #1b1b29 !important; border-color: #323248 !important; color: #92929f !important; }
-[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
-[data-bs-theme="dark"] .text-gray-800 { color: #e1e1e6 !important; }
-[data-bs-theme="dark"] .text-gray-500 { color: #7e8299 !important; }
-
-/* --- CARD HOVER & INTERACTIONS --- */
-.hover-float { transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
-.hover-float:hover { transform: translateY(-8px); box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important; z-index: 10; }
-.group-hover:hover .group-hover-show { opacity: 1 !important; }
-.transition-transform { transition: transform 0.4s ease; }
-.group-hover:hover .transition-transform { transform: scale(1.05); }
-
-/* --- UTILITIES --- */
-.grayscale { filter: grayscale(100%); }
-.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-.custom-scroll::-webkit-scrollbar { width: 5px; }
-.custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
-.btn-active-push:active { transform: scale(0.97); }
-.h-150px { height: 150px; }
-
-/* --- ANIMATIONS --- */
-.anim-fade-in { animation: fadeIn 0.8s ease-out forwards; }
-.anim-slide-down { animation: slideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; transform: translateY(-20px); }
-.anim-slide-left { animation: slideLeft 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; transform: translateX(30px); }
-.anim-staggered-item { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; transform: translateY(30px); animation-delay: var(--delay); }
-
+.btn-orange { background: #ff6b00; color: white; border: none; transition: all 0.2s; }
+.btn-orange:hover { background: #e05e00; transform: translateY(-2px); }
+.hover-scale:hover { transform: scale(1.05); }
+.anim-fade-in { animation: fadeIn 0.5s ease forwards; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideDown { to { opacity: 1; transform: translateY(0); } }
-@keyframes slideLeft { to { opacity: 1; transform: translateX(0); } }
-@keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
 
-/* Cart Item Animation */
-.list-enter-active, .list-leave-active { transition: all 0.3s ease; }
-.list-enter-from, .list-leave-to { opacity: 0; transform: translateX(20px); }
+/* Adaptive Light/Dark Mode Classes */
+.bg-adaptive-light { background-color: #ffffff; }
+.bg-adaptive-lighter { background-color: #f5f5f5; }
+.text-adaptive-dark { color: #1f2937; }
+.text-adaptive-secondary { color: #6b7280; }
+.border-adaptive-border { border-color: #e5e7eb; }
 
-/* Pulse for add button */
-.pulse-anim { animation: pulse 2s infinite; }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(255, 107, 0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0); } }
+/* DARK MODE SUPPORT */
+[data-bs-theme="dark"] .bg-adaptive-light { 
+    background-color: #1e1e2d !important; 
+}
+[data-bs-theme="dark"] .bg-adaptive-lighter {
+    background-color: #2b2b40 !important;
+}
+[data-bs-theme="dark"] .text-adaptive-dark {
+    color: #ffffff !important;
+}
+[data-bs-theme="dark"] .text-adaptive-secondary {
+    color: #cdcdde !important;
+}
+[data-bs-theme="dark"] .border-adaptive-border {
+    border-color: #323248 !important;
+}
+[data-bs-theme="dark"] .card {
+    background-color: #1e1e2d;
+    border-color: #323248;
+}
+[data-bs-theme="dark"] .card-header {
+    background-color: #1e1e2d !important;
+    border-color: #323248;
+}
+[data-bs-theme="dark"] .card-body {
+    background-color: #1e1e2d;
+}
+[data-bs-theme="dark"] :deep(.el-tabs) {
+    --el-border-color: #323248;
+}
+[data-bs-theme="dark"] :deep(.el-tabs__nav-wrap) {
+    background-color: #1e1e2d;
+}
+[data-bs-theme="dark"] :deep(.el-input__wrapper),
+[data-bs-theme="dark"] :deep(.el-select__wrapper) {
+    background-color: #1b1b29 !important;
+    border-color: #323248 !important;
+    color: #ffffff;
+}
+[data-bs-theme="dark"] :deep(.el-input__wrapper.is-focus),
+[data-bs-theme="dark"] :deep(.el-select__wrapper.is-focus) {
+    border-color: #ff6b00 !important;
+    background-color: #1b1b29 !important;
+}
+[data-bs-theme="dark"] :deep(.el-select-dropdown) {
+    background-color: #1e1e2d !important;
+    border-color: #323248 !important;
+}
+[data-bs-theme="dark"] :deep(.el-select-dropdown__item) {
+    color: #cdcdde;
+}
+[data-bs-theme="dark"] :deep(.el-select-dropdown__item:hover) {
+    background-color: #2b2b40 !important;
+    color: #ff6b00;
+}
+[data-bs-theme="dark"] :deep(.el-option-group__title) {
+    color: #cdcdde;
+}
+[data-bs-theme="dark"] :deep(.el-tab-pane__content) {
+    background-color: #1e1e2d;
+}
 </style>

@@ -26,7 +26,10 @@ use App\Http\Controllers\Api\Warehouse\WarehouseItemController;
 use App\Http\Controllers\Api\Warehouse\StockTransactionController;
 use App\Http\Controllers\Api\Warehouse\WarehouseCategoryController;
 // Guest & Admin Namespace Controllers
+use App\Http\Controllers\Api\Restopos\TableController;
+use App\Http\Controllers\Api\Restopos\TableTypeController;
 use App\Http\Controllers\Api\Admin\CheckoutHistoryController;
+use App\Http\Controllers\Api\KitchenController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\ServiceRequestController as AdminServiceRequestController;
 use App\Http\Controllers\Api\Guest\CheckoutController;
@@ -147,6 +150,30 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/admin/check-ins/store-direct', [CheckInController::class, 'storeDirect']);
 
         Route::post('/check-out/{room}', [CheckInController::class, 'checkout']);
+
+        Route::get('/pos/tables', [TableController::class, 'index']);
+        Route::post('/pos/tables', [TableController::class, 'store']); // Create Table (Potong Stok)
+        Route::put('/pos/tables/{id}', [TableController::class, 'update']);
+        Route::delete('/pos/tables/{id}', [TableController::class, 'destroy']);
+        
+        // Table Types Management
+        Route::get('/pos/table-types', [TableTypeController::class, 'index']);
+        Route::post('/pos/table-types', [TableTypeController::class, 'store']);
+        Route::put('/pos/table-types/{id}', [TableTypeController::class, 'update']);
+        Route::delete('/pos/table-types/{id}', [TableTypeController::class, 'destroy']);
+        
+        // Route Baru: Repair/Ganti Sparepart
+        Route::post('/pos/tables/{id}/replace-item', [TableController::class, 'replaceItem']);
+        // -------------------------------
+
+        Route::get('/pos/online-orders-count', [AdminOrderController::class, 'getPendingCount']);
+        Route::get('/pos/occupied-rooms', [RoomController::class, 'getOccupiedRoomsForPos']);
+        Route::post('/orders', [OrderController::class, 'store']);
+        Route::get('/kitchen/queue', [KitchenController::class, 'getQueueStatus']);
+        Route::get('/kitchen/orders', [KitchenController::class, 'getTodayOrders']); // Ambil data hari ini + paginate
+        Route::get('/kitchen/chefs', [KitchenController::class, 'getChefs']); // Ambil list chef
+        Route::post('/kitchen/orders/{order}/assign', [KitchenController::class, 'assignChef']); // Assign Chef & Waktu
+        Route::patch('/kitchen/orders/{order}/status', [KitchenController::class, 'updateStatus']); // Update status masakan
     });
 
     Route::prefix('warehouse')->middleware('auth:api')->group(function () {

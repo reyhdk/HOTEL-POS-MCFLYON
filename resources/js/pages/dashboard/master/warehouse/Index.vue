@@ -1247,4 +1247,19 @@ thead th { letter-spacing: 0.05em; color: #7e8299 !important; }
 [data-bs-theme="dark"] .custom-dropdown-menu { background-color: #1e1e2d; border-color: #323248; }
 [data-bs-theme="dark"] .dropdown-item-custom { color: #9A9CAE; }
 [data-bs-theme="dark"] .dropdown-item-custom:hover { background-color: #2b2b40; color: #009EF7; }
+
+/* Ensure table headers blend with dark mode */
+[data-bs-theme="dark"] thead.bg-light-primary {
+  background-color: rgba(13,110,253,0.06) !important;
+}
+[data-bs-theme="dark"] thead th {
+  color: #cfe3ff !important;
+  border-bottom: 1px solid #323248 !important;
+  background-color: transparent !important;
+}
+[data-bs-theme="dark"] .table thead th { background: transparent !important; }
+[data-bs-theme="dark"] .table { color: #e6eefc; }
+[data-bs-theme="dark"] .bg-light-primary { background-color: rgba(13,110,253,0.04) !important; }
+[data-bs-theme="dark"] thead.bg-light-primary .text-gray-600 { color: #9A9CAE !important; }
+
 </style>

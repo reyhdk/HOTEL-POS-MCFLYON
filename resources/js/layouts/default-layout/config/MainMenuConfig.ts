@@ -113,9 +113,9 @@ const MainMenuConfig: MenuItem[] = [
                         name: "create pos_orders",
                     },
                     {
-                        heading: "Pesanan Masuk",
-                        route: "/admin/online-orders",
-                        name: "view online_orders",
+                        heading: "Dapur",
+                        route: "/admin/kitchen",
+                        name: "view kitchen",
                     },
                     {
                         heading: "Daftar Tagihan",

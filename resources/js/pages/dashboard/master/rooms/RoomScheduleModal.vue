@@ -364,4 +364,29 @@ export default {
 .scroll-y::-webkit-scrollbar { width: 4px; }
 .scroll-y::-webkit-scrollbar-track { background: transparent; }
 .scroll-y::-webkit-scrollbar-thumb { background: #E4E6EF; border-radius: 10px; }
+
+/* ========================
+   DARK MODE OVERRIDES
+   ======================== */
+[data-bs-theme="dark"] .theme-modal { background-color: #1e1e2d; }
+[data-bs-theme="dark"] .bg-white { background-color: #1e1e2d !important; }
+[data-bs-theme="dark"] .bg-light-subtle { background-color: #151521 !important; }
+[data-bs-theme="dark"] .bg-light { background-color: #1b1b29 !important; }
+[data-bs-theme="dark"] .border-end, 
+[data-bs-theme="dark"] .border-gray-200, 
+[data-bs-theme="dark"] .border-gray-100 { border-color: #323248 !important; }
+[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
+[data-bs-theme="dark"] .text-gray-700 { color: #cdcdde !important; }
+[data-bs-theme="dark"] .text-gray-600, 
+[data-bs-theme="dark"] .text-gray-400, 
+[data-bs-theme="dark"] .text-muted { color: #a1a5b7 !important; }
+[data-bs-theme="dark"] .calendar-day.is-empty { background-color: #1b1b29; border-color: #323248; color: #a1a5b7; }
+[data-bs-theme="dark"] .calendar-day.is-occupied { background-color: rgba(23, 198, 83, 0.1); color: #17c653; border-color: rgba(23, 198, 83, 0.2); }
+[data-bs-theme="dark"] .calendar-day.is-reserved { background-color: rgba(246, 139, 30, 0.1); color: #f68b1e; border-color: rgba(246, 139, 30, 0.2); }
+[data-bs-theme="dark"] .calendar-day.is-history { background-color: rgba(0, 158, 247, 0.1); color: #009ef7; border-color: transparent; }
+[data-bs-theme="dark"] .calendar-day.is-selected { background-color: #ffffff !important; color: #1e1e2d !important; border-color: #ffffff !important; }
+[data-bs-theme="dark"] .guest-card { background-color: #1b1b29 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .guest-card .bg-light { background-color: #151521 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .bg-empty { background-color: #323248 !important; }
+[data-bs-theme="dark"] .loading-overlay { background: rgba(30, 30, 45, 0.8); }
 </style>

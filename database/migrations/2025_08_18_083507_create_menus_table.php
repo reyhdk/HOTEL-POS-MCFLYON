@@ -17,6 +17,9 @@ return new class extends Migration
         $table->string('name');
         $table->string('category'); // contoh: 'makanan', 'minuman'
         $table->integer('price');
+        $table->integer('stock');
+        $table->string('image')->nullable();
+        $table->integer('cooking_estimate_time')->nullable(); // dalam menit
         $table->text('description')->nullable();
         $table->timestamps();
     });

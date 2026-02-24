@@ -12,7 +12,6 @@ class MenuController extends Controller
 {
     public function index()
     {
-        // Load ingredients agar bisa diedit di frontend
         return Menu::with('ingredients')->latest()->get();
     }
 
@@ -23,8 +22,9 @@ class MenuController extends Controller
             'category' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
+            // [UPDATE] Tambah validasi estimasi
+            'cooking_estimation_time' => 'required|integer|min:1', 
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            // Validasi Array Ingredients
             'ingredients' => 'nullable|array',
             'ingredients.*.id' => 'required|exists:warehouse_items,id',
             'ingredients.*.quantity' => 'required|numeric|min:0.001',
@@ -39,7 +39,6 @@ class MenuController extends Controller
 
             $menu = Menu::create($validatedData);
 
-            // Simpan Resep/Ingredients
             if (!empty($request->ingredients)) {
                 $ingredientsData = [];
                 foreach ($request->ingredients as $ing) {
@@ -69,8 +68,9 @@ class MenuController extends Controller
             'category' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
+            // [UPDATE] Tambah validasi estimasi
+            'cooking_estimation_time' => 'required|integer|min:1',
             'image' => 'nullable|sometimes',
-            // Validasi Ingredients
             'ingredients' => 'nullable|array',
             'ingredients.*.id' => 'required|exists:warehouse_items,id',
             'ingredients.*.quantity' => 'required|numeric|min:0.001',
@@ -88,7 +88,6 @@ class MenuController extends Controller
 
             $menu->update($validatedData);
 
-            // Sync Resep/Ingredients (Hapus yang lama, ganti yang baru sesuai input)
             if (isset($request->ingredients)) {
                 $ingredientsData = [];
                 foreach ($request->ingredients as $ing) {
@@ -111,9 +110,7 @@ class MenuController extends Controller
         if ($menu->image) {
             Storage::delete($menu->image);
         }
-        // Ingredients di pivot table otomatis terhapus karena cascading di migration
         $menu->delete();
-
         return response()->json(null, 204);
     }
 }

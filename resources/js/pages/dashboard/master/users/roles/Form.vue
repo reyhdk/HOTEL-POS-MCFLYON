@@ -155,15 +155,10 @@ const loadRoleDetails = async (roleId: number) => {
         const role = data.data || data;
 
         // --- PERBAIKAN LOGIC SINKRONISASI EDIT ---
-        // Backend mengirim permissions sebagai array of strings: ['view', 'edit']
-        // Kode lama mencoba .map() seolah-olah object, sehingga hasilnya undefined/error
-        
         if (role.permissions && Array.isArray(role.permissions)) {
-            // Cek apakah item didalamnya adalah string (langsung nama permission)
             if (role.permissions.length > 0 && typeof role.permissions[0] === 'string') {
                  formData.value.permissions = role.permissions;
             } 
-            // Cek jika item didalamnya object (misal controller berubah dikemudian hari)
             else if (role.permissions.length > 0 && typeof role.permissions[0] === 'object') {
                  formData.value.permissions = role.permissions.map((p: any) => p.name);
             }
@@ -182,7 +177,6 @@ const loadRoleDetails = async (roleId: number) => {
     }
 };
 
-// --- Computed & Helpers ---
 const filteredPermissions = computed(() => {
     if (!searchPermission.value) return allPermissions.value;
     const q = searchPermission.value.toLowerCase();
@@ -212,9 +206,7 @@ const formatPermissionName = (name: string) => {
 
 watch(() => props.roleData, async (newVal) => {
   if (newVal) {
-    // Set data dasar dulu agar UI responsif
     formData.value = { name: newVal.name, full_name: newVal.full_name, permissions: [] };
-    // Load permissions detail untuk mengisi checklist
     await loadRoleDetails(newVal.id);
   } else {
     formRef.value?.resetFields();
@@ -292,14 +284,13 @@ onMounted(() => { fetchPermissions(); });
 }
 
 /* ========================
-   INPUTS STYLE
+   INPUTS STYLE (LIGHT MODE)
    ======================== */
 .required:after { content: "*"; color: #f1416c; margin-left: 3px; }
 
 :deep(.metronic-input .el-input__wrapper) {
     background-color: #F9F9F9;
-    box-shadow: none !important; 
-    border: 1px solid transparent; 
+    box-shadow: 0 0 0 1px transparent inset !important; /* Element Plus relies on box-shadow for border */
     border-radius: 0.6rem; 
     padding: 8px 12px;
     height: 40px;
@@ -308,8 +299,7 @@ onMounted(() => { fetchPermissions(); });
 
 :deep(.metronic-input .el-input__wrapper.is-focus) {
     background-color: #ffffff;
-    border-color: #F68B1E !important;
-    box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1) !important;
+    box-shadow: 0 0 0 1px #F68B1E inset !important;
 }
 
 /* ========================
@@ -323,6 +313,7 @@ onMounted(() => { fetchPermissions(); });
 [data-bs-theme="dark"] .bg-light-subtle { background-color: #1b1b29 !important; border-color: #323248 !important; }
 [data-bs-theme="dark"] .bg-body { background-color: #151521 !important; }
 [data-bs-theme="dark"] .border-gray-300, [data-bs-theme="dark"] .border-gray-200 { border-color: #323248 !important; }
+[data-bs-theme="dark"] .form-control-solid { background-color: #1b1b29 !important; border-color: #323248 !important; color: #ffffff; }
 
 /* Permission Dark */
 [data-bs-theme="dark"] .permission-box { background-color: #1b1b29; border-color: #323248 !important; }
@@ -330,17 +321,34 @@ onMounted(() => { fetchPermissions(); });
 [data-bs-theme="dark"] .permission-item:hover { border-color: #F68B1E !important; background-color: #2b2b40 !important; }
 [data-bs-theme="dark"] .permission-item.active { background-color: rgba(246, 139, 30, 0.15) !important; border-color: #F68B1E !important; }
 [data-bs-theme="dark"] .bg-light-orange { background-color: #2b2b40 !important; }
+</style>
 
-/* Input Dark */
-[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper) {
+<!-- BLOK STYLE BARU UNTUK MEMASTIKAN ELEMENT PLUS INPUT IKUT DARK MODE -->
+<style>
+/* --- PERBAIKAN ELEMENT PLUS INPUT DARK MODE (UNSCOPED) --- */
+/* Menghapus scoped agar selektor data-bs-theme bekerja pada internal third-party lib */
+[data-bs-theme="dark"] #kt_modal_role .metronic-input .el-input__wrapper {
     background-color: #1b1b29 !important; 
-    color: #ffffff;
-    border-color: #323248 !important;
+    box-shadow: 0 0 0 1px #323248 inset !important; /* Gunakan box shadow untuk border */
 }
-[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper.is-focus) {
-    border-color: #F68B1E !important;
+
+[data-bs-theme="dark"] #kt_modal_role .metronic-input .el-input__wrapper.is-focus {
     background-color: #151521 !important;
+    box-shadow: 0 0 0 1px #F68B1E inset !important;
 }
-[data-bs-theme="dark"] :deep(.el-input__inner) { color: #ffffff; }
-[data-bs-theme="dark"] .form-control-solid { background-color: #1b1b29 !important; border-color: #323248 !important; color: #ffffff; }
+
+[data-bs-theme="dark"] #kt_modal_role .metronic-input .el-input__inner { 
+    color: #ffffff !important; 
+    -webkit-text-fill-color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] #kt_modal_role .metronic-input.is-disabled .el-input__wrapper {
+    background-color: #151521 !important; 
+    box-shadow: 0 0 0 1px #2b2b40 inset !important;
+}
+
+[data-bs-theme="dark"] #kt_modal_role .metronic-input.is-disabled .el-input__inner {
+    color: #6d6d80 !important;
+    -webkit-text-fill-color: #6d6d80 !important;
+}
 </style>

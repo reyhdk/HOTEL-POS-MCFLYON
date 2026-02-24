@@ -11,7 +11,7 @@
         </div>
 
         <div class="modal-body scroll-y px-5 pb-5 pt-2">
-          <!-- Menghapus v-on:submit.prevent karena parser bermasalah dengan modifier dot (.) -->
+          <!-- Form Input -->
           <el-form :model="formData" :rules="rules" ref="formRef" label-position="top" class="compact-form">
             
             <div class="row g-5">
@@ -73,6 +73,16 @@
                             </el-form-item>
                         </div>
                     </div>
+
+                    <!-- INPUT BARU: ESTIMASI WAKTU MASAK -->
+                    <el-form-item prop="cooking_estimation_time" label="Estimasi Masak (Menit)" class="mb-3">
+                        <div class="d-flex align-items-center">
+                            <i class="ki-duotone ki-timer fs-2 text-gray-500 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            <el-input v-model="formData.cooking_estimation_time" type="number" placeholder="Contoh: 15" class="metronic-input fw-bold" />
+                        </div>
+                        <div class="form-text fs-9 text-muted mt-1">Digunakan untuk menghitung antrian dapur.</div>
+                    </el-form-item>
+
                 </div>
 
                 <!-- KOLOM KANAN: Resep & Kalkulasi HPP -->
@@ -106,7 +116,6 @@
                                     </td>
                                 </tr>
                                 <tr v-for="(item, index) in formData.ingredients" :key="index" class="animate-fade-in">
-                                    <!-- 1. PILIH KATEGORI GUDANG -->
                                     <td class="ps-2">
                                         <el-select 
                                             v-model="item.category_filter" 
@@ -121,8 +130,6 @@
                                             />
                                         </el-select>
                                     </td>
-
-                                    <!-- 2. PILIH ITEM (DIFILTER BERDASARKAN KATEGORI) -->
                                     <td>
                                         <el-select 
                                             v-model="item.warehouse_item_id" 
@@ -143,7 +150,6 @@
                                             </el-option>
                                         </el-select>
                                     </td>
-
                                     <td>
                                         <el-input 
                                             v-model="item.quantity" 
@@ -154,7 +160,6 @@
                                             class="metronic-input text-center h-35px" />
                                     </td>
                                     <td>
-                                        <!-- Dropdown Satuan dengan Logika Validasi -->
                                         <el-select 
                                             v-model="item.unit_label" 
                                             placeholder="Satuan" 
@@ -186,7 +191,7 @@
                         <div class="card-body p-4">
                             <div class="row text-center">
                                 <div class="col-4 border-end border-warning border-opacity-25">
-                                    <div class="fs-8 text-gray-600 fw-semibold text-uppercase">Total HPP (Modal)</div>
+                                    <div class="fs-8 text-gray-600 fw-semibold text-uppercase">Total HPP</div>
                                     <div class="fs-4 fw-bolder text-gray-900 mt-1">{{ formatCurrency(totalHPP) }}</div>
                                 </div>
                                 <div class="col-4 border-end border-warning border-opacity-25">
@@ -194,7 +199,7 @@
                                     <div class="fs-4 fw-bolder text-gray-900 mt-1">{{ formatCurrency(formData.price || 0) }}</div>
                                 </div>
                                 <div class="col-4">
-                                    <div class="fs-8 text-gray-600 fw-semibold text-uppercase">Estimasi Profit</div>
+                                    <div class="fs-8 text-gray-600 fw-semibold text-uppercase">Margin</div>
                                     <div class="fs-4 fw-bolder mt-1" :class="profitValue > 0 ? 'text-success' : 'text-danger'">
                                         {{ formatCurrency(profitValue) }}
                                     </div>
@@ -206,27 +211,11 @@
                         </div>
                     </div>
                     
-                    <div class="alert alert-dismissible bg-light-primary border border-primary border-dashed d-flex flex-column flex-sm-row p-3 mt-3">
-                         <i class="ki-duotone ki-information-5 fs-2hx text-primary me-4 mb-5 mb-sm-0"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-                         <div class="d-flex flex-column pe-0 pe-sm-10">
-                            <h5 class="mb-1">Info Konversi Satuan</h5>
-                            <span class="fs-8 text-gray-600">
-                                <ul class="mb-0 ps-3">
-                                    <li><b>Berat:</b> Kg, Gram, Ons (100g), Pon (500g), Kwintal.</li>
-                                    <li><b>Volume:</b> Liter, ML, SDM (15ml), SDT (5ml), Cup (250ml).</li>
-                                    <li><b>Jumlah:</b> Pcs, Lusin (12), Kodi (20), Gross (144).</li>
-                                    <li class="mt-2 text-dark fw-bold">Tips: Anda bisa menggunakan angka desimal. <br/>Contoh: Input <b>0.1 Botol</b> jika hanya menggunakan sebagian kecil.</li>
-                                </ul>
-                            </span>
-                         </div>
-                    </div>
-
                 </div>
             </div>
 
             <div class="d-flex justify-content-end align-items-center mt-5 pt-3 border-top border-gray-200">
                  <button type="button" class="btn btn-sm btn-light me-3 fw-bold text-gray-700 px-5" data-bs-dismiss="modal">Batal</button>
-                 <!-- Mengubah type submit menjadi button dan menggunakan @click untuk menghindari isu modifier form -->
                  <button :disabled="loading" class="btn btn-orange fw-bold px-6 shadow-sm hover-elevate" type="button" v-on:click="submit">
                     <span v-if="!loading" class="d-flex align-items-center">
                         Simpan Menu <i class="ki-duotone ki-check-circle fs-2 ms-2 text-white"><span class="path1"></span><span class="path2"></span></i>
@@ -253,7 +242,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 
 // --- Interfaces ---
 interface IngredientInput {
-    category_filter: string; // [BARU] Untuk filter dropdown
+    category_filter: string;
     warehouse_item_id: number | null;
     quantity: number;
     unit_label: string; 
@@ -267,6 +256,7 @@ interface MenuData {
     category: string; 
     price: number; 
     stock: number; 
+    cooking_estimation_time: number; // [UPDATE] Interface Menu Data
     image_url: string | null;
     ingredients?: any[];
 }
@@ -277,6 +267,7 @@ interface FormData {
     category: string; 
     price: number | string; 
     stock: number | string; 
+    cooking_estimation_time: number | string; // [UPDATE] Interface Form Data
     image: File | null; 
     ingredients: IngredientInput[];
 }
@@ -285,7 +276,7 @@ interface WarehouseItem {
     id: number;
     name: string;
     unit: string;
-    category: string; // Pastikan backend mengirim ini
+    category: string;
     cost_price: number;
     current_stock: number;
 }
@@ -293,7 +284,6 @@ interface WarehouseItem {
 const props = defineProps<{ menuData: MenuData | null }>();
 const emit = defineEmits(['menu-updated']);
 
-// --- Refs ---
 const formRef = ref<FormInstance>();
 const modalRef = ref<null | HTMLElement>(null);
 const loading = ref(false);
@@ -302,42 +292,29 @@ const warehouseItems = ref<WarehouseItem[]>([]);
 const isEditMode = computed(() => !!props.menuData);
 const modalTitle = computed(() => isEditMode.value ? 'Edit Menu & Resep' : 'Menu Baru & Resep');
 
+// [UPDATE] Initial Data includes cooking_estimation_time
 const getInitialFormData = (): FormData => ({ 
     id: null, 
     name: "", 
     category: "", 
     price: "", 
     stock: "", 
+    cooking_estimation_time: 10, // Default 10 menit
     image: null,
     ingredients: [] 
 });
 
 const formData = ref<FormData>(getInitialFormData());
 
-// --- Helper: Advanced Unit Conversion Logic ---
-
-// 1. Normalisasi string satuan agar tidak case-sensitive
-const normalizeUnit = (u: string) => u ? u.toLowerCase().trim() : '';
-
-// 2. Kategori Satuan & Faktor Konversi
+// --- Helper: Unit Conversion Logic (Sama seperti sebelumnya) ---
 const unitFactors: Record<string, number> = {
-    // Berat (Base: Gram)
-    'kg': 1000, 'kilo': 1000, 'kilogram': 1000,
-    'hg': 100, 'ons': 100, 'pon': 500, 'kwintal': 100000, 'ton': 1000000,
-    'gram': 1, 'gr': 1, 'g': 1, 'mg': 0.001,
-
-    // Volume (Base: ML)
-    'liter': 1000, 'ltr': 1000, 'l': 1000,
-    'ml': 1, 'cc': 1, 'milliliter': 1,
-    'sdt': 5, 'tsp': 5, 'sdm': 15, 'tbsp': 15, 'cup': 250, 'gelas': 250,
-
-    // Hitung (Base: Pcs)
-    'pcs': 1, 'pc': 1, 'buah': 1, 'biji': 1, 'unit': 1, 'btl': 1, 'botol': 1, 'bungkus': 1, 'bks': 1, 'sachet': 1, 'pack': 1, 'pax': 1,
-    'lusin': 12, 'dozen': 12, 'kodi': 20, 'gross': 144, 'rim': 500
+    'kg': 1000, 'kilo': 1000, 'kilogram': 1000, 'hg': 100, 'ons': 100, 'pon': 500, 'kwintal': 100000, 'ton': 1000000, 'gram': 1, 'gr': 1, 'g': 1, 'mg': 0.001,
+    'liter': 1000, 'ltr': 1000, 'l': 1000, 'ml': 1, 'cc': 1, 'milliliter': 1, 'sdt': 5, 'tsp': 5, 'sdm': 15, 'tbsp': 15, 'cup': 250, 'gelas': 250,
+    'pcs': 1, 'pc': 1, 'buah': 1, 'biji': 1, 'unit': 1, 'btl': 1, 'botol': 1, 'bungkus': 1, 'bks': 1, 'sachet': 1, 'pack': 1, 'pax': 1, 'lusin': 12, 'dozen': 12, 'kodi': 20, 'gross': 144, 'rim': 500
 };
 
-// 3. Tentukan kategori unit
-const getUnitCategory = (unit: string): 'weight' | 'volume' | 'count' | 'unknown' => {
+const normalizeUnit = (u: string) => u ? u.toLowerCase().trim() : '';
+const getUnitCategory = (unit: string) => {
     const u = normalizeUnit(unit);
     if (['kg', 'kilo', 'kilogram', 'hg', 'ons', 'pon', 'kwintal', 'ton', 'gram', 'gr', 'g', 'mg'].includes(u)) return 'weight';
     if (['liter', 'ltr', 'l', 'ml', 'cc', 'milliliter', 'sdt', 'tsp', 'sdm', 'tbsp', 'cup', 'gelas'].includes(u)) return 'volume';
@@ -345,88 +322,65 @@ const getUnitCategory = (unit: string): 'weight' | 'volume' | 'count' | 'unknown
     return 'unknown';
 }
 
-// 4. Daftar Satuan untuk Dropdown
 const getAvailableUnits = (baseUnit: string) => {
     if (!baseUnit) return [];
     const category = getUnitCategory(baseUnit);
     let options: string[] = [];
-    
     if (category === 'weight') options = ['Kg', 'Gram', 'Ons (100g)', 'Pon (500g)', 'Kwintal'];
     else if (category === 'volume') options = ['Liter', 'ML', 'SDM (15ml)', 'SDT (5ml)', 'Cup (250ml)'];
     else if (category === 'count') options = ['Pcs', 'Lusin (12)', 'Kodi (20)', 'Gross (144)'];
     else return [baseUnit];
-
     const baseNormalized = normalizeUnit(baseUnit);
-    const exists = options.some(opt => normalizeUnit(opt).includes(baseNormalized) || normalizeUnit(opt) === baseNormalized);
-    if (!exists) options.unshift(baseUnit);
-
+    if (!options.some(opt => normalizeUnit(opt).includes(baseNormalized) || normalizeUnit(opt) === baseNormalized)) options.unshift(baseUnit);
     return options;
 }
 
-// 5. Rumus Konversi
 const convertToBase = (qty: number, fromUnitLabel: string, baseUnit: string): number => {
     if (!qty || !fromUnitLabel || !baseUnit) return qty;
     const cleanFrom = normalizeUnit(fromUnitLabel.split('(')[0]); 
     const cleanBase = normalizeUnit(baseUnit);
     if (cleanFrom === cleanBase) return qty;
-
     const factorFrom = unitFactors[cleanFrom];
     const factorBase = unitFactors[cleanBase];
-
     if (factorFrom && factorBase && getUnitCategory(cleanFrom) === getUnitCategory(cleanBase)) {
         return (qty * factorFrom) / factorBase;
     }
     return qty;
 }
 
-// --- Data Fetching ---
 const fetchWarehouseItems = async () => {
     try {
         const response = await axios.get('/warehouse/items?per_page=100&status=active'); 
         warehouseItems.value = response.data.data;
-    } catch (e) {
-        console.error("Gagal ambil data gudang", e);
-    }
+    } catch (e) { console.error("Gagal ambil data gudang", e); }
 };
 
 onMounted(() => { fetchWarehouseItems(); });
 
-// --- Filter Categories Logic ---
-const uniqueItemCategories = computed(() => {
-    // Ambil kategori unik dari list barang gudang
-    const cats = warehouseItems.value.map(i => i.category);
-    return [...new Set(cats)].filter(Boolean).sort();
-});
-
-const getItemsByCategory = (category: string) => {
-    if (!category) return [];
-    return warehouseItems.value.filter(i => i.category === category);
-};
+const uniqueItemCategories = computed(() => [...new Set(warehouseItems.value.map(i => i.category))].filter(Boolean).sort());
+const getItemsByCategory = (category: string) => category ? warehouseItems.value.filter(i => i.category === category) : [];
 
 const onCategoryChange = (index: number) => {
-    // Reset item saat kategori berubah agar tidak rancu
     formData.value.ingredients[index].warehouse_item_id = null;
     formData.value.ingredients[index].base_unit = '';
     formData.value.ingredients[index].unit_label = '';
     formData.value.ingredients[index].cost_price = 0;
 };
 
-// --- Watcher for Edit Mode ---
+// --- Watcher for Edit Mode (UPDATE: Populate cooking_estimation_time) ---
 watch(() => props.menuData, (newVal) => {
   if (newVal) {
     formData.value = { 
         ...newVal, 
         price: String(newVal.price), 
         stock: String(newVal.stock), 
+        cooking_estimation_time: newVal.cooking_estimation_time || 10, // Populate
         image: null,
         ingredients: newVal.ingredients ? newVal.ingredients.map((i: any) => {
-            // Cari item di gudang untuk mendapatkan kategorinya (Auto-fill kategori saat edit)
             const matchedItem = warehouseItems.value.find(w => w.id === i.id);
-            const category = matchedItem ? matchedItem.category : '';
-
             return {
                 warehouse_item_id: i.id,
-                category_filter: category, // SET KATEGORI DISINI
+                category_filter: matchedItem ? matchedItem.category : '',
                 quantity: parseFloat(i.pivot.quantity), 
                 unit_label: i.unit, 
                 base_unit: i.unit,
@@ -442,21 +396,10 @@ watch(() => props.menuData, (newVal) => {
   }
 });
 
-// --- Ingredient UI Logic ---
 const addIngredientRow = () => {
-    formData.value.ingredients.push({
-        category_filter: '', // Start empty
-        warehouse_item_id: null,
-        quantity: 0,
-        unit_label: '',
-        base_unit: '',
-        cost_price: 0
-    });
+    formData.value.ingredients.push({ category_filter: '', warehouse_item_id: null, quantity: 0, unit_label: '', base_unit: '', cost_price: 0 });
 };
-
-const removeIngredientRow = (index: number) => {
-    formData.value.ingredients.splice(index, 1);
-};
+const removeIngredientRow = (index: number) => { formData.value.ingredients.splice(index, 1); };
 
 const onIngredientSelect = (id: number, index: number) => {
     const selected = warehouseItems.value.find(i => i.id === id);
@@ -467,58 +410,40 @@ const onIngredientSelect = (id: number, index: number) => {
     }
 };
 
-// --- Auto Calculate Stock Logic ---
 const calculateAutoStock = () => {
     let minStock = Infinity;
     let hasIngredients = false;
-
     formData.value.ingredients.forEach(ing => {
         if (ing.warehouse_item_id && ing.quantity > 0) {
             hasIngredients = true;
             const wItem = warehouseItems.value.find(x => x.id === ing.warehouse_item_id);
-            
             if (wItem) {
                 const usageInBase = convertToBase(ing.quantity, ing.unit_label, wItem.unit);
                 if (usageInBase > 0) {
                     const possiblePortions = Math.floor(wItem.current_stock / usageInBase);
-                    if (possiblePortions < minStock) {
-                        minStock = possiblePortions;
-                    }
+                    if (possiblePortions < minStock) minStock = possiblePortions;
                 }
             }
         }
     });
-
     if (hasIngredients && minStock !== Infinity) {
         formData.value.stock = minStock;
-        Swal.fire({
-            toast: true, position: 'top-end', icon: 'success', 
-            title: `Stok Max: ${minStock} porsi`, showConfirmButton: false, timer: 2000 
-        });
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `Stok Max: ${minStock} porsi`, showConfirmButton: false, timer: 2000 });
     } else {
         Swal.fire({ icon: 'warning', text: hasIngredients ? 'Stok bahan tidak cukup.' : 'Tambahkan bahan baku terlebih dahulu.' });
     }
 }
 
-// --- Cost Calculations ---
 const calculateRowSubtotal = (item: IngredientInput) => {
     const qtyBase = convertToBase(item.quantity, item.unit_label, item.base_unit);
     return (qtyBase || 0) * (item.cost_price || 0);
 };
 
-const totalHPP = computed(() => {
-    return formData.value.ingredients.reduce((acc, item) => acc + calculateRowSubtotal(item), 0);
-});
-
-const profitValue = computed(() => {
-    const price = parseFloat(String(formData.value.price)) || 0;
-    return price - totalHPP.value;
-});
-
+const totalHPP = computed(() => formData.value.ingredients.reduce((acc, item) => acc + calculateRowSubtotal(item), 0));
+const profitValue = computed(() => (parseFloat(String(formData.value.price)) || 0) - totalHPP.value);
 const profitMargin = computed(() => {
     const price = parseFloat(String(formData.value.price)) || 0;
-    if (price === 0) return 0;
-    return Math.round((profitValue.value / price) * 100);
+    return price === 0 ? 0 : Math.round((profitValue.value / price) * 100);
 });
 
 const formatCurrency = (value: number | string) => {
@@ -526,7 +451,6 @@ const formatCurrency = (value: number | string) => {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(val || 0);
 };
 
-// --- Form Submit ---
 const handleImageChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
   if (target.files && target.files[0]) {
@@ -541,16 +465,17 @@ const handleImageChange = (event: Event) => {
 
 const removeImage = () => { imagePreview.value = null; formData.value.image = null; };
 
+// [UPDATE] Rules Validation
 const rules = ref<FormRules>({
   name: [{ required: true, message: "Wajib diisi", trigger: "blur" }],
   category: [{ required: true, message: "Pilih kategori", trigger: "change" }],
   price: [{ required: true, message: "Wajib diisi", trigger: "blur" }],
   stock: [{ required: true, message: "Wajib diisi", trigger: "blur" }], 
+  cooking_estimation_time: [{ required: true, message: "Wajib diisi", trigger: "blur" }], 
 });
 
 const submit = () => {
   if (!formRef.value) return;
-  
   formRef.value.validate(async (valid: boolean) => {
     if (valid) {
       loading.value = true;
@@ -559,6 +484,9 @@ const submit = () => {
       data.append('category', formData.value.category);
       data.append('price', String(formData.value.price));
       data.append('stock', String(formData.value.stock));
+      // [UPDATE] Append estimation time
+      data.append('cooking_estimation_time', String(formData.value.cooking_estimation_time));
+
       if (formData.value.image) data.append('image', formData.value.image);
 
       formData.value.ingredients.forEach((item, index) => {
@@ -583,64 +511,84 @@ const submit = () => {
                 emit('menu-updated');
             });
       } catch (error: any) {
-        console.error(error);
         Swal.fire({ text: "Gagal menyimpan data.", icon: "error" });
       } finally {
         loading.value = false;
       }
     } else {
         Swal.fire({ text: "Mohon lengkapi formulir.", icon: "warning" });
-        return; 
     }
   });
 };
 </script>
 
 <style scoped>
-/* ========================
-   THEME COLORS & UTILS
-   ======================== */
+/* STYLES KHUSUS KOMPONEN (Light Mode Default) */
 .text-orange { color: #F68B1E !important; }
 .btn-orange { background-color: #F68B1E; color: white; border: none; }
 .btn-orange:hover { background-color: #d97814; color: white; }
-
-.image-upload-box {
-    height: 180px; 
-    background-size: cover; background-position: center;
-    transition: all 0.2s ease;
-}
+.image-upload-box { height: 180px; background-size: cover; background-position: center; transition: all 0.2s ease; }
 .image-upload-box:hover { border-color: #F68B1E !important; }
 .image-upload-box.has-image { border-style: solid; }
-
 .hover-overlay { opacity: 0; transition: opacity 0.2s ease; }
 .image-upload-box:hover .hover-overlay { opacity: 1; }
 .backdrop-blur { backdrop-filter: blur(2px); }
-
-/* Compact inputs for table */
 .h-35px { height: 35px !important; }
 .form-select-sm { padding-top: 0.25rem; padding-bottom: 0.25rem; font-size: 0.9rem; }
 
-:deep(.metronic-input .el-input__wrapper), 
-:deep(.metronic-input .el-textarea__inner) {
-    background-color: #F9F9F9;
+:deep(.metronic-input .el-input__wrapper), :deep(.metronic-input .el-textarea__inner) { 
+    background-color: #F9F9F9; 
     box-shadow: none !important; 
     border: 1px solid transparent; 
     border-radius: 0.5rem; 
-    padding: 6px 12px;
-    transition: all 0.2s;
+    padding: 6px 12px; 
+    transition: all 0.2s; 
 }
-
-:deep(.metronic-input .el-input__wrapper.is-focus) {
-    background-color: #ffffff;
-    border-color: #F68B1E !important;
-    box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1) !important;
+:deep(.metronic-input .el-input__wrapper.is-focus) { 
+    background-color: #ffffff; 
+    border-color: #F68B1E !important; 
+    box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.1) !important; 
 }
+</style>
 
-/* Dark Mode Support */
+<!-- STYLE GLOBAL (UNSCOPED) UNTUK MENANGKAP ATRIBUT DATA-BS-THEME DARI ROOT/BODY -->
+<style>
+/* ========================
+   GLOBAL DARK MODE (Modal)
+   ======================== */
 [data-bs-theme="dark"] .theme-modal { background-color: #1e1e2d; color: #ffffff; }
-[data-bs-theme="dark"] .text-gray-900 { color: #ffffff !important; }
-[data-bs-theme="dark"] .text-gray-800 { color: #e1e1e8 !important; }
-[data-bs-theme="dark"] .bg-light-subtle { background-color: #1b1b29 !important; border-color: #323248 !important; }
-[data-bs-theme="dark"] .table-row-dashed tr { border-bottom-color: #323248 !important; }
-[data-bs-theme="dark"] :deep(.metronic-input .el-input__wrapper) { background-color: #151521 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .theme-modal .text-gray-900 { color: #ffffff !important; }
+[data-bs-theme="dark"] .theme-modal .text-gray-800 { color: #e1e1e8 !important; }
+[data-bs-theme="dark"] .theme-modal .text-gray-600 { color: #9A9CAE !important; }
+[data-bs-theme="dark"] .theme-modal .bg-light-subtle { background-color: #1b1b29 !important; border-color: #323248 !important; }
+[data-bs-theme="dark"] .theme-modal .table-row-dashed tr { border-bottom-color: #323248 !important; }
+[data-bs-theme="dark"] .theme-modal .border-gray-300 { border-color: #323248 !important; }
+[data-bs-theme="dark"] .theme-modal .border-gray-200 { border-color: #323248 !important; }
+[data-bs-theme="dark"] .theme-modal .bg-body { background-color: #1e1e2d !important; }
+
+/* Override Form Element Plus di Dark Mode */
+[data-bs-theme="dark"] .theme-modal .metronic-input .el-input__wrapper,
+[data-bs-theme="dark"] .theme-modal .metronic-input .el-textarea__inner { 
+    background-color: #151521 !important; 
+    border-color: #323248 !important; 
+    box-shadow: none !important;
+}
+[data-bs-theme="dark"] .theme-modal .metronic-input .el-input__inner { 
+    color: #ffffff !important; 
+}
+
+/* Menangani popup Element Plus (dropdown select) saat dark mode 
+  (Dropdown Element Plus secara default di-render di elemen body, sehingga butuh selector global murni) 
+*/
+[data-bs-theme="dark"] .el-popper.is-light {
+    background-color: #1e1e2d !important;
+    border-color: #323248 !important;
+}
+[data-bs-theme="dark"] .el-popper.is-light .el-popper__arrow::before {
+    background-color: #1e1e2d !important;
+    border-color: #323248 !important;
+}
+[data-bs-theme="dark"] .el-select-dropdown__item { color: #CDCDDE !important; }
+[data-bs-theme="dark"] .el-select-dropdown__item.hover, 
+[data-bs-theme="dark"] .el-select-dropdown__item:hover { background-color: #2b2b40 !important; }
 </style>
