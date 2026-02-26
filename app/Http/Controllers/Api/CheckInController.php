@@ -173,11 +173,15 @@ class CheckInController extends Controller
             // Validasi tanggal untuk booking (mencegah check-in terlalu awal dari jadwal)
             if (!$isWalkIn) {
                 $bookingCheck = Booking::findOrFail($bookingId);
-                $todayStr = Carbon::today('Asia/Jakarta')->format('Y-m-d');
                 
-                if ($bookingCheck->check_in_date > $todayStr) {
+                // PERBAIKAN: Gunakan Carbon untuk memastikan perbandingan hanya mengambil tanggalnya saja tanpa mempedulikan jam
+                $bookingDate = Carbon::parse($bookingCheck->check_in_date)->timezone('Asia/Jakarta')->startOfDay();
+                $today = Carbon::today('Asia/Jakarta')->startOfDay();
+                
+                // Evaluasi menggunakan helper Carbon
+                if ($bookingDate->gt($today)) {
                     return response()->json([
-                        'message' => "Booking ini dijadwalkan untuk tanggal " . Carbon::parse($bookingCheck->check_in_date)->format('d M Y') . ". Belum bisa check-in hari ini."
+                        'message' => "Booking ini dijadwalkan untuk tanggal " . $bookingDate->format('d M Y') . ". Belum bisa check-in hari ini."
                     ], 422);
                 }
             }

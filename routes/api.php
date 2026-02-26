@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\UserCheckInStatusController;
 use App\Http\Controllers\Api\Warehouse\WarehouseItemController;
 use App\Http\Controllers\Api\Warehouse\StockTransactionController;
 use App\Http\Controllers\Api\Warehouse\WarehouseCategoryController;
+use App\Http\Controllers\Api\ChefController; // Import ChefController
 // Guest & Admin Namespace Controllers
 use App\Http\Controllers\Api\Restopos\TableController;
 use App\Http\Controllers\Api\Restopos\TableTypeController;
@@ -169,11 +170,27 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/pos/online-orders-count', [AdminOrderController::class, 'getPendingCount']);
         Route::get('/pos/occupied-rooms', [RoomController::class, 'getOccupiedRoomsForPos']);
         Route::post('/orders', [OrderController::class, 'store']);
-        Route::get('/kitchen/queue', [KitchenController::class, 'getQueueStatus']);
-        Route::get('/kitchen/orders', [KitchenController::class, 'getTodayOrders']); // Ambil data hari ini + paginate
-        Route::get('/kitchen/chefs', [KitchenController::class, 'getChefs']); // Ambil list chef
-        Route::post('/kitchen/orders/{order}/assign', [KitchenController::class, 'assignChef']); // Assign Chef & Waktu
-        Route::patch('/kitchen/orders/{order}/status', [KitchenController::class, 'updateStatus']); // Update status masakan
+        Route::prefix('kitchen')->group(function () {
+            // Queue & Orders
+            Route::get('/queue', [KitchenController::class, 'getQueueStatus']);
+            Route::get('/orders', [KitchenController::class, 'getTodayOrders']);
+            
+            // Chef Assignment (Sekarang pakai database)
+            Route::get('/chefs', [ChefController::class, 'getAvailableChefs']); // ✅ Updated
+            Route::post('/orders/{order}/assign', [KitchenController::class, 'assignChef']);
+            Route::patch('/orders/{order}/status', [KitchenController::class, 'updateStatus']);
+        });
+
+        // ✅ NEW: Chef Management Routes (Admin Only)
+        Route::prefix('chefs')->group(function () {
+            Route::get('/', [ChefController::class, 'index']); // List all chefs
+            Route::get('/statistics', [ChefController::class, 'statistics']); // Stats
+            Route::get('/eligible-users', [ChefController::class, 'getEligibleUsers']); // Users yang bisa jadi chef
+            Route::post('/', [ChefController::class, 'store']); // Add chef
+            Route::put('/{id}', [ChefController::class, 'update']); // Update chef
+            Route::patch('/{id}/toggle-status', [ChefController::class, 'toggleStatus']); // Aktif/nonaktif
+            Route::delete('/{id}', [ChefController::class, 'destroy']); // Delete chef
+        });
     });
 
     Route::prefix('warehouse')->middleware('auth:api')->group(function () {
