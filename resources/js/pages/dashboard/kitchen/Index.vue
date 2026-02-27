@@ -29,7 +29,7 @@
                           <i class="ki-duotone ki-filter-search fs-4 text-gray-500">
                               <span class="path1"></span><span class="path2"></span><span class="path3"></span>
                           </i>
-                          <span class="fs-9 fw-bold text-gray-600 text-uppercase ls-1">Status</span>
+                          <!-- <span class="fs-9 fw-bold text-gray-600 text-uppercase ls-1">Status</span> -->
                       </div>
                   </template>
                   <el-option label="Semua Pesanan" value="" />

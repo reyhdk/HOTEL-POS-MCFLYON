@@ -1,11 +1,12 @@
 <template>
   <div class="d-flex flex-column h-100">
-    <div class="d-flex flex-column flex-md-row gap-3 pb-4 border-bottom mb-4">
+    <!-- Tambahkan align-items-md-center disini -->
+    <div class="d-flex flex-column flex-md-row align-items-md-center gap-3 pb-4 border-bottom mb-4">
       <div class="position-relative flex-grow-1">
         <i class="bi bi-search position-absolute top-50 ms-4 translate-middle-y text-gray-400 fs-6"></i>
         <input type="text" v-model="searchQuery" class="form-control form-control-solid ps-12 rounded-pill border-0 h-45px bg-light" placeholder="Cari menu makanan atau minuman..." />
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex align-items-center gap-2">
         <div class="w-100 w-md-250px">
           <el-select v-model="selectedCategory" placeholder="Semua Kategori" class="w-100 custom-el-select h-45px" clearable>
             <template #prefix><i class="bi bi-funnel text-orange fs-5"></i></template>
@@ -13,8 +14,7 @@
           </el-select>
         </div>
         
-        <!-- FITUR BARU: Tombol Refresh Konten (sama dengan OnlineOrdersTab) -->
-        <button @click="fetchMenus" class="btn btn-light-primary btn-icon w-45px h-45px rounded-3 shadow-sm hover-elevate-up" title="Refresh Menu" :disabled="loading">
+        <button @click="fetchMenus" class="btn btn-light-primary btn-icon w-45px h-45px rounded-3 shadow-sm hover-elevate-up flex-shrink-0" title="Refresh Menu" :disabled="loading">
           <i class="bi bi-arrow-clockwise fs-2" :class="{ 'spin': loading }"></i>
         </button>
       </div>
@@ -128,14 +128,18 @@ onMounted(() => {
 .btn-orange { background: #ff6b00; color: white; border: none; transition: all 0.2s; }
 .btn-orange:hover { background: #e05e00; transform: scale(1.1); }
 
-/* Custom Light Blue Button (used for refresh) */
+/* Custom Light Blue Button */
 .btn-light-orange { background-color: #f0f7ff; color: #0d6efd; border: 1px solid transparent; transition: all 0.3s; }
 .btn-light-orange:hover, .btn-light-orange:active { background-color: #0d6efd; color: white; border-color: #0d6efd; }
 .btn-light-orange .bi { transition: color 0.3s; }
 
-/* Dark mode tweaks for the refresh button */
-[data-bs-theme="dark"] .btn-light-orange { background-color: rgba(13,110,253,0.12) !important; color: #74b6ff !important; border-color: transparent !important; }
-[data-bs-theme="dark"] .btn-light-orange:hover, [data-bs-theme="dark"] .btn-light-orange:active { background-color: #0d6efd !important; color: white !important; border-color: #0d6efd !important; }
+/* FIX ALIGNMENT EL-SELECT */
+:deep(.custom-el-select .el-select__wrapper) {
+    min-height: 45px !important;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+}
 
 .hover-elevate-up:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; }
 .group-hover:hover .group-hover-scale { transform: scale(1.1); }
@@ -147,6 +151,9 @@ onMounted(() => {
 
 /* Adaptive Light/Dark Mode */
 .form-control-solid { background-color: #f5f5f5; border-color: #e5e7eb; color: #1f2937; }
+[data-bs-theme="dark"] .btn-light-orange { background-color: rgba(13,110,253,0.12) !important; color: #74b6ff !important; border-color: transparent !important; }
+[data-bs-theme="dark"] .btn-light-orange:hover, [data-bs-theme="dark"] .btn-light-orange:active { background-color: #0d6efd !important; color: white !important; border-color: #0d6efd !important; }
+
 [data-bs-theme="dark"] .form-control-solid {
     background-color: #1b1b29 !important;
     border-color: #323248 !important;

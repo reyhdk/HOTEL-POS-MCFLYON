@@ -5,33 +5,32 @@
     <div class="flex-lg-row-fluid">
       <div class="card card-custom border-0 shadow-lg rounded-4 overflow-hidden h-100">
         
-        <!-- Header Navigasi Tab -->
+        <!-- Header Navigasi Tab (Sekarang Icon Only & Hemat Ruang) -->
         <div class="card-header border-0 pt-6 px-8 bg-adaptive-light z-index-1 pb-0 min-h-auto">
-            <div class="d-flex align-items-center justify-content-between w-100 overflow-auto">
+            <div class="d-flex align-items-center justify-content-between w-100 overflow-auto pb-3">
               <ul class="nav nav-pills nav-pills-custom gap-3 border-0 flex-nowrap">
                 <li class="nav-item">
-                  <a href="#" :class="getTabClass('menu')" @click.prevent="activeTab = 'menu'">
-                    <i class="bi bi-grid-fill fs-4 me-2" :class="getIconClass('menu')"></i> Menu
+                  <a href="#" :class="getTabClass('menu')" @click.prevent="activeTab = 'menu'" title="Menu & POS">
+                    <i class="bi bi-grid-fill fs-3" :class="getIconClass('menu')"></i>
                   </a>
                 </li>
                 <li class="nav-item position-relative">
-                  <a href="#" :class="getTabClass('online')" @click.prevent="activeTab = 'online'">
-                    <i class="bi bi-cloud-download-fill fs-4 me-2" :class="getIconClass('online')"></i>
-                    Pesanan Online
-                    <span v-if="onlineOrdersCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-2 border-white shadow-sm">
+                  <a href="#" :class="getTabClass('online')" @click.prevent="activeTab = 'online'" title="Pesanan Online">
+                    <i class="bi bi-cloud-download-fill fs-3" :class="getIconClass('online')"></i>
+                    <span v-if="onlineOrdersCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-2 border-white shadow-sm px-2">
                       {{ onlineOrdersCount }}
                     </span>
                   </a>
                 </li>
                 <li class="nav-item">
-                  <a href="#" :class="getTabClass('tables')" @click.prevent="activeTab = 'tables'">
-                    <i class="bi bi-layout-three-columns fs-4 me-2" :class="getIconClass('tables')"></i> Kelola Meja
+                  <a href="#" :class="getTabClass('tables')" @click.prevent="activeTab = 'tables'" title="Kelola Meja">
+                    <i class="bi bi-layout-three-columns fs-3" :class="getIconClass('tables')"></i>
                   </a>
                 </li>
                 <!-- Tab Estimasi Dapur -->
                 <li class="nav-item">
-                  <a href="#" :class="getTabClass('estimasi')" @click.prevent="activeTab = 'estimasi'">
-                    <i class="bi bi-stopwatch-fill fs-4 me-2" :class="getIconClass('estimasi')"></i> Dapur & Estimasi
+                  <a href="#" :class="getTabClass('estimasi')" @click.prevent="activeTab = 'estimasi'" title="Dapur & Estimasi">
+                    <i class="bi bi-stopwatch-fill fs-3" :class="getIconClass('estimasi')"></i>
                   </a>
                 </li>
               </ul>
@@ -54,24 +53,37 @@
     </div>
 
     <!-- Kolom Kanan: Keranjang / POS (Sidebar) -->
-    <!-- PERBAIKAN: Menghapus v-if="activeTab !== 'estimasi'" agar sidebar selalu muncul -->
     <div class="flex-column-auto w-100 w-xl-400px transition-all">
        <div class="card card-custom border-0 shadow-lg rounded-4 h-100 position-sticky top-0 bg-adaptive-light">
+          
+          <!-- Loading Overlay Spinner menutupi seluruh Card Pesanan Baru -->
+          <div v-if="isRefreshing" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center rounded-4 overlay-bg" style="z-index: 100;">
+              <div class="spinner-border text-orange mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+              <span class="fw-bolder fs-5 text-gray-800">Memperbarui Data...</span>
+          </div>
+
           <div class="card-header border-0 pt-6 px-7 pb-0 bg-adaptive-light">
              <div class="w-100 d-flex justify-content-between align-items-start">
                 <h3 class="card-title fw-bolder text-adaptive-dark flex-column align-items-start">
                   <span class="fs-4">Pesanan Baru</span>
                   <span class="text-gray-400 fs-8 mt-1 fw-bold">Items dalam keranjang</span>
                 </h3>
-                <div class="card-toolbar">
-                  <button @click="clearCart" class="btn btn-icon btn-sm btn-light-danger rounded-circle shadow-sm hover-scale" title="Kosongkan"><i class="bi bi-trash-fill"></i></button>
+                <div class="card-toolbar d-flex gap-2">
+                  <!-- Tombol Refresh Tujuan Pesanan -->
+                  <button @click="fetchGlobalData" class="btn btn-icon btn-sm btn-light-primary rounded-circle shadow-sm hover-scale transition-all" title="Refresh Tujuan Pesanan" :disabled="isRefreshing">
+                    <i class="bi bi-arrow-clockwise" :class="{ 'spin': isRefreshing }"></i>
+                  </button>
+                  <!-- Tombol Hapus Keranjang -->
+                  <button @click="clearCart" class="btn btn-icon btn-sm btn-light-danger rounded-circle shadow-sm hover-scale" title="Kosongkan Keranjang">
+                    <i class="bi bi-trash-fill"></i>
+                  </button>
                 </div>
              </div>
           </div>
 
           <div class="card-body px-7 pt-4 d-flex flex-column h-100">
              <!-- Pilihan Lokasi (Meja/Kamar) -->
-             <div class="mb-6 bg-light p-4 rounded-4 border border-dashed border-gray-300">
+             <div class="mb-6 bg-light p-4 rounded-4 border border-dashed border-gray-300 position-relative">
                 <label class="form-label fs-8 fw-bold text-uppercase text-gray-500 mb-3 d-block">Tujuan Pesanan</label>
                 <el-tabs v-model="deliveryType" class="compact-tabs mb-3 w-100">
                    <el-tab-pane label="Kamar Hotel" name="room"></el-tab-pane>
@@ -145,7 +157,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import ApiService from "@/core/services/ApiService"; 
 import Swal from "sweetalert2";
 import { useThemeStore } from "@/stores/theme";
@@ -156,11 +168,9 @@ import OnlineOrdersTab from "./components/OnlineOrdersTab.vue";
 import TablesTab from "./components/TablesTab.vue";
 import EstimasiTab from "./components/EstimasiTab.vue";
 
-// Tipe Tab yang valid
 const themeStore = useThemeStore();
 const activeTab = ref<'menu' | 'online' | 'tables' | 'estimasi'>('menu');
 
-// Logika Switch Component
 const activeComponent = computed(() => {
     switch(activeTab.value) {
         case 'menu': return MenuTab;
@@ -179,6 +189,12 @@ const occupiedRooms = ref<any[]>([]);
 const tables = ref<any[]>([]);
 const onlineOrdersCount = ref(0);
 const processing = ref(false); 
+const isRefreshing = ref(false); 
+
+// Tonton perubahan tab, jika berubah, refresh data di sidebar pesanan baru
+watch(activeTab, () => {
+    fetchGlobalData();
+});
 
 const addToCart = (menu: any) => {
     const item = cart.value.find(i => i.menu_id === menu.id);
@@ -197,7 +213,6 @@ const importOrderToCart = (order: any) => {
     if(order.room_id) { deliveryType.value = 'room'; selectedLocationId.value = order.room_id; }
     else if(order.table_id) { deliveryType.value = 'table'; selectedLocationId.value = order.table_id; }
     
-    // Auto switch ke menu tab untuk checkout
     activeTab.value = 'menu';
 };
 
@@ -256,6 +271,7 @@ const submitOrder = async () => {
 };
 
 const fetchGlobalData = async () => {
+    isRefreshing.value = true;
     try {
         const [roomsRes, tablesRes] = await Promise.all([
             ApiService.get("/pos/occupied-rooms"),
@@ -263,12 +279,16 @@ const fetchGlobalData = async () => {
         ]);
         occupiedRooms.value = roomsRes.data || [];
         tables.value = tablesRes.data || [];
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error(e); 
+    } finally {
+        setTimeout(() => { isRefreshing.value = false; }, 500); 
+    }
 };
 
 const getTabClass = (tabName: string) => {
     const isActive = activeTab.value === tabName;
-    const common = "nav-link d-flex align-items-center px-6 py-3 rounded-pill fw-bold transition-all";
+    const common = "nav-link d-flex align-items-center justify-content-center w-50px h-50px rounded-circle fw-bold transition-all p-0";
     return isActive ? `${common} bg-orange text-white shadow-md` : `${common} bg-light text-gray-600 hover-scale`;
 };
 const getIconClass = (tabName: string) => activeTab.value === tabName ? "text-white" : "text-gray-500";
@@ -287,6 +307,16 @@ onMounted(() => { fetchGlobalData(); setInterval(fetchGlobalData, 30000); });
 .anim-fade-in { animation: fadeIn 0.5s ease forwards; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+/* Animasi Spin untuk icon refresh */
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* Overlay Background untuk Loading Card */
+.overlay-bg {
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(2px);
+}
+
 /* Adaptive Light/Dark Mode Classes */
 .bg-adaptive-light { background-color: #ffffff; }
 .bg-adaptive-lighter { background-color: #f5f5f5; }
@@ -300,6 +330,9 @@ onMounted(() => { fetchGlobalData(); setInterval(fetchGlobalData, 30000); });
 }
 [data-bs-theme="dark"] .bg-adaptive-lighter {
     background-color: #2b2b40 !important;
+}
+[data-bs-theme="dark"] .overlay-bg {
+    background-color: rgba(30, 30, 45, 0.8) !important;
 }
 [data-bs-theme="dark"] .text-adaptive-dark {
     color: #ffffff !important;

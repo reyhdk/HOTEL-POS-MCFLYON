@@ -2,7 +2,8 @@
   <div class="d-flex flex-column h-100">
     <div class="d-flex flex-column gap-3 mb-4">
         
-        <div class="d-flex flex-column flex-md-row gap-3 w-100">
+        <!-- Tambahkan align-items-md-center disini -->
+        <div class="d-flex flex-column flex-md-row align-items-md-center gap-3 w-100">
             <div class="position-relative flex-grow-1">
                 <i class="bi bi-search position-absolute top-50 ms-4 translate-middle-y text-gray-400 fs-6"></i>
                 <input type="text" v-model="searchQuery" class="form-control form-control-solid ps-12 rounded-pill border-0 h-45px bg-light" placeholder="Cari nama meja..." />
@@ -26,13 +27,13 @@
         </div>
 
         <div class="d-flex gap-3">
-             <button @click="openModalCreate" class="btn btn-orange rounded-pill px-5 shadow-sm hover-elevate-up fw-bold d-flex align-items-center gap-2 h-45px flex-grow-1 flex-md-grow-0">
+             <button @click="openModalCreate" class="btn btn-orange rounded-pill px-5 shadow-sm hover-elevate-up fw-bold d-flex align-items-center justify-content-center gap-2 h-45px flex-grow-1 flex-md-grow-0">
                 <i class="bi bi-plus-lg fs-4"></i> Tambah Meja
             </button>
-            <button @click="openTypeModal" class="btn btn-light-primary rounded-pill px-5 shadow-sm hover-elevate-up fw-bold d-flex align-items-center gap-2 h-45px flex-grow-1 flex-md-grow-0">
+            <button @click="openTypeModal" class="btn btn-light-primary rounded-pill px-5 shadow-sm hover-elevate-up fw-bold d-flex align-items-center justify-content-center gap-2 h-45px flex-grow-1 flex-md-grow-0">
                 <i class="bi bi-gear-fill fs-4"></i> Kelola Tipe
             </button>
-            <button @click="refreshTables" class="btn btn-light-primary btn-icon w-45px h-45px rounded-3 shadow-sm hover-elevate-up" title="Refresh Data" :disabled="loading">
+            <button @click="refreshTables" class="btn btn-light-primary btn-icon w-45px h-45px rounded-3 shadow-sm hover-elevate-up flex-shrink-0" title="Refresh Data" :disabled="loading">
                 <i class="bi bi-arrow-clockwise fs-2" :class="{ 'spin': loading }"></i>
             </button>
         </div>
@@ -664,6 +665,14 @@ onMounted(() => {
 .btn-light-orange { background-color: #f0f7ff; color: #0d6efd; border: 1px solid transparent; transition: all 0.3s; }
 .btn-light-orange:hover, .btn-light-orange:active { background-color: #0d6efd; color: white; border-color: #0d6efd; }
 .btn-light-orange .bi { transition: color 0.3s; }
+
+/* FIX ALIGNMENT EL-SELECT */
+:deep(.custom-el-select .el-select__wrapper) {
+    min-height: 45px !important;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+}
 
 /* Dark mode tweaks for the refresh button */
 [data-bs-theme="dark"] .btn-light-orange { background-color: rgba(13,110,253,0.12) !important; color: #74b6ff !important; border-color: transparent !important; }

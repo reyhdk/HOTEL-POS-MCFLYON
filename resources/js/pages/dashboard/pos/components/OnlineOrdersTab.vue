@@ -1,6 +1,7 @@
 <template>
   <div class="d-flex flex-column h-100">
-    <div class="d-flex flex-column flex-md-row gap-3 pb-4 border-bottom mb-4">
+    <!-- Tambahkan align-items-md-center disini -->
+    <div class="d-flex flex-column flex-md-row align-items-md-center gap-3 pb-4 border-bottom mb-4">
       <div class="position-relative flex-grow-1">
         <i class="bi bi-search position-absolute top-50 ms-4 translate-middle-y text-gray-400 fs-6"></i>
         <input type="text" v-model="searchQuery" class="form-control form-control-solid ps-12 rounded-pill border-0 h-45px bg-light" placeholder="Cari ID Pesanan, Tamu atau No. Kamar..." />
@@ -16,7 +17,7 @@
         </el-select>
       </div>
       <div class="d-flex gap-2">
-        <button @click="refreshOrders" class="btn btn-light-primary btn-icon w-45px h-45px rounded-3 shadow-sm hover-elevate-up" title="Refresh Data" :disabled="loading">
+        <button @click="refreshOrders" class="btn btn-light-primary btn-icon w-45px h-45px rounded-3 shadow-sm hover-elevate-up flex-shrink-0" title="Refresh Data" :disabled="loading">
           <i class="bi bi-arrow-clockwise fs-2" :class="{ 'spin': loading }"></i>
         </button>
       </div>
@@ -334,6 +335,15 @@ onMounted(() => {
 
 <style scoped>
 .text-orange { color: #ff6b00 !important; }
+
+/* FIX ALIGNMENT EL-SELECT */
+:deep(.custom-el-select .el-select__wrapper) {
+    min-height: 45px !important;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
 .custom-scroll::-webkit-scrollbar { width: 6px; }
 .custom-scroll::-webkit-scrollbar-thumb { background: #e1e1e1; border-radius: 10px; }
 .anim-fade-in { animation: fadeIn 0.3s ease forwards; }
@@ -377,5 +387,4 @@ onMounted(() => {
 [data-bs-theme="dark"] :deep(.el-select-dropdown__item:hover) {
     background-color: #2b2b40 !important;
 }
-
 </style>
