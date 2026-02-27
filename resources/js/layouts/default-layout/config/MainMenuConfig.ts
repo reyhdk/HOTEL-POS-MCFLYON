@@ -101,6 +101,28 @@ const MainMenuConfig: MenuItem[] = [
         route: "/apps",
         pages: [
             {
+                sectionTitle: "Reseptionist",
+                route: "/admin/receptionist",
+                keenthemesIcon: "home",
+                sub: [
+                    {
+                        heading: "Data Kamar",
+                        route: "/admin/receptionist/rooms",
+                        name: "view rooms",
+                    },
+                    {
+                        heading: "Data Tamu",
+                        route: "/admin/receptionist/guests",
+                        name: "view guests",
+                    },
+                    {
+                        heading: "Verifikasi KTP",
+                        route: "/admin/receptionist/verification",
+                        name: "view guests",
+                    },
+                ],
+            },
+            {
                 sectionTitle: "Point of Sale",
                 route: "/pos",
                 // name: "pos", <--- DIHAPUS: Agar Staff Kasir/Chef bisa lihat jika punya akses submenu
@@ -117,16 +139,21 @@ const MainMenuConfig: MenuItem[] = [
                         route: "/admin/kitchen",
                         name: "view kitchen",
                     },
-                    {
-                        heading: "Daftar Tagihan",
-                        route: "/admin/payment",
-                        name: "manage payments",
+                                        {
+                        heading: "Menu Makanan",
+                        route: "/admin/menus",
+                        name: "view menus", // Chef harus punya permission ini
                     },
-                    {
-                        heading: "Folio Kamar",
-                        route: "/admin/folio",
-                        name: "view folios",
-                    },
+                    // {
+                    //     heading: "Daftar Tagihan",
+                    //     route: "/admin/payment",
+                    //     name: "manage payments",
+                    // },
+                    // {
+                    //     heading: "Folio Kamar",
+                    //     route: "/admin/folio",
+                    //     name: "view folios",
+                    // },
                 ],
             },
             {
@@ -142,6 +169,12 @@ const MainMenuConfig: MenuItem[] = [
                         name: "manage service_requests",
                     },
                 ],
+            },
+            {
+                heading: "Gudang",
+                route: "/admin/master/warehouse",
+                keenthemesIcon: "package",
+                name: "view warehouse",
             },
         ],
     },
@@ -161,30 +194,9 @@ const MainMenuConfig: MenuItem[] = [
                 // roles: ["admin"], <--- DIHAPUS
                 sub: [
                     {
-                        heading: "Data Kamar",
-                        route: "/admin/master/rooms",
-                        name: "view rooms",
-                    },
-                    {
                         heading: "Fasilitas Hotel",
                         route: "/admin/master/facilities",
                         name: "view facilities",
-                    },
-                    {
-                        heading: "Data Tamu",
-                        route: "/admin/master/guests",
-                        name: "view guests",
-                    },
-                    {
-                        heading: "Verifikasi KTP",
-                        route: "/admin/master/verification",
-                        keenthemesIcon: "shield-tick",
-                        name: "view guests", // Asumsi pakai permission view guests atau admin
-                    },
-                    {
-                        heading: "Menu Makanan",
-                        route: "/admin/master/menus",
-                        name: "view menus", // Chef harus punya permission ini
                     },
                     {
                         heading: "Management User",
@@ -195,11 +207,6 @@ const MainMenuConfig: MenuItem[] = [
                         heading: "Role & Permission",
                         route: "/admin/master/roles",
                         name: "view roles",
-                    },
-                    {
-                        heading: "Gudang",
-                        route: "/admin/master/warehouse",
-                        name: "view warehouse",
                     },
                 ],
             },
@@ -222,7 +229,7 @@ const MainMenuConfig: MenuItem[] = [
                 sub: [
                     {
                         heading: "Riwayat Transaksi",
-                        route: "/admin/history",
+                        route: "/admin/reports/transaction-history",
                         name: "view transaction_history",
                     },
                 ],

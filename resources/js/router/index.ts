@@ -170,14 +170,14 @@ const routes: Array<RouteRecordRaw> = [
                 meta: { pageTitle: "Permintaan Layanan" },
             },
             {
-                path: "master/rooms",
+                path: "receptionist/rooms",
                 name: "admin-master-rooms",
                 component: () =>
                     import("@/pages/dashboard/master/rooms/Index.vue"),
                 meta: { pageTitle: "Kamar" },
             },
             {
-                path: "master/verification",
+                path: "receptionist/verification",
                 name: "admin-verification",
                 component: () =>
                     import("@/pages/dashboard/master/verification/Index.vue"),
@@ -213,20 +213,20 @@ const routes: Array<RouteRecordRaw> = [
                 meta: { pageTitle: "Folio Kamar" },
             },
             {
-                path: "history",
-                name: "admin-history",
-                component: () => import("@/pages/dashboard/history/Index.vue"),
-                meta: { pageTitle: "Riwayat Transaksi" },
+                path: "reports/transaction-history",
+                name: "admin-reports",
+                component: () => import("@/pages/dashboard/reports/Transaction-History.vue"),
+                meta: { pageTitle: "Laporan" },
             },
             {
-                path: "master/guests",
+                path: "receptionist/guests",
                 name: "admin-master-guests",
                 component: () =>
                     import("@/pages/dashboard/master/guests/Index.vue"),
                 meta: { pageTitle: "Tamu" },
             },
             {
-                path: "master/menus",
+                path: "menus",
                 name: "admin-master-menus",
                 component: () =>
                     import("@/pages/dashboard/master/menus/Index.vue"),
