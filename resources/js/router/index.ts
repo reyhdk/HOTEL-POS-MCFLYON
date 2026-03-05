@@ -166,8 +166,29 @@ const routes: Array<RouteRecordRaw> = [
                 path: "service-requests",
                 name: "admin-service-requests",
                 component: () =>
-                    import("@/pages/dashboard/service-requests/Index.vue"),
-                meta: { pageTitle: "Permintaan Layanan" },
+                    import("@/pages/dashboard/roomService/service-requests/Index.vue"),
+                meta: { pageTitle: "Permintaan Layanan Pelanggan" },
+            },
+            {
+                path: "cleaning",
+                name: "admin-cleaning",
+                component: () =>
+                    import("@/pages/dashboard/roomService/cleaning/cleaning.vue"),
+                meta: { pageTitle: "Kebersihan Kamar" },
+            },
+            {
+                path: "setting-housekeeping",
+                name: "admin-setting-housekeeping",
+                component: () =>
+                    import("@/pages/dashboard/roomService/settinghousekeeper/housekeepingSetting.vue"),
+                meta: { pageTitle: "Pengaturan Housekeeping" },
+            },
+            {
+                path: "service-settings",
+                name: "admin-service-settings-housekeeping",
+                component: () =>
+                    import("@/pages/dashboard/roomService/serviceSetting/serviceSetting.vue"),
+                meta: { pageTitle: "Pengaturan Layanan" },
             },
             {
                 path: "receptionist/rooms",

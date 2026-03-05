@@ -361,4 +361,24 @@ class RoomController extends Controller
             
         return response()->json($rooms);
     }
+
+    public function getCleaningTasks(Request $request)
+    {
+        $date = $request->query('date');
+        $today = now()->toDateString();
+
+        // Ambil kamar dengan status kotor / butuh pembersihan
+        $query = Room::whereIn('status', ['dirty', 'request cleaning', 'needs cleaning']);
+
+        // Logika Filter Tanggal:
+        // Jika mencari hari ini, tampilkan SEMUA kamar yang kotor (termasuk sisa kemarin yang belum dibersihkan)
+        // Jika mencari tanggal lampau, tampilkan kamar yang statusnya berubah pada tanggal tersebut
+        if ($date && $date !== $today) {
+            $query->whereDate('updated_at', $date);
+        }
+
+        $rooms = $query->with('facilities')->get();
+
+        return response()->json($rooms);
+    }
 }

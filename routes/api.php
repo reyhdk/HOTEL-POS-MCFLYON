@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\Warehouse\StockTransactionController;
 use App\Http\Controllers\Api\Warehouse\WarehouseCategoryController;
 use App\Http\Controllers\Api\ChefController; // Import ChefController
 // Guest & Admin Namespace Controllers
+use App\Http\Controllers\Api\ServiceItemController;
 use App\Http\Controllers\Api\Restopos\TableController;
 use App\Http\Controllers\Api\Restopos\TableTypeController;
 use App\Http\Controllers\Api\Admin\CheckoutHistoryController;
@@ -108,9 +109,24 @@ Route::middleware('auth:api')->group(function () {
 
         Route::post('/service-requests', [ServiceRequestController::class, 'store']);
         Route::get('/service-requests', [ServiceRequestController::class, 'index']);
+        Route::get('/service-items', [ServiceItemController::class, 'index']);
 
         Route::get('/folio', [CheckoutController::class, 'getFolio']);
         Route::post('/checkout', [CheckoutController::class, 'processCheckout']);
+    });
+
+    Route::middleware('can:manage service_requests')->group(function () {
+
+    // CRUD Master Item
+        Route::apiResource('admin/service-items', ServiceItemController::class);
+
+        // Endpoint tambahan
+        Route::get('/admin/service-items-categories', [ServiceItemController::class, 'categories']);
+        Route::get('/admin/service-items-staff',      [ServiceItemController::class, 'eligibleStaff']);
+
+        // Update status request (sudah ada, pastikan ada)
+        Route::patch('/admin/service-requests/{serviceRequest}/status', [AdminServiceRequestController::class, 'updateStatus']);
+        Route::patch('/admin/service-requests/{serviceRequest}/assign', [AdminServiceRequestController::class, 'assignStaff']);
     });
 
 
@@ -250,6 +266,9 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/admin/service-requests', [AdminServiceRequestController::class, 'index']);
         Route::patch('/admin/service-requests/{serviceRequest}/status', [AdminServiceRequestController::class, 'updateStatus']);
     });
+
+    Route::get('/rooms/cleaning-tasks', [RoomController::class, 'getCleaningTasks'])
+        ->middleware('can:manage cleaning status');
 
     // Master Data
     Route::apiResource('menus', MenuController::class)->middleware('can:view menus');

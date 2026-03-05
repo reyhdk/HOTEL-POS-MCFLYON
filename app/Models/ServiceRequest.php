@@ -13,6 +13,8 @@ class ServiceRequest extends Model
         'room_id',
         'user_id',
         'service_name',
+        'service_item_id',
+        'category',
         'quantity',
         'notes',
         'status',
@@ -27,5 +29,15 @@ class ServiceRequest extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function assignedTo()
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function serviceItem()
+    {
+        return $this->belongsTo(ServiceItem::class, 'service_name', 'name');
     }
 }

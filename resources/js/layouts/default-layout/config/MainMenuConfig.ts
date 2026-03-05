@@ -157,12 +157,27 @@ const MainMenuConfig: MenuItem[] = [
                 ],
             },
             {
-                sectionTitle: "Permintaan Layanan",
+                sectionTitle: "Room Service",
                 route: "/hotel-services",
                 // name: "manage service_requests", <--- DIHAPUS: Agar staff HK bisa lihat tanpa permission parent
                 keenthemesIcon: "notification-status",
                 // roles: ["admin"],
                 sub: [
+                    {
+                        heading: "Kebersihan Kamar",
+                        route: "/admin/cleaning",
+                        name: "manage cleaning",
+                    },
+                    // {
+                    //     heading: "Pengaturan Housekeeping",
+                    //     route: "/admin/setting-housekeeping",
+                    //     name: "manage housekeeping",
+                    // },
+                    {
+                        heading: "Pengaturan Layanan",
+                        route: "/admin/service-settings",
+                        name: "manage service_settings",
+                    },
                     {
                         heading: "Daftar Permintaan",
                         route: "/admin/service-requests",
@@ -210,16 +225,6 @@ const MainMenuConfig: MenuItem[] = [
                     },
                 ],
             },
-        ],
-    },
-
-    // =======================================================
-    // == GRUP 5: LAPORAN & PENGATURAN ==
-    // =======================================================
-    {
-        heading: "System",
-        route: "/system",
-        pages: [
             {
                 sectionTitle: "Laporan",
                 route: "/reports",
@@ -234,6 +239,16 @@ const MainMenuConfig: MenuItem[] = [
                     },
                 ],
             },
+        ],
+    },
+
+    // =======================================================
+    // == GRUP 5: LAPORAN & PENGATURAN ==
+    // =======================================================
+    {
+        heading: "System",
+        route: "/system",
+        pages: [
             {
                 sectionTitle: "Pengaturan",
                 route: "/pengaturan",
