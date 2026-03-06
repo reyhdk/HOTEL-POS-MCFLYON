@@ -26,6 +26,10 @@ use App\Http\Controllers\Api\Warehouse\WarehouseItemController;
 use App\Http\Controllers\Api\Warehouse\StockTransactionController;
 use App\Http\Controllers\Api\Warehouse\WarehouseCategoryController;
 use App\Http\Controllers\Api\ChefController; // Import ChefController
+use App\Http\Controllers\Api\Laundry\LaundryController;
+// use App\Http\Controllers\Api\Laundry\LaundryMachineController;
+use App\Http\Controllers\Api\Laundry\LaundryOrderController;
+use App\Http\Controllers\Api\Laundry\LaundryServiceController;
 // Guest & Admin Namespace Controllers
 use App\Http\Controllers\Api\ServiceItemController;
 use App\Http\Controllers\Api\Restopos\TableController;
@@ -207,6 +211,28 @@ Route::middleware('auth:api')->group(function () {
             Route::patch('/{id}/toggle-status', [ChefController::class, 'toggleStatus']); // Aktif/nonaktif
             Route::delete('/{id}', [ChefController::class, 'destroy']); // Delete chef
         });
+    });
+
+    Route::prefix('guest/laundry')->group(function () {
+        Route::get('/services', [LaundryController::class, 'getServices']); // Lihat daftar harga
+        Route::post('/request', [LaundryController::class, 'requestLaundry']); // Tamu klik request
+        Route::get('/my-requests', [LaundryController::class, 'myRequests']); // Status laundry tamu
+    });
+
+    // Untuk Petugas / Admin Laundry
+    Route::prefix('admin/laundry')->middleware('can:manage laundry')->group(function () {
+        // Master Data & Setting
+        // Route::apiResource('machines', LaundryMachineController::class);
+        Route::apiResource('services', LaundryServiceController::class);
+        
+        // Integrasi Estimasi Gudang
+        Route::post('/services/{id}/materials', [LaundryServiceController::class, 'setMaterials']);
+        
+        // Operasional (User Request Laundry)
+        Route::get('/orders', [LaundryOrderController::class, 'index']); // List request tamu
+        Route::post('/orders/{id}/pickup', [LaundryOrderController::class, 'pickup']); // Petugas ambil
+        Route::post('/orders/{id}/process', [LaundryOrderController::class, 'process']); // Mulai cuci (disini auto-potong stok)
+        Route::post('/orders/{id}/deliver', [LaundryOrderController::class, 'deliver']); // Selesai
     });
 
     Route::prefix('warehouse')->middleware('auth:api')->group(function () {

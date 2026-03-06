@@ -38,6 +38,12 @@ const MainMenuConfig: MenuItem[] = [
                         keenthemesIcon: "profile-circle",
                         roles: ["user"],
                     },
+                    {
+                        heading: "Laundry",
+                        route: "/user/laundry-order",
+                        keenthemesIcon: "washing",
+                        roles: ["user"],
+                    }
                 ],
             },
             {
@@ -183,6 +189,24 @@ const MainMenuConfig: MenuItem[] = [
                         route: "/admin/service-requests",
                         name: "manage service_requests",
                     },
+                ],
+            },
+            {
+                sectionTitle: "Laundry",
+                route: "/laundry",
+                keenthemesIcon: "handcart",
+                // roles: ["admin"],
+                sub: [
+                    {
+                        heading: "Laundry Setting",
+                        route: "/admin/laundry",
+                        name: "manage laundry",
+                    },
+                    {
+                        heading: "Permintaan Laundry",
+                        route: "/admin/user-request-laundry",
+                        name: "manage user_request_laundry",
+                    }
                 ],
             },
             {

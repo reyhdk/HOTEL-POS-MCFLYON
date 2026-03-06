@@ -5,13 +5,26 @@
       Nikmati hidangan lezat yang diantar langsung ke kamar Anda.
     </p>
 
-    <div class="row g-6 g-xl-9">
-      <div class="col-lg-8">
-        <div v-if="isLoading" class="d-flex justify-content-center py-20">
-          <div class="spinner-border text-primary" style="width: 3rem; height: 3rem"></div>
-        </div>
+    <!-- Loading State -->
+    <div v-if="isLoading" class="d-flex justify-content-center py-20">
+      <div class="spinner-border text-primary" style="width: 3rem; height: 3rem"></div>
+    </div>
 
-        <div v-else-if="menus.length === 0" class="card shadow-sm">
+    <!-- Belum Check In State -->
+    <div v-else-if="!activeRoom" class="notice d-flex bg-light-warning rounded border-warning border border-dashed p-6">
+      <i class="ki-duotone ki-information fs-2tx text-warning me-4"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+      <div class="d-flex flex-stack flex-grow-1">
+        <div class="fw-semibold">
+          <h4 class="text-gray-900 fw-bold">Fitur Belum Tersedia</h4>
+          <div class="fs-6 text-gray-700">Pemesanan makanan dan minuman hanya dapat dilakukan setelah Anda melakukan check-in.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content (Sudah Check-In) -->
+    <div v-else class="row g-6 g-xl-9">
+      <div class="col-lg-8">
+        <div v-if="menus.length === 0" class="card shadow-sm">
             <div class="card-body d-flex flex-column flex-center text-center p-20">
                 <i class="ki-duotone ki-coffee fs-5x text-muted mb-5">
                     <span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span><span class="path6"></span>
@@ -139,7 +152,9 @@
 </template>
 
 <style scoped>
-/* ... (style Anda tidak berubah) ... */
+.notice {
+  transition: all 0.3s ease;
+}
 .list-enter-active,
 .list-leave-active {
   transition: all 0.3s ease;
@@ -265,7 +280,7 @@ const resetForm = () => {
     fetchMenus();
 };
 
-// --- FUNGSI-FUNGSI LAIN (tidak berubah) ---
+// --- FUNGSI-FUNGSI LAIN ---
 const addToCart = (menu: Menu) => {
   const itemInCart = cart.value.find((item) => item.id === menu.id);
   if (itemInCart) {

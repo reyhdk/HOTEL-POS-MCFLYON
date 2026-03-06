@@ -86,6 +86,13 @@ const routes: Array<RouteRecordRaw> = [
                 meta: { pageTitle: "Layanan Kamar" },
             },
             {
+                path: "laundry-order",
+                name: "user-laundry-order",
+                component: () =>
+                    import("@/pages/user-dashboard/laundry-order/LaundryOrder.vue"),
+                meta: { pageTitle: "Pesan Laundry" },
+            },
+            {
                 path: "request-history",
                 name: "user-request-history",
                 component: () =>
@@ -206,6 +213,20 @@ const routes: Array<RouteRecordRaw> = [
                     pageTitle: "Verifikasi KTP",
                     breadcrumbs: ["Master Data", "Verifikasi KTP"],
                 },
+            },
+            {
+                path: "laundry",
+                name: "admin-laundry",
+                component: () =>
+                    import("@/pages/dashboard/laundry/SettingLaundry.vue"),
+                meta: { pageTitle: "Laundry" },
+            },
+            {
+                path: "user-request-laundry",
+                name: "admin-user-request-laundry",
+                component: () =>
+                    import("@/pages/dashboard/laundry/UserRequestLaundry.vue"),
+                meta: { pageTitle: "Permintaan Laundry" },
             },
             {
                 path: "master/warehouse",
