@@ -29,6 +29,7 @@ class SettingController extends Controller
                 'check_in_time' => '14:00', // Default Check-in
                 'check_out_time' => '12:00', // Default Check-out
                 'early_check_in_fee' => 0,   // Default Fee
+                'tax_rate' => 0,              // Default Tax Rate
             ]);
         }
 
@@ -51,6 +52,7 @@ class SettingController extends Controller
 
             // [BARU] Validasi Fee Early Check-in (Boleh kosong, harus angka, minimal 0)
             'early_check_in_fee' => 'nullable|integer|min:0',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
 
             // Validasi Gambar
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048', // Max 2MB
@@ -76,6 +78,7 @@ class SettingController extends Controller
         $setting->description = $request->description;
         $setting->check_in_time = $request->check_in_time;
         $setting->check_out_time = $request->check_out_time;
+        $setting->tax_rate = $request->filled('tax_rate') ? $request->tax_rate : 0;
 
         // [BARU] Simpan Fee
         // Jika user tidak mengisi (kosong), kita set jadi 0 agar aman

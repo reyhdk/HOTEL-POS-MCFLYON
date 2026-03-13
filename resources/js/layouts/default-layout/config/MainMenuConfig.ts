@@ -256,11 +256,36 @@ const MainMenuConfig: MenuItem[] = [
                 keenthemesIcon: "chart-simple",
                 // roles: ["admin"],
                 sub: [
+                    // {
+                    //     heading: "Riwayat Transaksi",
+                    //     route: "/admin/reports/transaction-history",
+                    //     name: "view transaction_history",
+                    // },
+                    // {
+                    //     heading: "Laba",
+                    //     route: "/admin/reports/laba",
+                    //     name: "view laba_report",
+                    // },
                     {
-                        heading: "Riwayat Transaksi",
-                        route: "/admin/reports/transaction-history",
-                        name: "view transaction_history",
+                        heading: "Cash Flow",
+                        route: "/admin/reports/cash-flow",
+                        name: "view cash_flow_report",
                     },
+                    {
+                        heading: "Laporan Pembelian",
+                        route: "/admin/reports/laporan-pembelian",
+                        name: "view purchase_report",
+                    },
+                    {
+                        heading: "Laporan Stock",
+                        route: "/admin/reports/laporan-stock",
+                        name: "view stock_report",
+                    },
+                    {
+                        heading: "Laporan Hotel",
+                        route: "/admin/reports/laporan-hotel",
+                        name: "view hotel_report",
+                    }
                 ],
             },
         ],

@@ -7,6 +7,7 @@ use App\Models\CheckIn;
 use App\Models\Menu;
 use App\Models\Order;
 use App\Models\WarehouseItem;
+use App\Models\CashFlow; // [TAMBAHAN] Import CashFlow
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -36,7 +37,6 @@ class OrderController extends Controller
         }
 
         try {
-            // Gunakan transaksi agar jika error, data tidak tersimpan setengah-setengah
             $result = DB::transaction(function () use ($validated, $request) {
                 
                 $userId = Auth::id() ?? ($request->user() ? $request->user()->id : 1);
@@ -45,7 +45,6 @@ class OrderController extends Controller
                 $roomId = $validated['room_id'] ?? null;
                 $tableId = $validated['table_id'] ?? null;
 
-                // --- CONTEXT: ROOM SERVICE ---
                 if ($roomId) {
                     $activeCheckIn = CheckIn::where('room_id', $roomId)
                                             ->where('is_active', true)
@@ -58,7 +57,6 @@ class OrderController extends Controller
                     $guestId = $activeCheckIn->guest_id;
                 }
                 
-                // --- CONTEXT: DINE IN (MEJA) ---
                 if ($tableId) {
                     $table = DB::table('tables')->where('id', $tableId)->first();
                     if ($table && $table->status === 'available') {
@@ -66,16 +64,11 @@ class OrderController extends Controller
                     }
                 }
 
-                // --- HITUNG TOTAL ---
                 $totalPrice = 0;
                 $orderItems = [];
 
                 foreach ($validated['items'] as $item) {
                     $menu = Menu::findOrFail($item['menu_id']);
-                    // Opsional: Cek stok menu jadi (jika Anda masih pakai stok di tabel menu)
-                    // if ($menu->stock < $item['quantity']) {
-                    //     throw new \Exception("Stok untuk menu '{$menu->name}' tidak mencukupi.");
-                    // }
                     $totalPrice += $menu->price * $item['quantity'];
                     
                     $orderItems[] = [
@@ -85,7 +78,6 @@ class OrderController extends Controller
                     ];
                 }
 
-                // --- SET PAYMENT & STATUS ---
                 $status = 'pending'; 
                 $paidAmount = 0;
                 
@@ -96,7 +88,6 @@ class OrderController extends Controller
 
                 $orderCode = 'ORD/' . date('Ymd') . '/' . strtoupper(Str::random(5));
 
-                // --- INSERT ORDER ---
                 $order = new Order();
                 $order->order_code = $orderCode;
                 $order->room_id = $roomId;
@@ -111,19 +102,24 @@ class OrderController extends Controller
                 $order->booking_id = $bookingId;
                 $order->save();
 
-                // Insert Items
                 $order->items()->createMany($orderItems);
 
-                // ==========================================
-                // LOGIKA 1: JIKA CASH, LANGSUNG POTONG BAHAN BAKU
-                // ==========================================
                 if ($validated['payment_method'] === 'cash') {
                     $this->deductIngredients($order);
+
+                    // [TAMBAHAN] OTOMATIS CATAT CASH FLOW JIKA BAYAR CASH DI KASIR
+                    CashFlow::create([
+                        'transaction_date' => now(),
+                        'type' => 'income',
+                        'category' => 'resto',
+                        'description' => 'Pesanan Resto/Room Service Kasir (Tunai)',
+                        'payment_method' => 'Cash',
+                        'amount' => $totalPrice,
+                        'reference_id' => $orderCode,
+                        'user_id' => $userId
+                    ]);
                 }
 
-                // ==========================================
-                // LOGIKA 2: JIKA MIDTRANS, BUAT SNAP TOKEN QRIS
-                // ==========================================
                 $snapToken = null;
                 if ($validated['payment_method'] === 'midtrans') {
                     Config::$serverKey = config('services.midtrans.server_key');
@@ -142,7 +138,7 @@ class OrderController extends Controller
                     ];
 
                     $snapToken = Snap::getSnapToken($params);
-                    $order->midtrans_order_id = $orderCode; // Simpan untuk dicocokkan di webhook
+                    $order->midtrans_order_id = $orderCode; 
                     $order->save();
                 }
 
@@ -152,7 +148,7 @@ class OrderController extends Controller
             return response()->json([
                 'message' => 'Pesanan berhasil dibuat.', 
                 'order' => $result['order'],
-                'snap_token' => $result['snap_token'] // Kirim token ke frontend
+                'snap_token' => $result['snap_token'] 
             ], 201);
 
         } catch (Throwable $e) {
@@ -163,9 +159,6 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Helper Function: Memotong bahan baku dari gudang berdasarkan resep menu
-     */
     public function deductIngredients(Order $order)
     {
         $order->load('items.menu.ingredients');
@@ -173,22 +166,18 @@ class OrderController extends Controller
         foreach ($order->items as $orderItem) {
             $menu = $orderItem->menu;
             
-            // 1. Kurangi stok menu jadi (opsional, jika dipakai)
             if($menu->stock >= $orderItem->quantity){
                $menu->decrement('stock', $orderItem->quantity);
             }
 
-            // 2. Kurangi stok bahan baku dari gudang (Sesuai Resep)
             if ($menu->ingredients) {
                 foreach ($menu->ingredients as $ingredient) {
-                    // Kuantitas bahan per porsi x jumlah porsi dipesan
                     $totalDeduction = $ingredient->pivot->quantity * $orderItem->quantity;
                     
                     $warehouseItem = WarehouseItem::find($ingredient->id);
                     if ($warehouseItem) {
                         $warehouseItem->decrement('current_stock', $totalDeduction);
 
-                        // 3. Catat ke riwayat transaksi gudang agar laporan rapi
                         DB::table('stock_transactions')->insert([
                             'transaction_code' => 'OUT/' . date('Ymd') . '/' . strtoupper(Str::random(5)),
                             'warehouse_item_id' => $warehouseItem->id,

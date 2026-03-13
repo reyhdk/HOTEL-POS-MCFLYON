@@ -254,6 +254,37 @@ const routes: Array<RouteRecordRaw> = [
                 component: () => import("@/pages/dashboard/folio/Index.vue"),
                 meta: { pageTitle: "Folio Kamar" },
             },
+            // Laporan 
+            {
+                path: "reports/cash-flow",
+                name: "admin-reports-cash-flow",
+                component: () => import("@/pages/dashboard/reports/laporanKeuangan/CashFlow.vue"),
+                meta: { pageTitle: "Laporan Arus Kas" },
+            },
+            {
+                path: "reports/laba",
+                name: "admin-reports-laba-rugi",
+                component: () => import("@/pages/dashboard/reports/laporanKeuangan/Laba.vue"),
+                meta: { pageTitle: "Laporan Laba Rugi" },
+            },
+            {
+                path: "reports/laporan-pembelian",
+                name: "admin-reports-laporan-pembelian",
+                component: () => import("@/pages/dashboard/reports/laporanGudang/LaporanPembelian.vue"),
+                meta: { pageTitle: "Laporan Pembelian" },
+            },
+            {
+                path: "reports/laporan-stock",
+                name: "admin-reports-laporan-stock",
+                component: () => import("@/pages/dashboard/reports/laporanGudang/LaporanStock.vue"),
+                meta: { pageTitle: "Laporan Stock" },       
+            },
+            {
+                path: "reports/laporan-hotel",
+                name: "admin-reports-laporan-hotel",
+                component: () => import("@/pages/dashboard/reports/laporanHotel/LaporanHotel.vue"),
+                meta: { pageTitle: "Laporan Hotel" },
+            },
             {
                 path: "reports/transaction-history",
                 name: "admin-reports",

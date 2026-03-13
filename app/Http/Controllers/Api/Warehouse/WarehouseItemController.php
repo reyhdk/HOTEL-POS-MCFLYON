@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Warehouse;
 
 use App\Http\Controllers\Controller;
 use App\Models\WarehouseItem;
+use App\Models\CashFlow; // [TAMBAHAN] Import CashFlow
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -137,6 +138,20 @@ class WarehouseItemController extends Controller
                 'is_active' => $request->is_active ?? true
             ]);
 
+            // [TAMBAHAN] Catat Cash Flow jika Barang Baru langsung diisi stok awalnya (> 0)
+            if ($item->current_stock > 0) {
+                CashFlow::create([
+                    'transaction_date' => now(),
+                    'type' => 'expense',
+                    'category' => 'warehouse',
+                    'description' => 'Pembelian Stok Awal: ' . $item->name,
+                    'payment_method' => 'Cash',
+                    'amount' => $item->current_stock * $item->cost_price,
+                    'reference_id' => $item->code,
+                    'user_id' => auth()->id() ?? 1
+                ]);
+            }
+
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Barang berhasil ditambahkan', 'data' => $item], 201);
         } catch (\Exception $e) {
@@ -219,8 +234,7 @@ class WarehouseItemController extends Controller
 
     /**
      * Adjust Stock - FIXED VERSION (BYPASS EVENTS)
-     * 
-     * Masalah: Ada Observer/Event yang otomatis update stok lagi setelah save()
+     * * Masalah: Ada Observer/Event yang otomatis update stok lagi setelah save()
      * Solusi: Update langsung ke database menggunakan DB::table() untuk bypass model events
      */
     public function adjustStock(Request $request, $id)
@@ -315,6 +329,20 @@ class WarehouseItemController extends Controller
                     'created_at' => now(),
                     'updated_at' => now()
                 ]);
+
+                // [TAMBAHAN] Catat ke CashFlow sebagai Pengeluaran jika Stok Bertambah (Beli Barang)
+                if ($transactionType === 'in') {
+                    CashFlow::create([
+                        'transaction_date' => now(),
+                        'type' => 'expense',
+                        'category' => 'warehouse',
+                        'description' => 'Penyesuaian Stok (Masuk): ' . $item->name . ' (' . ($request->notes ?? 'Manual') . ')',
+                        'payment_method' => 'Cash',
+                        'amount' => $quantityChanged * $item->cost_price,
+                        'reference_id' => $trxCode,
+                        'user_id' => auth()->id() ?? 1
+                    ]);
+                }
             }
 
             DB::commit();

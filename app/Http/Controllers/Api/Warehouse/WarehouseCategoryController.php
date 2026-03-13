@@ -67,4 +67,29 @@ class WarehouseCategoryController extends Controller
         DB::table('warehouse_categories')->where('id', $id)->delete();
         return response()->json(['success' => true, 'message' => 'Kategori dihapus']);
     }
+
+    public function updateIcons(Request $request)
+    {
+        $request->validate([
+            'icons' => 'required|array',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Looping data map { "Makanan": "ki-burger", "Minuman": "ki-coffee" }
+            foreach ($request->icons as $categoryName => $iconName) {
+                DB::table('warehouse_categories')
+                    ->where('name', $categoryName)
+                    ->update([
+                        'icon' => $iconName,
+                        'updated_at' => now()
+                    ]);
+            }
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Ikon kategori berhasil diperbarui']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Gagal memperbarui ikon', 'error' => $e->getMessage()], 500);
+        }
+    }
 }

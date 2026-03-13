@@ -5,26 +5,20 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\Order;
 use App\Models\CheckIn;
-use App\Models\WarehouseItem; // Import untuk pemotongan stok bahan
+use App\Models\WarehouseItem; 
+use App\Models\CashFlow; // [TAMBAHAN] Import CashFlow
 use App\Mail\BookingSuccessMail; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail; 
-use Illuminate\Support\Str; // Import untuk generate random code
+use Illuminate\Support\Str; 
 use Midtrans\Notification;
 use Midtrans\Config;
 use Throwable;
 
-/**
- * Class MidtransController
- * Menangani Webhook/Notifikasi dari Midtrans untuk berbagai jenis transaksi.
- */
 class MidtransController extends Controller
 {
-    /**
-     * Inisialisasi konfigurasi Midtrans.
-     */
     public function __construct()
     {
         Config::$serverKey = config('services.midtrans.server_key');
@@ -33,16 +27,12 @@ class MidtransController extends Controller
         Config::$is3ds = config('services.midtrans.is_3ds', true);
     }
 
-    /**
-     * Entry point utama untuk menerima notifikasi dari Midtrans.
-     */
     public function handleNotification(Request $request)
     {
         try {
             Log::info('===== MIDTRANS WEBHOOK: MULAI PROSES =====');
             
             $notification = new Notification();
-            
             $orderId = $notification->order_id;
             $transactionStatus = $notification->transaction_status;
             $paymentType = $notification->payment_type;
@@ -50,30 +40,19 @@ class MidtransController extends Controller
             Log::info("Notifikasi Diterima - Order ID: $orderId");
             Log::info("Status Transaksi: $transactionStatus | Metode: $paymentType");
 
-            // Routing Notifikasi berdasarkan Prefix Order ID
             if (str_starts_with($orderId, 'BOOK-')) {
                 return $this->handleBookingNotification($notification);
             }
-            
             if (str_starts_with($orderId, 'EARLY-')) {
                 return $this->handleEarlyCheckInNotification($notification);
             }
-            
             if (str_starts_with($orderId, 'WALKIN-')) {
                 return $this->handleWalkInNotification($notification);
             }
-            
             if (str_starts_with($orderId, 'CHECKOUT-')) {
                 return $this->handleCheckoutNotification($notification);
             }
-
-            // Pesanan POS (QRIS / Midtrans F&B)
-            if (str_starts_with($orderId, 'ORD/')) {
-                return $this->handleOrderNotification($notification);
-            }
-
-            // Fallback backward compatibility (jika ada pesanan lama yang pakai ORDER-)
-            if (str_starts_with($orderId, 'ORDER-')) {
+            if (str_starts_with($orderId, 'ORD/') || str_starts_with($orderId, 'ORDER-')) {
                 return $this->handleOrderNotification($notification);
             }
 
@@ -83,16 +62,10 @@ class MidtransController extends Controller
         } catch (Throwable $e) {
             Log::error('===== MIDTRANS WEBHOOK: GAGAL =====');
             Log::error('Pesan Error: ' . $e->getMessage());
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Internal Server Error'
-            ], 500);
+            return response()->json(['status' => 'error', 'message' => 'Internal Server Error'], 500);
         }
     }
 
-    /**
-     * Menangani Notifikasi untuk Booking/Reservasi Online.
-     */
     private function handleBookingNotification(Notification $notification)
     {
         Log::info("Memproses Booking Notification: " . $notification->order_id);
@@ -104,16 +77,27 @@ class MidtransController extends Controller
             return response()->json(['message' => 'Booking not found'], 404);
         }
 
-        if ($this->determineIfPaid($notification)) {
+        if ($this->determineIfPaid($notification) && $booking->status !== 'paid') {
             DB::transaction(function () use ($booking, $notification) {
                 $booking->update([
                     'payment_status' => 'paid',
                     'status' => 'paid',
                     'payment_method' => $notification->payment_type ?? 'online'
                 ]);
+
+                // [TAMBAHAN] OTOMATIS CATAT CASH FLOW
+                CashFlow::create([
+                    'transaction_date' => now(),
+                    'type' => 'income',
+                    'category' => 'booking',
+                    'description' => 'Pelunasan Booking Kamar Online',
+                    'payment_method' => 'Midtrans ('.$notification->payment_type.')',
+                    'amount' => $notification->gross_amount ?? $booking->total_price,
+                    'reference_id' => $notification->order_id,
+                    'user_id' => 1 // System/Midtrans
+                ]);
             });
 
-            // LOGIKA PENGIRIMAN EMAIL
             try {
                 if ($booking->guest && $booking->guest->email) {
                     Mail::to($booking->guest->email)->send(new BookingSuccessMail($booking));
@@ -129,9 +113,6 @@ class MidtransController extends Controller
         return response()->json(['message' => 'Success']);
     }
 
-    /**
-     * Menangani Biaya Early Check-In.
-     */
     private function handleEarlyCheckInNotification(Notification $notification)
     {
         Log::info("Memproses Early Fee Notification: " . $notification->order_id);
@@ -150,9 +131,6 @@ class MidtransController extends Controller
         return response()->json(['message' => 'Success']);
     }
 
-    /**
-     * Menangani Pembayaran Walk-In.
-     */
     private function handleWalkInNotification(Notification $notification)
     {
         Log::info("Memproses Walk-In Payment Notification: " . $notification->order_id);
@@ -187,17 +165,25 @@ class MidtransController extends Controller
                 if ($booking->room) {
                     $booking->room->update(['status' => 'occupied']);
                 }
+
+                // [TAMBAHAN] OTOMATIS CATAT CASH FLOW
+                CashFlow::create([
+                    'transaction_date' => now(),
+                    'type' => 'income',
+                    'category' => 'booking',
+                    'description' => 'Pembayaran Kamar Walk-In',
+                    'payment_method' => 'Midtrans ('.$notification->payment_type.')',
+                    'amount' => $notification->gross_amount ?? $booking->total_price,
+                    'reference_id' => $notification->order_id,
+                    'user_id' => 1
+                ]);
             });
 
-            // Kirim email Walk-In
             try {
                 if ($booking->guest && $booking->guest->email) {
                     Mail::to($booking->guest->email)->send(new BookingSuccessMail($booking));
-                    Log::info("📧 Email Walk-In dikirim ke: " . $booking->guest->email);
                 }
-            } catch (Throwable $mailError) {
-                Log::error("❌ Gagal mengirim email Walk-In: " . $mailError->getMessage());
-            }
+            } catch (Throwable $mailError) {}
 
             Log::info("✅ Walk-In Lunas & Check-In Selesai: Booking #{$booking->id}");
         }
@@ -205,21 +191,16 @@ class MidtransController extends Controller
         return response()->json(['message' => 'Success']);
     }
 
-    /**
-     * Menangani Notifikasi untuk Pesanan POS (Restaurant/Room Service).
-     */
     private function handleOrderNotification(Notification $notification)
     {
         Log::info("Memproses POS Order Notification: " . $notification->order_id);
         
-        // Cari order berdasarkan ID Midtrans ATAU kode order sistem (kalau-kalau mapping berbeda)
         $order = Order::where('midtrans_order_id', $notification->order_id)
                       ->orWhere('order_code', $notification->order_id)
                       ->first();
 
         if ($order && $this->determineIfPaid($notification)) {
             
-            // Cek agar tidak mengeksekusi dobel pemotongan bahan jika webhook dikirim ulang
             if ($order->status !== 'paid') {
                 DB::transaction(function () use ($order, $notification) {
                     $order->update([
@@ -228,8 +209,19 @@ class MidtransController extends Controller
                         'payment_method' => $notification->payment_type ?? 'qris'
                     ]);
 
-                    // POTONG BAHAN BAKU SETELAH PEMBAYARAN MIDTRANS BERHASIL
                     $this->deductIngredients($order);
+
+                    // [TAMBAHAN] OTOMATIS CATAT CASH FLOW
+                    CashFlow::create([
+                        'transaction_date' => now(),
+                        'type' => 'income',
+                        'category' => 'resto',
+                        'description' => 'Pelunasan Pesanan Resto',
+                        'payment_method' => 'Midtrans ('.$notification->payment_type.')',
+                        'amount' => $notification->gross_amount ?? $order->total_price,
+                        'reference_id' => $notification->order_id,
+                        'user_id' => 1
+                    ]);
                 });
                 
                 Log::info("✅ Pesanan POS #{$order->id} lunas & Bahan Baku dipotong (Midtrans).");
@@ -239,33 +231,19 @@ class MidtransController extends Controller
         return response()->json(['message' => 'Success']);
     }
 
-    /**
-     * Helper Function: Memotong bahan baku dari gudang berdasarkan resep menu
-     */
     private function deductIngredients(Order $order)
     {
-        // Load item beserta menu dan relasi bahannya (ingredients)
         $order->load('items.menu.ingredients');
-
         foreach ($order->items as $orderItem) {
             $menu = $orderItem->menu;
-            
-            // Kurangi stok menu jadi (opsional, jika Anda menggunakan stok di tabel menus)
-            if ($menu->stock >= $orderItem->quantity) {
-               $menu->decrement('stock', $orderItem->quantity);
-            }
+            if ($menu->stock >= $orderItem->quantity) $menu->decrement('stock', $orderItem->quantity);
 
-            // Kurangi stok bahan baku riil di Gudang
             if ($menu->ingredients) {
                 foreach ($menu->ingredients as $ingredient) {
-                    // Kalikan kebutuhan per porsi dengan jumlah pesanan
                     $totalDeduction = $ingredient->pivot->quantity * $orderItem->quantity;
                     $warehouseItem = WarehouseItem::find($ingredient->id);
-                    
                     if ($warehouseItem) {
                         $warehouseItem->decrement('current_stock', $totalDeduction);
-
-                        // Simpan log transaksi ke stock_transactions agar laporan gudang tercatat rapi
                         DB::table('stock_transactions')->insert([
                             'transaction_code' => 'OUT/' . date('Ymd') . '/' . strtoupper(Str::random(5)),
                             'warehouse_item_id' => $warehouseItem->id,
@@ -286,13 +264,8 @@ class MidtransController extends Controller
         }
     }
 
-    /**
-     * Menangani Pelunasan saat Checkout.
-     */
     private function handleCheckoutNotification(Notification $notification)
     {
-        Log::info("Memproses Checkout Payment Notification: " . $notification->order_id);
-        
         $parts = explode('-', $notification->order_id);
         if (count($parts) < 2) return response()->json(['message' => 'Invalid ID'], 400);
         
@@ -306,33 +279,23 @@ class MidtransController extends Controller
                     ->update(['status' => 'paid']);
 
                 $booking->update(['status' => 'completed']);
-
                 if ($booking->room) $booking->room->update(['status' => 'dirty']);
 
                 CheckIn::where('booking_id', $booking->id)
                     ->where('is_active', true)
                     ->update(['is_active' => false, 'check_out_time' => now()]);
             });
-            Log::info("✅ Proses Checkout Selesai untuk Booking #{$bookingId}");
         }
-
         return response()->json(['message' => 'Success']);
     }
 
-    /**
-     * Helper: Menentukan apakah transaksi dianggap berhasil (Lunas).
-     */
     private function determineIfPaid(Notification $notification)
     {
         $status = $notification->transaction_status;
         $fraud = $notification->fraud_status;
-
-        // Untuk kartu kredit biasanya statusnya 'capture'
         if ($status == 'capture') {
             return ($fraud == 'accept');
         }
-        
-        // Untuk QRIS, GoPay, dan lainnya biasanya langsung 'settlement' atau 'capture'
         return ($status == 'settlement' || $status == 'capture');
     }
 }

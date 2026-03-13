@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Laundry;
 use App\Http\Controllers\Controller;
 use App\Models\LaundryOrder;
 use App\Models\LaundryOrderItem;
+use App\Models\CashFlow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -143,11 +144,26 @@ class LaundryOrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Cucian belum diproses'], 400);
         }
 
-        $order->status = 'delivered';
-        $order->save();
+        DB::transaction(function () use ($order) {
+            $order->status = 'delivered';
+            $order->save();
+
+            // [TAMBAHAN] OTOMATIS CATAT CASH FLOW SEBAGAI PEMASUKAN LAUNDRY
+            // Asumsi: Laundry langsung dibayar tunai atau ditagihkan ke kamar tamu (folio)
+            CashFlow::create([
+                'transaction_date' => now(),
+                'type' => 'income',
+                'category' => 'laundry',
+                'description' => 'Pendapatan Laundry Order',
+                'payment_method' => 'Cash',
+                'amount' => $order->total_price,
+                'reference_id' => $order->order_number,
+                'user_id' => auth()->id() ?? 1
+            ]);
+        });
 
         // Disini nanti bisa ditambahkan trigger untuk menambah bill tagihan folio ke kamar
 
-        return response()->json(['success' => true, 'message' => 'Cucian selesai dan siap dikirim ke kamar', 'data' => $order]);
+        return response()->json(['success' => true, 'message' => 'Cucian selesai dan Kas Pemasukan Laundry berhasil dicatat.', 'data' => $order]);
     }
 }

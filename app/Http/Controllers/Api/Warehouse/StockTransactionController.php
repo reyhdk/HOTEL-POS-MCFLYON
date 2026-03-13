@@ -5,6 +5,11 @@ namespace App\Http\Controllers\Api\Warehouse;
 use App\Http\Controllers\Controller;
 use App\Models\StockTransaction;
 use App\Models\WarehouseItem;
+use App\Models\CashFlow; 
+use Barryvdh\DomPDF\Facade\Pdf;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\PembelianExport;
+use App\Exports\LaporanStokExport; // Jangan lupa panggil class Export Anda
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -21,6 +26,7 @@ class StockTransactionController extends Controller
             $search = $request->input('search');
             $type = $request->input('type'); // 'in', 'out'
             $itemId = $request->input('item_id');
+            $category = $request->input('category'); // Filter Kategori Baru
             $startDate = $request->input('start_date');
             $endDate = $request->input('end_date');
 
@@ -41,7 +47,14 @@ class StockTransactionController extends Controller
                 $query->where('transaction_date', '>=', $startDate);
             }
             if ($endDate) {
-                $query->where('transaction_date', '<=', $endDate);
+                $query->where('transaction_date', '<=', $endDate . ' 23:59:59');
+            }
+            
+            // Filter Kategori dari Tabel Relasi
+            if ($category) {
+                $query->whereHas('warehouseItem', function($q) use ($category) {
+                    $q->where('category', $category);
+                });
             }
 
             // Pencarian
@@ -139,6 +152,18 @@ class StockTransactionController extends Controller
             // Update stok barang
             if ($request->transaction_type === 'in') {
                 $item->increment('current_stock', $request->quantity);
+
+                CashFlow::create([
+                    'transaction_date' => $request->transaction_date,
+                    'type' => 'expense',
+                    'category' => 'warehouse',
+                    'description' => 'Pembelian Stok Gudang: ' . $item->name,
+                    'payment_method' => 'Cash',
+                    'amount' => $totalPrice,
+                    'reference_id' => $transaction->transaction_code,
+                    'user_id' => auth()->id() ?? 1
+                ]);
+
             } else {
                 $item->decrement('current_stock', $request->quantity);
             }
@@ -168,17 +193,9 @@ class StockTransactionController extends Controller
     {
         try {
             $transaction = StockTransaction::with(['warehouseItem', 'creator'])->findOrFail($id);
-
-            return response()->json([
-                'success' => true,
-                'data' => $transaction
-            ]);
-
+            return response()->json(['success' => true, 'data' => $transaction]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Transaksi tidak ditemukan'
-            ], 404);
+            return response()->json(['success' => false, 'message' => 'Transaksi tidak ditemukan'], 404);
         }
     }
 
@@ -192,7 +209,6 @@ class StockTransactionController extends Controller
             $transaction = StockTransaction::findOrFail($id);
             $item = $transaction->warehouseItem;
 
-            // Rollback stok
             if ($transaction->transaction_type === 'in') {
                 $item->decrement('current_stock', $transaction->quantity);
             } else {
@@ -200,13 +216,9 @@ class StockTransactionController extends Controller
             }
 
             $transaction->delete();
-
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Transaksi berhasil dihapus'
-            ]);
+            return response()->json(['success' => true, 'message' => 'Transaksi berhasil dihapus']);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -219,7 +231,7 @@ class StockTransactionController extends Controller
     }
 
     /**
-     * Get transaction summary (harian/bulanan)
+     * Get transaction summary
      */
     public function getSummary(Request $request)
     {
@@ -228,19 +240,19 @@ class StockTransactionController extends Controller
             $startDate = $request->input('start_date', now()->subDays(30)->format('Y-m-d'));
             $endDate = $request->input('end_date', now()->format('Y-m-d'));
 
-            $query = StockTransaction::whereBetween('transaction_date', [$startDate, $endDate]);
+            $query = StockTransaction::whereBetween('transaction_date', [$startDate, $endDate . ' 23:59:59']);
 
             if ($period === 'daily') {
                 $summary = $query->selectRaw('
-                    transaction_date,
+                    DATE(transaction_date) as tgl_trx,
                     SUM(CASE WHEN transaction_type = "in" THEN quantity ELSE 0 END) as total_in,
                     SUM(CASE WHEN transaction_type = "out" THEN quantity ELSE 0 END) as total_out,
                     SUM(CASE WHEN transaction_type = "in" THEN total_price ELSE 0 END) as total_in_value,
                     SUM(CASE WHEN transaction_type = "out" THEN total_price ELSE 0 END) as total_out_value,
                     COUNT(*) as transaction_count
                 ')
-                ->groupBy('transaction_date')
-                ->orderBy('transaction_date', 'desc')
+                ->groupBy('tgl_trx')
+                ->orderBy('tgl_trx', 'desc')
                 ->get();
             } else {
                 $summary = $query->selectRaw('
@@ -256,38 +268,28 @@ class StockTransactionController extends Controller
                 ->get();
             }
 
-            // Total keseluruhan
-            $totalIn = $summary->sum('total_in');
-            $totalOut = $summary->sum('total_out');
-            $totalInValue = $summary->sum('total_in_value');
-            $totalOutValue = $summary->sum('total_out_value');
-            $totalTransactions = $summary->sum('transaction_count');
-
             return response()->json([
                 'success' => true,
                 'data' => [
                     'summary' => $summary,
                     'totals' => [
-                        'total_in' => $totalIn,
-                        'total_out' => $totalOut,
-                        'total_in_value' => $totalInValue,
-                        'total_out_value' => $totalOutValue,
-                        'net_value' => $totalInValue - $totalOutValue,
-                        'total_transactions' => $totalTransactions
+                        'total_in' => $summary->sum('total_in'),
+                        'total_out' => $summary->sum('total_out'),
+                        'total_in_value' => $summary->sum('total_in_value'),
+                        'total_out_value' => $summary->sum('total_out_value'),
+                        'net_value' => $summary->sum('total_in_value') - $summary->sum('total_out_value'),
+                        'total_transactions' => $summary->sum('transaction_count')
                     ]
                 ]
             ]);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil ringkasan transaksi'
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Gagal mengambil ringkasan'], 500);
         }
     }
 
     /**
-     * Bulk store transactions (untuk import atau multiple items)
+     * Bulk store transactions
      */
     public function bulkStore(Request $request)
     {
@@ -301,11 +303,7 @@ class StockTransactionController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validasi gagal',
-                'errors' => $validator->errors()
-            ], 422);
+            return response()->json(['success' => false, 'message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
         }
 
         DB::beginTransaction();
@@ -317,13 +315,8 @@ class StockTransactionController extends Controller
                 try {
                     $item = WarehouseItem::find($transactionData['warehouse_item_id']);
 
-                    // Validasi stok untuk transaksi keluar
-                    if ($transactionData['transaction_type'] === 'out' && 
-                        $item->current_stock < $transactionData['quantity']) {
-                        $errors[] = [
-                            'index' => $index,
-                            'message' => "Stok {$item->name} tidak mencukupi (tersedia: {$item->current_stock})"
-                        ];
+                    if ($transactionData['transaction_type'] === 'out' && $item->current_stock < $transactionData['quantity']) {
+                        $errors[] = ['index' => $index, 'message' => "Stok {$item->name} tidak mencukupi"];
                         continue;
                     }
 
@@ -341,9 +334,18 @@ class StockTransactionController extends Controller
                         'created_by' => auth()->id()
                     ]);
 
-                    // Update stok
                     if ($transactionData['transaction_type'] === 'in') {
                         $item->increment('current_stock', $transactionData['quantity']);
+                        CashFlow::create([
+                            'transaction_date' => now(),
+                            'type' => 'expense',
+                            'category' => 'warehouse',
+                            'description' => 'Pembelian Stok Gudang (Bulk): ' . $item->name,
+                            'payment_method' => 'Cash',
+                            'amount' => $totalPrice,
+                            'reference_id' => $transaction->transaction_code,
+                            'user_id' => auth()->id() ?? 1
+                        ]);
                     } else {
                         $item->decrement('current_stock', $transactionData['quantity']);
                     }
@@ -351,41 +353,155 @@ class StockTransactionController extends Controller
                     $createdTransactions[] = $transaction->load('warehouseItem');
 
                 } catch (\Exception $e) {
-                    $errors[] = [
-                        'index' => $index,
-                        'message' => $e->getMessage()
-                    ];
+                    $errors[] = ['index' => $index, 'message' => $e->getMessage()];
                 }
             }
 
             if (count($errors) > 0 && count($createdTransactions) === 0) {
                 DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Semua transaksi gagal diproses',
-                    'errors' => $errors
-                ], 400);
+                return response()->json(['success' => false, 'message' => 'Semua gagal', 'errors' => $errors], 400);
             }
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => count($createdTransactions) . ' transaksi berhasil diproses',
+                'message' => count($createdTransactions) . ' transaksi diproses',
                 'data' => $createdTransactions,
-                'errors' => $errors,
-                'stats' => [
-                    'success' => count($createdTransactions),
-                    'failed' => count($errors)
-                ]
+                'errors' => $errors
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Gagal memproses batch', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+
+    public function exportLaporan(Request $request)
+    {
+        try {
+            $format    = $request->input('format', 'pdf');
+            $startDate = $request->input('start_date');
+            $endDate   = $request->input('end_date');
+            $category  = $request->input('category');
+
+            // ── Tentukan jenis laporan ──────────────────────────────
+            $reportType = ($startDate && $endDate) ? 'detail' : 'comparison';
+
+            // ── Logo hotel (opsional) ───────────────────────────────
+            $logoPath = public_path('images/logo.png');
+            $logo     = file_exists($logoPath)
+                ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
+                : null;
+
+            // ── Label periode ───────────────────────────────────────
+            $periode = ($startDate && $endDate)
+                ? date('d M Y', strtotime($startDate)) . ' – ' . date('d M Y', strtotime($endDate))
+                : 'Semua Waktu';
+
+            $printedAt = now()->format('d M Y H:i:s');
+
+            if ($reportType === 'detail') {
+
+                $query = StockTransaction::with(['warehouseItem']);
+
+                if ($category) {
+                    $query->whereHas('warehouseItem', fn($q) => $q->where('category', $category));
+                }
+                if ($startDate) $query->where('transaction_date', '>=', $startDate);
+                if ($endDate)   $query->where('transaction_date', '<=', $endDate . ' 23:59:59');
+
+                $transactions = $query->orderBy('transaction_date', 'desc')->get();
+
+                $summary = [
+                    'total_in_value'     => $transactions->where('transaction_type', 'in')->sum('total_price'),
+                    'total_out_value'    => $transactions->where('transaction_type', 'out')->sum('total_price'),
+                    'total_transactions' => $transactions->count(),
+                ];
+
+                if ($format === 'excel') {
+                    return Excel::download(
+                        new LaporanStokExport($transactions, 'detail', $startDate, $endDate, $summary),
+                        'Laporan_Stok_Gudang_' . now()->format('Ymd') . '.xlsx'
+                    );
+                }
+
+                $pdf = Pdf::loadView('exports.laporan-stok', [
+                    'reportType'   => 'detail',
+                    'transactions' => $transactions,
+                    'summary'      => $summary,
+                    'periode'      => $periode,
+                    'printed_at'   => $printedAt,
+                    'logo'         => $logo,
+                ])->setPaper('A4', 'landscape');
+
+                return $pdf->download('Laporan_Stok_Gudang_' . now()->format('Ymd') . '.pdf');
+            }
+
+            // --- REPORT COMPARISON (REKAP STOK SAAT INI) ---
+            // Stok Awal dihapus dari query untuk efisiensi
+            $items = DB::table('warehouse_items as wi')
+                ->leftJoin(
+                    DB::raw('(
+                        SELECT
+                            warehouse_item_id,
+                            SUM(CASE WHEN transaction_type = "in"  THEN quantity ELSE 0 END) AS total_in,
+                            SUM(CASE WHEN transaction_type = "out" THEN quantity ELSE 0 END) AS total_out
+                        FROM stock_transactions
+                        GROUP BY warehouse_item_id
+                    ) as st'),
+                    'wi.id', '=', 'st.warehouse_item_id'
+                )
+                ->select(
+                    'wi.id',
+                    'wi.code',
+                    'wi.name',
+                    'wi.category',
+                    'wi.unit',
+                    'wi.current_stock',
+                    'wi.min_stock',
+                    'wi.cost_price',
+                    'wi.is_active',
+                    DB::raw('COALESCE(st.total_in,  0) AS total_in'),
+                    DB::raw('COALESCE(st.total_out, 0) AS total_out')
+                )
+                ->when($category, fn($q) => $q->where('wi.category', $category))
+                ->orderBy('wi.category')
+                ->orderBy('wi.name')
+                ->get();
+
+            // Summary keseluruhan
+            $summary = [
+                'total_items'        => $items->count(),
+                'low_stock_count'    => $items->filter(fn($i) => $i->current_stock > 0 && $i->current_stock <= $i->min_stock)->count(),
+                'out_of_stock_count' => $items->filter(fn($i) => $i->current_stock <= 0)->count(),
+                'total_asset_value'  => $items->sum(fn($i) => $i->current_stock * $i->cost_price),
+            ];
+
+            if ($format === 'excel') {
+                return Excel::download(
+                    new LaporanStokExport($items, 'comparison', null, null, $summary),
+                    'Laporan_Status_Stok_Gudang_' . now()->format('Ymd') . '.xlsx'
+                );
+            }
+
+            $pdf = Pdf::loadView('exports.laporan-stok', [
+                'reportType' => 'comparison',
+                'items'      => $items,
+                'summary'    => $summary,
+                'periode'    => $periode,
+                'printed_at' => $printedAt,
+                'logo'       => $logo,
+            ])->setPaper('A4', 'landscape');
+
+            return $pdf->download('Laporan_Status_Stok_Gudang_' . now()->format('Ymd') . '.pdf');
+
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memproses transaksi batch',
-                'error' => $e->getMessage()
+                'message' => 'Gagal mengekspor laporan stok',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }

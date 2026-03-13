@@ -11,6 +11,7 @@ class WarehouseCategory extends Model
 
     protected $fillable = [
         'name',
+        'icon',
         'units',
     ];
 }

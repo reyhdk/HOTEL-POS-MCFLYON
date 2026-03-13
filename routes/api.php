@@ -41,6 +41,8 @@ use App\Http\Controllers\Api\Admin\ServiceRequestController as AdminServiceReque
 use App\Http\Controllers\Api\Guest\CheckoutController;
 use App\Http\Controllers\Api\Guest\GuestOrderController;
 use App\Http\Controllers\Api\Guest\ServiceRequestController;
+use App\Http\Controllers\Api\CashFlowController;
+use App\Http\Controllers\Api\ReportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -140,7 +142,14 @@ Route::middleware('auth:api')->group(function () {
     Route::middleware('can:view dashboard')->group(function () {
         Route::get('/dashboard-stats', [DashboardController::class, 'getStats']);
         Route::get('/sales-chart-data', [DashboardController::class, 'getSalesChartData']);
+
+        Route::get('/reports/hotel', [ReportController::class, 'hotelReport']);
+        Route::get('/reports/hotel/export', [ReportController::class, 'exportHotelReport']);
     });
+
+    Route::get('/cash-flow/export', [CashFlowController::class, 'export']);
+    Route::get('/cash-flow', [CashFlowController::class, 'index']);
+    Route::post('/cash-flow', [CashFlowController::class, 'store']);
 
     // Settings Update
     Route::post('/settings', [SettingController::class, 'update'])->middleware('can:edit settings');
@@ -239,7 +248,7 @@ Route::middleware('auth:api')->group(function () {
         
         // 1. Master Data Kategori (Baru)
         Route::apiResource('categories', WarehouseCategoryController::class);
-
+        Route::post('categories/update-icons', [WarehouseCategoryController::class, 'updateIcons']);
         // 2. Items
         Route::get('items/next-code', [WarehouseItemController::class, 'getNextCode']); // Endpoint Baru Auto Code
         Route::get('items/low-stock', [WarehouseItemController::class, 'getLowStock']);
@@ -249,6 +258,8 @@ Route::middleware('auth:api')->group(function () {
         Route::apiResource('items', WarehouseItemController::class);
         
         // 3. Transactions
+        Route::get('/transactions/export', [StockTransactionController::class, 'export']);
+        Route::get('transactions/export-laporan', [StockTransactionController::class, 'exportLaporan']);
         Route::post('transactions/bulk', [StockTransactionController::class, 'bulkStore']);
         Route::get('transactions/summary', [StockTransactionController::class, 'getSummary']);
         Route::apiResource('transactions', StockTransactionController::class)->except(['update']);

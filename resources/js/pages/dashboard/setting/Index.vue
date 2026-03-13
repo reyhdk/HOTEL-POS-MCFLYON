@@ -56,7 +56,7 @@
                             </div>
                         </div>
 
-                        <div class="row">
+                        <div class="row mb-4">
                             <div class="col-12">
                                 <label class="form-label fw-bold fs-6">Biaya Early Check-In (Per Jam)</label>
                                 <div class="input-group input-group-solid">
@@ -68,6 +68,22 @@
                                     Biaya tambahan jika tamu check-in lebih awal dari jam standar. Isi 0 jika gratis.
                                 </div>
                                 <ErrorMessage name="early_check_in_fee" class="text-danger" />
+                            </div>
+                        </div>
+
+                        <!-- BARU: INPUT PAJAK / PPN -->
+                        <div class="row">
+                            <div class="col-12">
+                                <label class="form-label fw-bold fs-6 text-primary">Pajak / PPN Sistem</label>
+                                <div class="input-group input-group-solid">
+                                    <Field name="tax_rate" v-model="formData.tax_rate" 
+                                        class="form-control form-control-solid border-primary" type="number" step="0.01" min="0" max="100" placeholder="Contoh: 11 atau 12" />
+                                    <span class="input-group-text bg-primary text-white">%</span>
+                                </div>
+                                <div class="text-muted fs-7 mt-2">
+                                    Persentase pajak yang akan diaplikasikan ke seluruh tagihan (Kamar, Restoran, dll).
+                                </div>
+                                <ErrorMessage name="tax_rate" class="text-danger" />
                             </div>
                         </div>
 
@@ -142,8 +158,9 @@ export default defineComponent({
             description: Yup.string().required("Deskripsi harus diisi"),
             check_in_time: Yup.string().required("Jam Check-in wajib diisi"),
             check_out_time: Yup.string().required("Jam Check-out wajib diisi"),
-            // Validasi Fee: Harus angka, minimal 0
             early_check_in_fee: Yup.number().typeError("Harus berupa angka").min(0, "Tidak boleh kurang dari 0").nullable(),
+            // [BARU] Validasi Pajak
+            tax_rate: Yup.number().typeError("Harus berupa angka").min(0, "Tidak boleh kurang dari 0").max(100, "Maksimal 100%").nullable(),
         });
 
         return {
@@ -158,7 +175,8 @@ export default defineComponent({
                 description: "",
                 check_in_time: "14:00",
                 check_out_time: "12:00",
-                early_check_in_fee: 0, // Default 0
+                early_check_in_fee: 0,
+                tax_rate: 0, // [BARU] Default 0
                 logo: [],
                 bg_auth: [],
                 bg_landing: []
@@ -175,7 +193,6 @@ export default defineComponent({
         getSetting() {
             ApiService.get("settings")
                 .then(({ data }) => {
-                    // Data dari API langsung dimasukkan ke formData
                     const val = data;
 
                     this.formData.app = val.app || "";
@@ -183,8 +200,8 @@ export default defineComponent({
                     this.formData.check_in_time = val.check_in_time || "14:00";
                     this.formData.check_out_time = val.check_out_time || "12:00";
                     
-                    // Ambil Fee, jika null/kosong set ke 0
                     this.formData.early_check_in_fee = val.early_check_in_fee || 0;
+                    this.formData.tax_rate = val.tax_rate || 0; // [BARU] Ambil Data Pajak
 
                     // Handle Preview Gambar
                     const timestamp = new Date().getTime();
@@ -213,35 +230,27 @@ export default defineComponent({
             formData.append("check_in_time", this.formData.check_in_time);
             formData.append("check_out_time", this.formData.check_out_time);
             
-            // Kirim Fee ke Backend
             formData.append("early_check_in_fee", this.formData.early_check_in_fee);
+            formData.append("tax_rate", this.formData.tax_rate); // [BARU] Kirim ke Backend
 
             // --- FUNGSI BANTUAN UNTUK EKSTRAK FILEPOND ---
             const appendFile = (key, fileArray) => {
                 if (fileArray && fileArray.length > 0) {
                     const item = fileArray[0];
-                    
-                    // Logika Deteksi: Apakah ini FilePond Wrapper?
                     if (item.file instanceof File) {
                         formData.append(key, item.file);
-                    } 
-                    // Atau apakah ini sudah native File?
-                    else if (item instanceof File) {
+                    } else if (item instanceof File) {
                         formData.append(key, item);
                     }
-                    // Jika string URL lama, diabaikan
                 }
             };
 
-            // Terapkan ke 3 file gambar
             appendFile("logo", this.formData.logo);
             appendFile("bg_auth", this.formData.bg_auth);
             appendFile("bg_landing", this.formData.bg_landing);
 
-            // Method Spoofing
             formData.append("_method", "POST");
 
-            // Kirim Request
             ApiService.post("/settings", formData, {
                 headers: {
                     "Content-Type": "multipart/form-data" 
@@ -261,7 +270,6 @@ export default defineComponent({
                 console.error("Error Response:", err);
                 const pesan = err.response?.data?.message || "Terjadi kesalahan.";
                 
-                // Debug log backend errors
                 if (err.response?.data?.errors) {
                     console.log("Validation Errors:", err.response.data.errors);
                 }
@@ -280,7 +288,6 @@ export default defineComponent({
         }   
     },
     mounted() {
-        // Panggil fungsi getSetting saat komponen selesai dimuat
         this.getSetting();
     }
 });
